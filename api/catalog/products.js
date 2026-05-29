@@ -1,0 +1,12 @@
+const { listProducts, json } = require('../_shared/catalog.cjs');
+
+module.exports = function handler(req, res) {
+  if (req.method !== 'GET') {
+    return json(res, 405, { success: false, error: 'Method not allowed' });
+  }
+  const products = listProducts({
+    category: req.query.category,
+    q: req.query.q,
+  });
+  return json(res, 200, { success: true, data: products, count: products.length });
+};
