@@ -1,4 +1,10 @@
 import type { CatalogCategory, CatalogProduct, DesignDraft, QuoteBreakdown } from '@app-types/catalog';
+import {
+  createLocalDesignDraft,
+  createLocalQuote,
+  localCategories,
+  localProductsForCategory,
+} from './local-fixtures';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -24,10 +30,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  categories: () => request<CatalogCategory[]>('/api/catalog/categories'),
+  categories: () =>
+    request<CatalogCategory[]>('/api/catalog/categories').catch(() => localCategories),
   products: (category?: string) => {
     const search = category ? `?category=${encodeURIComponent(category)}` : '';
-    return request<CatalogProduct[]>(`/api/catalog/products${search}`);
+    return request<CatalogProduct[]>(`/api/catalog/products${search}`).catch(() =>
+      localProductsForCategory(category)
+    );
   },
   quote: (body: {
     items: Array<{
@@ -41,10 +50,10 @@ export const api = {
     request<QuoteBreakdown>('/api/catalog/quotes', {
       method: 'POST',
       body: JSON.stringify(body),
-    }),
+    }).catch(() => createLocalQuote(body.items)),
   designDraft: (prompt: string) =>
     request<DesignDraft>('/api/design/drafts', {
       method: 'POST',
       body: JSON.stringify({ prompt }),
-    }),
+    }).catch(() => createLocalDesignDraft(prompt)),
 };
