@@ -1,0 +1,29 @@
+{
+  "name": "open-merch-studio",
+  "version": "0.1.0",
+  "description": "Open-source AI-first custom merch studio for curated Printful catalog fulfillment.",
+  "private": false,
+  "license": "MIT",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=20.19 <23",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "concurrently \"node \\\"$npm_execpath\\\" --workspace open-merch-studio-backend run dev\" \"node \\\"$npm_execpath\\\" --workspace open-merch-studio-frontend run dev\"",
+    "dev:backend": "node \"$npm_execpath\" --workspace open-merch-studio-backend run dev",
+    "dev:frontend": "node \"$npm_execpath\" --workspace open-merch-studio-frontend run dev",
+    "build": "node \"$npm_execpath\" --workspace open-merch-studio-backend run build && node \"$npm_execpath\" --workspace open-merch-studio-frontend run build",
+    "start": "node \"$npm_execpath\" --workspace open-merch-studio-backend run start",
+    "lint": "node \"$npm_execpath\" --workspace open-merch-studio-backend run lint && node \"$npm_execpath\" --workspace open-merch-studio-frontend run lint",
+    "type-check": "node \"$npm_execpath\" --workspace open-merch-studio-backend run type-check && node \"$npm_execpath\" --workspace open-merch-studio-frontend run type-check",
+    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test",
+    "db:generate": "node \"$npm_execpath\" --workspace open-merch-studio-backend run db:generate"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

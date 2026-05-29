@@ -1,0 +1,71 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "plugins": ["react", "react-hooks", "@typescript-eslint", "prettier"],
+  "rules": {
+    "prettier/prettier": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/prop-types": "off",
+    "react/no-unescaped-entities": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "prefer-spread": "off",
+    "linebreak-style": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.tsx"],
+      "excludedFiles": ["**/*.d.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "TSInterfaceDeclaration",
+            "message": "Inline interface declarations are not allowed in .tsx files. Move to adjacent *.types.ts or src/types/."
+          },
+          {
+            "selector": "TSTypeAliasDeclaration",
+            "message": "Inline type declarations are not allowed in .tsx files. Move to adjacent *.types.ts or src/types/."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/types/**/*.ts", "**/*.types.ts", "**/*.d.ts"],
+      "rules": {
+        "no-restricted-syntax": "off"
+      }
+    }
+  ]
+}
