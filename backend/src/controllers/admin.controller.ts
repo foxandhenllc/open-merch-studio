@@ -6,9 +6,9 @@ import {
   buildAdminReport,
   buildLaunchReadiness,
   getRuntimeSettings,
-  listOrders,
   updateRuntimeSettings,
 } from '../services/runtime-store.js';
+import { listOrderSummaries } from '../services/order.service.js';
 
 export const postCatalogSync = asyncHandler(async (_req: Request, res: Response) => {
   if (!env.printfulApiKey) {
@@ -34,7 +34,7 @@ export const patchAdminSettings = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getAdminOrders = asyncHandler(async (_req: Request, res: Response) => {
-  const orders = listOrders();
+  const orders = await listOrderSummaries();
   res.json({ success: true, data: orders, count: orders.length });
 });
 

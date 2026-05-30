@@ -95,6 +95,7 @@ const mapProduct = (product: ProductWithCatalog): CatalogProductDto => {
     categorySlug: product.category?.slug ?? null,
     categoryTitle: product.category?.title ?? null,
     isSellable: product.isSellable,
+    curationStatus: product.curationStatus,
     variants,
     placements,
   };

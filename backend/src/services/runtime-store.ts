@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { prisma } from '../config/database.js';
 import type {
   AdminReport,
   AdminSettings,
@@ -16,6 +17,7 @@ import type {
 type LedgerEvent = {
   id: string;
   sessionId: string;
+  designAssetId?: string;
   action: 'idea' | 'rough_draft' | 'edit' | 'final' | 'review' | 'mockup';
   provider: 'mock' | 'openai-ready' | 'openai' | 'fixture' | 'printful-ready' | 'printful';
   estimatedCostCents: number;
@@ -213,25 +215,65 @@ export function getAllowanceState(sessionId: string): AllowanceState {
   };
 }
 
-export function authorizeDesignAction(
+const startOfToday = (): Date => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+function runtimeSpendTotals(sessionId: string): { sessionSpend: number; dailySpend: number } {
+  const start = startOfToday().toISOString();
+  const todaysEvents = state.ledger.filter((event) => event.createdAt >= start);
+  return {
+    sessionSpend: todaysEvents
+      .filter((event) => event.sessionId === sessionId)
+      .reduce((total, event) => total + event.estimatedCostCents, 0),
+    dailySpend: todaysEvents.reduce((total, event) => total + event.estimatedCostCents, 0),
+  };
+}
+
+async function durableSpendTotals(
+  sessionId: string
+): Promise<{ sessionSpend: number; dailySpend: number }> {
+  if (!env.databaseUrl) return runtimeSpendTotals(sessionId);
+  const today = startOfToday();
+  try {
+    const [sessionTotal, dailyTotal] = await Promise.all([
+      prisma.aiSpendEvent.aggregate({
+        where: { sessionId, createdAt: { gte: today } },
+        _sum: { estimatedCostCents: true },
+      }),
+      prisma.aiSpendEvent.aggregate({
+        where: { createdAt: { gte: today } },
+        _sum: { estimatedCostCents: true },
+      }),
+    ]);
+    return {
+      sessionSpend: sessionTotal._sum.estimatedCostCents ?? 0,
+      dailySpend: dailyTotal._sum.estimatedCostCents ?? 0,
+    };
+  } catch {
+    return runtimeSpendTotals(sessionId);
+  }
+}
+
+export async function authorizeDesignAction(
   sessionId: string,
-  action: LedgerEvent['action']
-): { allowed: boolean; allowance: AllowanceState; message?: string } {
+  action: LedgerEvent['action'],
+  pendingCostCents = 0
+): Promise<{ allowed: boolean; allowance: AllowanceState; message?: string }> {
   const session = getOrCreateSession(sessionId);
   const allowance = getAllowanceState(session.id);
-  const sessionSpend = state.ledger
-    .filter((event) => event.sessionId === session.id)
-    .reduce((total, event) => total + event.estimatedCostCents, 0);
-  const dailySpend = state.ledger.reduce((total, event) => total + event.estimatedCostCents, 0);
+  const { sessionSpend, dailySpend } = await durableSpendTotals(session.id);
 
-  if (dailySpend >= state.settings.dailyAiBudgetCents) {
+  if (dailySpend + pendingCostCents > state.settings.dailyAiBudgetCents) {
     return {
       allowed: false,
       allowance,
       message: 'Daily design budget is paused. Try again later or contact support.',
     };
   }
-  if (sessionSpend >= state.settings.perSessionBudgetCents) {
+  if (sessionSpend + pendingCostCents > state.settings.perSessionBudgetCents) {
     return {
       allowed: false,
       allowance,
@@ -257,17 +299,19 @@ export function authorizeDesignAction(
   return { allowed: true, allowance };
 }
 
-export function recordDesignSpend(params: {
+export async function recordDesignSpend(params: {
   sessionId: string;
+  designAssetId?: string;
   action: LedgerEvent['action'];
   provider: LedgerEvent['provider'];
   estimatedCostCents: number;
-}) {
-  state.ledger.push({
+}): Promise<LedgerEvent> {
+  const event = {
     id: createId('ledger'),
     createdAt: nowIso(),
     ...params,
-  });
+  };
+  state.ledger.push(event);
 
   const session = getOrCreateSession(params.sessionId);
   const pass = getStudioPassForSession(session.id);
@@ -284,6 +328,37 @@ export function recordDesignSpend(params: {
   if (params.action === 'final' && pass) {
     state.passes.set(pass.id, { ...pass, finalsUsed: pass.finalsUsed + 1 });
   }
+  if (env.databaseUrl) {
+    try {
+      await prisma.studioSession.upsert({
+        where: { id: session.id },
+        update: {
+          freeDraftsUsed: getOrCreateSession(session.id).freeDraftsUsed,
+          freeDraftLimit: session.freeDraftLimit,
+        },
+        create: {
+          id: session.id,
+          status: session.status,
+          freeDraftsUsed: getOrCreateSession(session.id).freeDraftsUsed,
+          freeDraftLimit: session.freeDraftLimit,
+        },
+      });
+      await prisma.aiSpendEvent.create({
+        data: {
+          id: event.id,
+          sessionId: session.id,
+          designAssetId: params.designAssetId,
+          action: params.action,
+          provider: params.provider,
+          estimatedCostCents: params.estimatedCostCents,
+          createdAt: new Date(event.createdAt),
+        },
+      });
+    } catch {
+      // Runtime ledger remains the fallback source if persistence is unavailable.
+    }
+  }
+  return event;
 }
 
 export function saveIdea(idea: DesignIdea): DesignIdea {

@@ -39,7 +39,7 @@ export const postFixtureFulfillment = asyncHandler(async (req: Request, res: Res
 });
 
 export const getOrder = asyncHandler(async (req: Request, res: Response) => {
-  const order = getOrderSummary(String(req.params.orderId ?? ''));
+  const order = await getOrderSummary(String(req.params.orderId ?? ''));
   if (!order) {
     throw new HttpError('Order not found.', 404);
   }
@@ -52,7 +52,7 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
     req.header('stripe-signature') ?? undefined
   );
   if (event.type === 'checkout.session.completed') {
-    await handleStripeCheckoutCompleted(event.data.object);
+    await handleStripeCheckoutCompleted(event.data.object, event.id);
   }
   res.json({ received: true });
 });

@@ -37,6 +37,10 @@ model CatalogProduct {
   sellingRegion    String            @default("north_america")
   isSellable       Boolean           @default(false)
   isActive         Boolean           @default(true)
+  curationStatus   String            @default("unreviewed")
+  curatedAt        DateTime?
+  curatedBy        String?
+  curationNotes    String?
   metadata         Json?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -148,6 +152,10 @@ model DesignAsset {
   provider        String      @default("mock")
   imageUrl        String?
   transparentUrl  String?
+  generationStatus String      @default("complete")
+  policyStatus    String      @default("pass")
+  policyReport    Json?
+  failureReason   String?
   readinessStatus String      @default("pending")
   readinessReport Json?
   createdAt       DateTime    @default(now())
@@ -220,6 +228,7 @@ model MockupTask {
   placementCodes  String[]
   imageUrl        String?
   providerTaskId  String?
+  errorMessage    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -267,6 +276,7 @@ model Quote {
   expiresAt            DateTime
   createdAt            DateTime    @default(now())
   items                QuoteItem[]
+  orders               Order[]
 
   @@index([expiresAt])
   @@map("quotes")
@@ -306,6 +316,7 @@ model Order {
   currency        String      @default("USD")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  quote           Quote?      @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   items           OrderItem[]
   transitions     OrderTransition[]
   paymentEvents   PaymentEvent[]
