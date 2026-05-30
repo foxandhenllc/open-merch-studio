@@ -146,6 +146,29 @@ const moneySettings = {
   paymentFeeFixedCents: 30,
 };
 
+function envFlag(name, defaultValue = false) {
+  const value = process.env[name];
+  if (typeof value !== 'string') return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+}
+
+function publicAppMode() {
+  return String(process.env.PUBLIC_APP_MODE || process.env.VITE_PUBLIC_APP_MODE || '').toLowerCase();
+}
+
+function isProductionPublicMode() {
+  return publicAppMode() === 'production';
+}
+
+function publicCheckoutEnabled() {
+  if (!isProductionPublicMode()) return true;
+  return envFlag('ENABLE_PUBLIC_CHECKOUT') || envFlag('VITE_ENABLE_PUBLIC_CHECKOUT');
+}
+
+function checkoutDisabledMessage() {
+  return 'Paid checkout opens after final provider and support review.';
+}
+
 function listProducts({ category, q } = {}) {
   return products.filter((product) => {
     const categoryMatches = !category || product.categorySlug === category;
@@ -325,6 +348,15 @@ function createMockup(body = {}) {
 }
 
 function createStudioPassCheckout() {
+  if (!publicCheckoutEnabled()) {
+    return {
+      id: `checkout_${Date.now().toString(36)}`,
+      mode: 'stripe-ready',
+      status: 'blocked',
+      checkoutUrl: null,
+      message: checkoutDisabledMessage(),
+    };
+  }
   if (process.env.ENABLE_LIVE_STRIPE === 'true') {
     return {
       id: `checkout_${Date.now().toString(36)}`,
@@ -369,6 +401,17 @@ function fixtureOrder(quote, email) {
 }
 
 function createCheckout(body = {}) {
+  if (!publicCheckoutEnabled()) {
+    return {
+      id: `checkout_${Date.now().toString(36)}`,
+      mode: 'stripe-ready',
+      status: 'blocked',
+      checkoutUrl: null,
+      quoteId: body.quoteId || body.quote?.id,
+      studioPassId: body.studioPassId,
+      message: checkoutDisabledMessage(),
+    };
+  }
   if (process.env.ENABLE_LIVE_STRIPE === 'true') {
     return {
       id: `checkout_${Date.now().toString(36)}`,
@@ -435,7 +478,7 @@ function adminReport() {
       liveOpenAiEnabled: false,
       liveStripeEnabled: false,
       livePrintfulEnabled: false,
-      checkoutEnabled: true,
+      checkoutEnabled: publicCheckoutEnabled(),
       fulfillmentEnabled: false,
       defaultMarginPercent: 30,
       minMarginCents: 500,
@@ -485,6 +528,7 @@ module.exports = {
   createMockup,
   createStudioPassCheckout,
   createCheckout,
+  publicCheckoutEnabled,
   fixtureOrder,
   adminReport,
   launchReadiness,

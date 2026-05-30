@@ -20,6 +20,11 @@ Store all provider values in deployment-managed storage. Do not commit provider 
 
 Keep live behavior disabled until the private OPS checklist is complete.
 
+- `PUBLIC_APP_MODE=production`
+- `ENABLE_PUBLIC_CHECKOUT=false`
+- `VITE_PUBLIC_APP_MODE=production`
+- `VITE_ENABLE_PUBLIC_CHECKOUT=false`
+- `VITE_ENABLE_LOCAL_FALLBACKS=false`
 - `ENABLE_LIVE_OPENAI=false`
 - `ENABLE_LIVE_STRIPE=false`
 - `ENABLE_LIVE_PRINTFUL=false`
@@ -30,6 +35,8 @@ Keep live behavior disabled until the private OPS checklist is complete.
 - `FULFILLMENT_ENABLED=false`
 
 Preview deployments should not use production provider settings. Production checkout, live generation, and real fulfillment must remain separate switches. The backend contains guarded live adapters, but the Vercel fixture API remains public-safe and does not create live provider sessions.
+
+The current Vercel deployment shape is a static frontend plus lightweight `/api/*` functions. In production mode, those functions block simulated checkout unless `ENABLE_PUBLIC_CHECKOUT=true`. Do not turn that flag on until the full backend, Stripe webhooks, Printful fulfillment path, support policies, and launch smoke tests are approved.
 
 Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Keep it conservative in serverless environments and prefer long-running backend workers for production mockup generation.
 

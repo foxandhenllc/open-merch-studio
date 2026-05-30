@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ProductVisual } from '@components/ProductVisual';
+import { canUseCustomerCheckout, publicConfig } from './config';
 import { api } from '@services/api';
 import type {
   AdminReport,
@@ -49,6 +50,177 @@ const WORKFLOW = [
   { label: 'Checkout', hint: 'Transparent price' },
 ] as const;
 
+type PolicyRoute = {
+  title: string;
+  eyebrow: string;
+  summary: string;
+  sections: Array<{ heading: string; body: string }>;
+};
+
+const policyRoutes: Record<string, PolicyRoute> = {
+  '/privacy': {
+    eyebrow: 'Privacy',
+    title: 'Privacy Policy',
+    summary:
+      'Open Merch Studio is designed to keep early design exploration lightweight and avoid unnecessary private data collection.',
+    sections: [
+      {
+        heading: 'What we collect',
+        body:
+          'You can browse products, draft ideas, and preview the studio without creating an account. When paid checkout is enabled, the app may collect the contact, shipping, order, and payment information needed to complete and support an order.',
+      },
+      {
+        heading: 'Provider processing',
+        body:
+          'Production orders may use providers such as Stripe for payment, Printful for fulfillment, OpenAI for optional design assistance, and email delivery services for confirmations. Provider credentials and private account data are managed outside the public repository.',
+      },
+      {
+        heading: 'Customer data',
+        body:
+          'Do not enter private customer records, secrets, account IDs, payment data, or sensitive personal information into design prompts. Public demo and fixture flows use synthetic data only.',
+      },
+    ],
+  },
+  '/terms': {
+    eyebrow: 'Terms',
+    title: 'Terms of Use',
+    summary:
+      'Use Open Merch Studio to create original, rights-cleared merchandise designs and review all generated output before ordering.',
+    sections: [
+      {
+        heading: 'Design rights',
+        body:
+          'You are responsible for making sure your prompts, uploaded materials, and final designs are original or properly licensed. Do not request trademarked logos, copyrighted characters, or designs that impersonate another brand.',
+      },
+      {
+        heading: 'Generated output',
+        body:
+          'AI-assisted drafts are starting points. Designs may need human review, print-readiness checks, and provider mockup confirmation before production.',
+      },
+      {
+        heading: 'Orders',
+        body:
+          'Final prices, shipping, taxes, availability, production timelines, and fulfillment eligibility are confirmed during checkout once live provider integrations are enabled.',
+      },
+    ],
+  },
+  '/returns': {
+    eyebrow: 'Support',
+    title: 'Returns And Cancellations',
+    summary:
+      'Custom print-on-demand products require a clear review step before production because each item is made for the order.',
+    sections: [
+      {
+        heading: 'Before fulfillment',
+        body:
+          'If an order has not entered production, contact support as quickly as possible so the order can be reviewed or cancelled when provider status allows.',
+      },
+      {
+        heading: 'Custom products',
+        body:
+          'Because custom merchandise is produced for a specific design and recipient, buyer-remorse returns may not be available once production begins.',
+      },
+      {
+        heading: 'Defects or mistakes',
+        body:
+          'If an item arrives damaged, misprinted, or materially different from the approved order, contact support with the order number and clear photos so the issue can be reviewed with the fulfillment provider.',
+      },
+    ],
+  },
+  '/content-policy': {
+    eyebrow: 'Safety',
+    title: 'Content Policy',
+    summary:
+      'The studio is for original, safe, rights-cleared designs that can be responsibly printed and fulfilled.',
+    sections: [
+      {
+        heading: 'Disallowed requests',
+        body:
+          'Do not submit requests involving stolen IP, impersonation, hateful content, harassment, explicit sexual content, illegal goods or services, private personal data, or instructions that would create real-world harm.',
+      },
+      {
+        heading: 'Brand and IP review',
+        body:
+          'The studio may block or flag references to well-known brands, characters, teams, public figures, or other protected marks unless the customer can show appropriate rights.',
+      },
+      {
+        heading: 'Production review',
+        body:
+          'Open Merch Studio may refuse, pause, or request revision for any design that appears unsafe, infringing, unprintable, or outside fulfillment-provider rules.',
+      },
+    ],
+  },
+  '/support': {
+    eyebrow: 'Help',
+    title: 'Support',
+    summary: `For launch questions, order help, or production review, contact ${publicConfig.supportEmail}.`,
+    sections: [
+      {
+        heading: 'Before checkout is live',
+        body:
+          'You can use the studio to browse the catalog, explore ideas, and review transparent price estimates. Paid checkout opens after provider gates and launch operations are verified.',
+      },
+      {
+        heading: 'What to include',
+        body:
+          'For order support, include the order number, email used at checkout, product, design issue, and any relevant photos. Do not send API keys, passwords, tokens, invoices, or private provider account data.',
+      },
+    ],
+  },
+};
+
+function normalizedPathname() {
+  const pathname = window.location.pathname.replace(/\/+$/, '');
+  return pathname || '/';
+}
+
+function SiteFooter() {
+  return (
+    <footer className="site-footer">
+      <nav aria-label="Footer links">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/returns">Returns</a>
+        <a href="/content-policy">Content policy</a>
+        <a href="/support">Support</a>
+        {!publicConfig.isProductionMode && (
+          <>
+            <a href="https://github.com/foxandhenllc/open-merch-studio">GitHub</a>
+            <a href="https://github.com/foxandhenllc/open-merch-studio/blob/main/docs/tickets/launch/README.md">
+              Roadmap
+            </a>
+          </>
+        )}
+      </nav>
+      <span>{publicConfig.appName}</span>
+    </footer>
+  );
+}
+
+function PolicyPage({ route }: { route: PolicyRoute }) {
+  return (
+    <main className="policy-shell">
+      <section className="policy-hero">
+        <a className="back-link" href="/">
+          Back to studio
+        </a>
+        <p className="eyebrow">{route.eyebrow}</p>
+        <h1>{route.title}</h1>
+        <p>{route.summary}</p>
+      </section>
+      <section className="policy-content">
+        {route.sections.map((section) => (
+          <article key={section.heading}>
+            <h2>{section.heading}</h2>
+            <p>{section.body}</p>
+          </article>
+        ))}
+      </section>
+      <SiteFooter />
+    </main>
+  );
+}
+
 function StepBadge({
   index,
   label,
@@ -72,6 +244,7 @@ function StepBadge({
 }
 
 export default function App() {
+  const policyRoute = policyRoutes[normalizedPathname()];
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [session, setSession] = useState<StudioSession | null>(null);
@@ -95,8 +268,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (policyRoute) return undefined;
     let mounted = true;
-    Promise.all([api.categories(), api.products(), api.session(), api.adminReport()])
+    Promise.all([
+      api.categories(),
+      api.products(),
+      api.session(),
+      publicConfig.isProductionMode ? Promise.resolve(null) : api.adminReport(),
+    ])
       .then(([categoryData, productData, sessionData, reportData]) => {
         if (!mounted) return;
         setCategories(categoryData);
@@ -120,9 +299,10 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [policyRoute]);
 
   useEffect(() => {
+    if (policyRoute) return undefined;
     api
       .products(selectedCategory || undefined)
       .then((productData) => {
@@ -139,7 +319,8 @@ export default function App() {
         }
       })
       .catch((caught: Error) => setError(caught.message));
-  }, [selectedCategory, selectedProductId]);
+    return undefined;
+  }, [policyRoute, selectedCategory, selectedProductId]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -154,6 +335,10 @@ export default function App() {
   const step = quote ? 5 : mockup ? 4 : design ? 3 : idea ? 2 : selectedProduct ? 1 : 0;
   const selectedCategoryTitle =
     categories.find((category) => category.slug === selectedCategory)?.title ?? 'All products';
+  const checkoutUnavailable =
+    publicConfig.isProductionMode && !publicConfig.enablePublicCheckout
+      ? 'Paid checkout opens after final provider and support review.'
+      : null;
 
   const runAction = async <T,>(
     key: string,
@@ -239,6 +424,16 @@ export default function App() {
 
   const buyStudioPass = () => {
     if (!session) return;
+    if (!canUseCustomerCheckout) {
+      setCheckout({
+        id: 'checkout-disabled',
+        mode: 'stripe-ready',
+        status: 'blocked',
+        checkoutUrl: null,
+        message: checkoutUnavailable ?? 'Checkout is not available yet.',
+      });
+      return;
+    }
     runAction(
       'pass',
       () => api.studioPassCheckout(session.id),
@@ -309,6 +504,18 @@ export default function App() {
 
   const createCheckout = () => {
     if (!quote) return;
+    if (!canUseCustomerCheckout) {
+      setCheckout({
+        id: 'checkout-disabled',
+        mode: 'stripe-ready',
+        status: 'blocked',
+        checkoutUrl: null,
+        quoteId: quote.id,
+        studioPassId: studioPass?.id,
+        message: checkoutUnavailable ?? 'Checkout is not available yet.',
+      });
+      return;
+    }
     runAction(
       'checkout',
       () =>
@@ -336,6 +543,10 @@ export default function App() {
       }
     );
   };
+
+  if (policyRoute) {
+    return <PolicyPage route={policyRoute} />;
+  }
 
   if (loading) {
     return (
@@ -378,22 +589,31 @@ export default function App() {
             </div>
           </div>
           <nav className="top-actions" aria-label="Project links">
-            <a href="https://github.com/foxandhenllc/open-merch-studio">GitHub</a>
-            <a href="https://github.com/foxandhenllc/open-merch-studio/blob/main/docs/tickets/launch/README.md">
-              Roadmap
-            </a>
+            <a href="/support">Support</a>
+            <a href="/privacy">Privacy</a>
+            {!publicConfig.isProductionMode && (
+              <>
+                <a href="https://github.com/foxandhenllc/open-merch-studio">GitHub</a>
+                <a href="https://github.com/foxandhenllc/open-merch-studio/blob/main/docs/tickets/launch/README.md">
+                  Roadmap
+                </a>
+              </>
+            )}
           </nav>
         </div>
         <p className="hero-tagline">
-          Dream it, generate it, wear it. Pick a product, describe your idea, and watch AI turn it
-          into print-ready art on a real mockup. <strong>Free to start — no account needed.</strong>
+          {checkoutUnavailable
+            ? 'Dream it, generate it, and price it before the paid beta opens. Pick a product, describe your idea, and preview the path from concept to merch.'
+            : 'Dream it, generate it, wear it. Pick a product, describe your idea, and watch AI turn it into print-ready art on a real mockup.'}{' '}
+          <strong>Free to start — no account needed.</strong>
         </p>
         <ul className="value-pills" aria-label="What to expect">
           <li>
             <span aria-hidden="true">✨</span> Start free
           </li>
           <li>
-            <span aria-hidden="true">🎟️</span> $5 Studio Pass when you're ready
+            <span aria-hidden="true">🎟️</span>{' '}
+            {checkoutUnavailable ? '$5 Studio Pass · opening soon' : "$5 Studio Pass when you're ready"}
           </li>
           <li>
             <span aria-hidden="true">📦</span> 8 product types &amp; growing
@@ -411,7 +631,18 @@ export default function App() {
         </div>
       )}
 
-      <section className="launch-strip" aria-label="Launch status">
+      {checkoutUnavailable && (
+        <section className="customer-note" aria-label="Checkout status">
+          <strong>Paid checkout is not open yet.</strong>
+          <span>
+            You can still browse products, shape a design prompt, preview mockups, and review
+            pricing. Live payment and fulfillment will open after final provider review.
+          </span>
+        </section>
+      )}
+
+      {!publicConfig.isProductionMode && (
+        <section className="launch-strip" aria-label="Launch status">
         <div className="launch-strip__lead">
           <span className="launch-dot" aria-hidden="true" />
           <div>
@@ -429,7 +660,8 @@ export default function App() {
             </span>
           ))}
         </div>
-      </section>
+        </section>
+      )}
 
       <ol className="workflow-steps" aria-label="How it works">
         {WORKFLOW.map((item, index) => (
@@ -739,13 +971,21 @@ export default function App() {
             <button
               className="btn btn-primary btn-block"
               onClick={buyStudioPass}
-              disabled={busy !== null || passActive}
+              disabled={busy !== null || passActive || !canUseCustomerCheckout}
               type="button"
             >
-              {passActive ? 'Pass active ✓' : busy === 'pass' ? 'Activating…' : 'Get the Studio Pass'}
+              {passActive
+                ? 'Pass active ✓'
+                : checkoutUnavailable
+                  ? 'Pass checkout opens soon'
+                  : busy === 'pass'
+                    ? 'Activating…'
+                    : 'Get the Studio Pass'}
             </button>
             <small className="studio-pass-card__note">
-              Your first draft is always free. The pass only matters once you want to explore more.
+              {checkoutUnavailable
+                ? 'Your first draft stays free while we finish live checkout and fulfillment review.'
+                : 'Your first draft is always free. The pass only matters once you want to explore more.'}
             </small>
           </div>
 
@@ -778,24 +1018,28 @@ export default function App() {
             </div>
           )}
 
-          <label className="field-block" htmlFor="email">
-            <span>Email for confirmation</span>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-            />
-          </label>
+          {canUseCustomerCheckout && (
+            <label className="field-block" htmlFor="email">
+              <span>Email for confirmation</span>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+              />
+            </label>
+          )}
 
           <button
             className="btn btn-primary btn-block checkout-button"
             onClick={createCheckout}
-            disabled={busy !== null || !quote}
+            disabled={busy !== null || !quote || !canUseCustomerCheckout}
             type="button"
           >
-            {!quote
+            {checkoutUnavailable
+              ? 'Checkout opens soon'
+              : !quote
               ? 'Add a price to check out'
               : checkout?.mode === 'stripe'
                 ? 'Continue to secure checkout'
@@ -829,7 +1073,8 @@ export default function App() {
         </aside>
       </section>
 
-      <section className="ops-panel" aria-label="Operator readiness">
+      {!publicConfig.isProductionMode && (
+        <section className="ops-panel" aria-label="Operator readiness">
         <div className="ops-intro">
           <p className="eyebrow">Operator controls</p>
           <h2>Launch gates stay explicit</h2>
@@ -847,7 +1092,10 @@ export default function App() {
             </article>
           ))}
         </div>
-      </section>
+        </section>
+      )}
+
+      <SiteFooter />
     </main>
   );
 }

@@ -23,6 +23,7 @@ import {
   localCategories,
   localProductsForCategory,
 } from './local-fixtures';
+import { publicConfig } from '../config';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -47,13 +48,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
+function withFallback<T>(requestPromise: Promise<T>, fallback: () => T | Promise<T>): Promise<T> {
+  return requestPromise.catch((error) => {
+    if (!publicConfig.enableLocalFallbacks) {
+      throw error;
+    }
+    return fallback();
+  });
+}
+
 export const api = {
   categories: () =>
-    request<CatalogCategory[]>('/api/catalog/categories').catch(() => localCategories),
+    withFallback(request<CatalogCategory[]>('/api/catalog/categories'), () => localCategories),
   products: (category?: string) => {
     const search = category ? `?category=${encodeURIComponent(category)}` : '';
-    return request<CatalogProduct[]>(`/api/catalog/products${search}`).catch(() =>
-      localProductsForCategory(category)
+    return withFallback(
+      request<CatalogProduct[]>(`/api/catalog/products${search}`),
+      () => localProductsForCategory(category)
     );
   },
   quote: (body: {
@@ -67,25 +78,34 @@ export const api = {
       designAssetId?: string;
     }>;
   }) =>
-    request<QuoteBreakdown>('/api/catalog/quotes', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }).catch(() => createLocalQuote(body.items, body.studioPassId)),
+    withFallback(
+      request<QuoteBreakdown>('/api/catalog/quotes', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+      () => createLocalQuote(body.items, body.studioPassId)
+    ),
   session: (sessionId?: string) =>
-    request<StudioSession>('/api/design/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ sessionId }),
-    }).catch(() => createLocalSession()),
+    withFallback(
+      request<StudioSession>('/api/design/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId }),
+      }),
+      () => createLocalSession()
+    ),
   designIdea: (body: {
     prompt: string;
     sessionId?: string;
     productId?: string;
     placementCodes?: string[];
   }) =>
-    request<DesignIdea>('/api/design/ideas', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }).catch(() => createLocalDesignIdea(body.prompt, body.sessionId)),
+    withFallback(
+      request<DesignIdea>('/api/design/ideas', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+      () => createLocalDesignIdea(body.prompt, body.sessionId)
+    ),
   designDraft: (body: {
     prompt: string;
     sessionId?: string;
@@ -94,15 +114,21 @@ export const api = {
     placementCodes?: string[];
     qualityTier?: 'rough' | 'final';
   }) =>
-    request<DesignDraft>('/api/design/drafts', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }).catch(() => createLocalDesignDraft(body.prompt, body.sessionId)),
+    withFallback(
+      request<DesignDraft>('/api/design/drafts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+      () => createLocalDesignDraft(body.prompt, body.sessionId)
+    ),
   reviseDraft: (body: { draftId: string; instructions: string; sessionId?: string }) =>
-    request<DesignDraft>(`/api/design/drafts/${encodeURIComponent(body.draftId)}/revisions`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }).catch(() => createLocalDesignDraft(`${body.instructions}`, body.sessionId)),
+    withFallback(
+      request<DesignDraft>(`/api/design/drafts/${encodeURIComponent(body.draftId)}/revisions`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+      () => createLocalDesignDraft(`${body.instructions}`, body.sessionId)
+    ),
   mockup: (body: {
     sessionId?: string;
     productId: string;
@@ -111,15 +137,21 @@ export const api = {
     designAssetId?: string;
     imageUrl?: string;
   }) =>
-    request<DesignMockup>('/api/design/mockups', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }).catch(() => createLocalMockup(body)),
+    withFallback(
+      request<DesignMockup>('/api/design/mockups', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+      () => createLocalMockup(body)
+    ),
   studioPassCheckout: (sessionId: string) =>
-    request<CheckoutSession>('/api/studio-passes/checkout', {
-      method: 'POST',
-      body: JSON.stringify({ sessionId }),
-    }).catch(() => createLocalStudioPass(sessionId)),
+    withFallback(
+      request<CheckoutSession>('/api/studio-passes/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId }),
+      }),
+      () => createLocalStudioPass(sessionId)
+    ),
   checkout: (body: {
     quote: QuoteBreakdown;
     quoteId?: string | null;
@@ -128,15 +160,19 @@ export const api = {
     email?: string;
     designAssetId?: string;
   }) =>
-    request<CheckoutSession>('/api/checkout/sessions', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }).catch(() => createLocalCheckout(body.quote, body.email)),
+    withFallback(
+      request<CheckoutSession>('/api/checkout/sessions', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+      () => createLocalCheckout(body.quote, body.email)
+    ),
   order: (orderId: string) =>
-    request<OrderSummary>(`/api/orders/${encodeURIComponent(orderId)}`).catch(() => {
+    withFallback(request<OrderSummary>(`/api/orders/${encodeURIComponent(orderId)}`), () => {
       const order = getLocalOrder();
       if (!order) throw new Error('Order not found.');
       return order;
     }),
-  adminReport: (): Promise<AdminReport> => Promise.resolve(localAdminReport),
+  adminReport: (): Promise<AdminReport> =>
+    withFallback(request<AdminReport>('/api/admin/report'), () => localAdminReport),
 };

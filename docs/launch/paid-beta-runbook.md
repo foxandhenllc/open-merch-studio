@@ -10,6 +10,11 @@ Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea r
 
 Live provider behavior must stay behind explicit environment gates.
 
+- `PUBLIC_APP_MODE=production` switches the public app into customer-facing mode and hides OSS/operator-only surfaces.
+- `ENABLE_PUBLIC_CHECKOUT=false` blocks Studio Pass purchase and merchandise checkout until launch approval.
+- `VITE_PUBLIC_APP_MODE=production` should be set for the production frontend build.
+- `VITE_ENABLE_PUBLIC_CHECKOUT=false` keeps checkout controls disabled for public visitors.
+- `VITE_ENABLE_LOCAL_FALLBACKS=false` prevents browser-only fixture fallbacks from masking production API failures.
 - `ENABLE_LIVE_OPENAI=false` keeps design generation in mock mode.
 - `ENABLE_LIVE_STRIPE=false` keeps Studio Pass and merchandise checkout in fixture mode.
 - `ENABLE_LIVE_PRINTFUL=false` keeps fulfillment in fixture mode.
@@ -19,7 +24,7 @@ Live provider behavior must stay behind explicit environment gates.
 - `PRINTFUL_MOCKUP_TIMEOUT_MS=180000` caps live Printful mockup task polling.
 - `FULFILLMENT_ENABLED=false` prevents real fulfillment activation.
 
-Do not enable these gates until the matching private OPS tickets are reviewed, the database migration has been applied, Stripe webhooks are verified, and provider test runs are captured.
+Do not enable these gates until the matching private OPS tickets are reviewed, the database migration has been applied, Stripe webhooks are verified, and provider test runs are captured. Public production deployments can safely allow browsing, design exploration, mockup preview, and quoting while checkout remains closed.
 
 ## Fixture Smoke Test
 
@@ -46,6 +51,7 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 - Fixture mode works from a clean clone.
 - `backend/prisma/migrations/20260529180000_paid_beta_foundation/migration.sql` has been applied to the intended database.
 - Preview and production environments are separated.
+- Production has `PUBLIC_APP_MODE=production`, `VITE_PUBLIC_APP_MODE=production`, `ENABLE_PUBLIC_CHECKOUT=false`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
 - Stripe Checkout Sessions and webhooks are implemented in the backend with idempotent session creation and must be verified with Stripe test mode before live checkout. Refunds, tax/accounting handling, and support paths still require private operator sign-off.
 - OpenAI provider calls are implemented behind a gate with prompt moderation and product-neutral print prompt shaping. Budget caps, spend alerts, and pause steps must be verified before live generation.
 - Printful catalog sync, mockup task polling, duplicate draft-order recovery, confirmation polling, and draft-order creation are implemented behind gates. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.

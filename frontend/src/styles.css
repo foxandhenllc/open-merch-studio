@@ -153,10 +153,14 @@ a {
 }
 
 .hero,
+.customer-note,
 .launch-strip,
 .workflow-steps,
 .shop-grid,
-.ops-panel {
+.ops-panel,
+.site-footer,
+.policy-hero,
+.policy-content {
   width: min(1560px, 100%);
   margin-inline: auto;
 }
@@ -330,6 +334,31 @@ h3 {
 .notice-info {
   border-color: var(--border-strong);
   background: var(--surface-soft);
+}
+
+/* ---------- Customer status ---------- */
+.customer-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 251, 235, 0.88);
+  box-shadow: var(--shadow-sm);
+}
+
+.customer-note strong {
+  flex: 0 0 auto;
+  color: var(--warn-ink);
+  font-size: 14px;
+}
+
+.customer-note span {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.45;
 }
 
 /* ---------- Launch strip ---------- */
@@ -1359,8 +1388,94 @@ button:disabled {
   line-height: 1.45;
 }
 
+/* ---------- Footer and policy pages ---------- */
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+  padding: 16px 4px 0;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.site-footer a {
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--brand-strong);
+}
+
+.policy-shell {
+  min-height: 100vh;
+  padding: 26px 22px 40px;
+}
+
+.policy-hero {
+  margin-bottom: 16px;
+  padding: 24px 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.8));
+  box-shadow: var(--shadow-sm);
+}
+
+.policy-hero h1 {
+  margin-bottom: 10px;
+}
+
+.policy-hero p:last-child {
+  max-width: 72ch;
+  margin-bottom: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.back-link {
+  display: inline-flex;
+  margin-bottom: 16px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--brand-strong);
+}
+
+.policy-content {
+  display: grid;
+  gap: 12px;
+}
+
+.policy-content article {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.policy-content p {
+  margin-bottom: 0;
+  color: var(--ink-soft);
+  line-height: 1.58;
+}
+
 /* ---------- Responsive ---------- */
-@media (max-width: 1260px) {
+@media (max-width: 1380px) {
   .shop-grid {
     grid-template-columns: minmax(280px, 320px) 1fr;
   }
@@ -1390,6 +1505,7 @@ button:disabled {
     align-items: flex-start;
     gap: 14px;
   }
+  .customer-note,
   .launch-strip,
   .ops-panel {
     flex-direction: column;
@@ -1413,6 +1529,10 @@ button:disabled {
   }
   .check-row span:last-child {
     grid-column: 2;
+  }
+  .site-footer {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
