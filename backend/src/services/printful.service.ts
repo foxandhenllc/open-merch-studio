@@ -111,6 +111,16 @@ function unwrapPrintfulResponse<T>(data: unknown): T {
   return (response?.result ?? response?.data ?? data) as T;
 }
 
+function isPublicHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const localHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+    return ['http:', 'https:'].includes(url.protocol) && !localHosts.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 const COUNTRY_CODE_MAP: Record<string, string> = {
   'UNITED STATES': 'US',
   'UNITED STATES OF AMERICA': 'US',
@@ -198,6 +208,9 @@ const providerPriceToAmount = (variant: PrintfulVariant): number => {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 };
 
+const curatedPrintfulProductIds = () =>
+  new Set(env.printfulCuratedProductIds.slice(0, env.printfulMaxLaunchProducts).map(String));
+
 async function fetchAll<T>(client: AxiosInstance, path: string): Promise<T[]> {
   const limit = 100;
   let offset = 0;
@@ -265,6 +278,18 @@ export async function syncPrintfulCatalog(): Promise<{
 
     for (const product of products) {
       const title = product.title ?? product.name ?? `Printful product ${product.id}`;
+      const explicitCuratedIds = curatedPrintfulProductIds();
+      const isExplicitlyCurated = explicitCuratedIds.has(String(product.id));
+      const existingProduct = await prisma.catalogProduct.findUnique({
+        where: { printfulId: product.id },
+        select: {
+          isSellable: true,
+          curationStatus: true,
+          curatedAt: true,
+          curatedBy: true,
+          curationNotes: true,
+        },
+      });
       const productCategories = await fetchAll<PrintfulCategory>(
         client,
         `/v2/catalog-products/${product.id}/catalog-categories`
@@ -275,6 +300,27 @@ export async function syncPrintfulCatalog(): Promise<{
       const categoryId =
         (launchCategory ? categoryByPrintfulId.get(launchCategory.id) : undefined) ??
         (productCategories[0] ? categoryByPrintfulId.get(productCategories[0].id) : undefined);
+      const hasExplicitCurationList = env.printfulCuratedProductIds.length > 0;
+      const isSellable = hasExplicitCurationList
+        ? isExplicitlyCurated
+        : (existingProduct?.isSellable ?? false);
+      const curationStatus = isSellable
+        ? 'curated'
+        : (existingProduct?.curationStatus ?? 'unreviewed');
+      const curatedAt = isExplicitlyCurated
+        ? (existingProduct?.curatedAt ?? new Date())
+        : existingProduct?.curatedAt;
+      const curatedBy = isExplicitlyCurated
+        ? (existingProduct?.curatedBy ?? 'PRINTFUL_CURATED_PRODUCT_IDS')
+        : existingProduct?.curatedBy;
+      const curationNotes = isExplicitlyCurated
+        ? (existingProduct?.curationNotes ?? 'Selected for the paid-beta curated launch catalog.')
+        : existingProduct?.curationNotes;
+      const metadata = {
+        printfulCategories: productCategories.map((category) => category.title),
+        launchCategoryMatched: Boolean(launchCategory),
+        explicitCurationListConfigured: hasExplicitCurationList,
+      };
 
       const createdProduct = await prisma.catalogProduct.upsert({
         where: { printfulId: product.id },
@@ -286,9 +332,13 @@ export async function syncPrintfulCatalog(): Promise<{
           thumbnailUrl: product.thumbnail_url ?? product.image ?? null,
           categoryId,
           sellingRegion: env.printfulSellingRegion,
-          isSellable: Boolean(launchCategory),
+          isSellable,
+          curationStatus,
+          curatedAt,
+          curatedBy,
+          curationNotes,
           isActive: true,
-          metadata: { printfulCategories: productCategories.map((category) => category.title) },
+          metadata,
         },
         create: {
           printfulId: product.id,
@@ -299,9 +349,13 @@ export async function syncPrintfulCatalog(): Promise<{
           thumbnailUrl: product.thumbnail_url ?? product.image ?? null,
           categoryId,
           sellingRegion: env.printfulSellingRegion,
-          isSellable: Boolean(launchCategory),
+          isSellable,
+          curationStatus,
+          curatedAt,
+          curatedBy,
+          curationNotes,
           isActive: true,
-          metadata: { printfulCategories: productCategories.map((category) => category.title) },
+          metadata,
         },
       });
 
@@ -469,6 +523,7 @@ export async function syncFixtureCatalog(): Promise<{
           thumbnailUrl: product.thumbnailUrl,
           categoryId: product.categorySlug ? categoryIds.get(product.categorySlug) : undefined,
           isSellable: product.isSellable,
+          curationStatus: product.isSellable ? 'fixture-curated' : 'fixture-hidden',
           isActive: true,
           metadata: { source: 'fixture' },
         },
@@ -482,6 +537,7 @@ export async function syncFixtureCatalog(): Promise<{
           thumbnailUrl: product.thumbnailUrl,
           categoryId: product.categorySlug ? categoryIds.get(product.categorySlug) : undefined,
           isSellable: product.isSellable,
+          curationStatus: product.isSellable ? 'fixture-curated' : 'fixture-hidden',
           isActive: true,
           metadata: { source: 'fixture' },
         },
@@ -596,6 +652,27 @@ export function buildPrintfulOrderPayload(params: {
   };
   artworkUrl: string;
 }): Record<string, unknown> {
+  if (!isPublicHttpUrl(params.artworkUrl)) {
+    throw new Error('Printful orders require a public HTTP(S) artwork URL.');
+  }
+  if (!params.recipient.name || !params.recipient.address1 || !params.recipient.city) {
+    throw new Error('Printful orders require recipient name, address, and city.');
+  }
+  if (!normalizeCountryCode(params.recipient.countryCode) || !params.recipient.zip) {
+    throw new Error('Printful orders require recipient country and postal code.');
+  }
+  for (const item of params.quote.items) {
+    if (!item.printfulVariantId) {
+      throw new Error(`Printful catalog variant ID is missing for ${item.title}.`);
+    }
+    if (!item.placementCodes.length) {
+      throw new Error(`Printful placement is missing for ${item.title}.`);
+    }
+    if (item.quantity <= 0 || item.unitRetailCents <= 0) {
+      throw new Error(`Printful order item ${item.title} has invalid quantity or price.`);
+    }
+  }
+
   return {
     recipient: {
       name: params.recipient.name,
@@ -645,32 +722,6 @@ async function fetchPrintfulOrderByExternalId(
   }
 }
 
-async function waitForPrintfulOrderReady(
-  client: AxiosInstance,
-  providerOrderId: string,
-  attempts = 6,
-  delayMs = 3000
-): Promise<PrintfulOrderResponse | null> {
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const response = await client.get(`/v2/orders/${providerOrderId}`);
-    const order = unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
-    const calculationStatus = order?.retail_costs?.calculation_status;
-    if (!calculationStatus || calculationStatus === 'done') {
-      return order;
-    }
-    await sleep(delayMs);
-  }
-  return null;
-}
-
-async function confirmPrintfulOrder(
-  client: AxiosInstance,
-  providerOrderId: string
-): Promise<PrintfulOrderResponse> {
-  const response = await client.post(`/v2/orders/${providerOrderId}/confirmation`);
-  return unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
-}
-
 export async function submitPrintfulDraftOrder(params: {
   quote: QuoteBreakdown;
   orderNumber: string;
@@ -688,6 +739,11 @@ export async function submitPrintfulDraftOrder(params: {
   if (!env.printfulApiKey || !env.enableLivePrintful || !env.allowLiveFulfillment) {
     throw new Error(
       'Printful live fulfillment requires PRINTFUL_API_KEY, ENABLE_LIVE_PRINTFUL, and ALLOW_LIVE_FULFILLMENT.'
+    );
+  }
+  if (env.printfulAutoConfirmOrders) {
+    throw new Error(
+      'Printful auto-confirm is disabled for paid beta. Set PRINTFUL_AUTO_CONFIRM_ORDERS=false and review draft orders manually.'
     );
   }
 
@@ -728,43 +784,7 @@ export async function submitPrintfulDraftOrder(params: {
     throw new Error('Printful order creation did not return an order ID.');
   }
 
-  let status = String(order?.status ?? 'draft');
-  let confirmed = false;
-  if (env.printfulAutoConfirmOrders) {
-    await waitForPrintfulOrderReady(client, providerOrderId);
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= 8; attempt += 1) {
-      try {
-        const confirmedOrder = await confirmPrintfulOrder(client, providerOrderId);
-        status = String(confirmedOrder?.status ?? 'pending');
-        confirmed = true;
-        break;
-      } catch (error) {
-        lastError = error;
-        const message =
-          axios.isAxiosError(error) && typeof error.response?.data === 'object'
-            ? JSON.stringify(error.response.data)
-            : error instanceof Error
-              ? error.message
-              : 'Printful confirmation failed.';
-        if (
-          !message.includes('calculations still running') &&
-          !message.includes('design is still processing')
-        ) {
-          throw error;
-        }
-        await waitForPrintfulOrderReady(client, providerOrderId, 3, 5000);
-        await sleep(Math.min(15000, 3000 * attempt));
-      }
-    }
-    if (!confirmed) {
-      throw lastError instanceof Error
-        ? lastError
-        : new Error('Failed to confirm Printful order after retries.');
-    }
-  }
-
-  return { providerOrderId, status, confirmed };
+  return { providerOrderId, status: String(order?.status ?? 'draft'), confirmed: false };
 }
 
 export async function fetchPrintfulOrderStatus(
@@ -925,8 +945,8 @@ export async function generatePrintfulMockupPreview(params: {
   if (!env.printfulApiKey || !env.enableLivePrintful) {
     throw new Error('Printful live mockups require PRINTFUL_API_KEY and ENABLE_LIVE_PRINTFUL.');
   }
-  if (!/^https?:\/\//.test(params.designImageUrl)) {
-    throw new Error('Printful live mockups require a public HTTP artwork URL.');
+  if (!isPublicHttpUrl(params.designImageUrl)) {
+    throw new Error('Printful live mockups require a public HTTP(S) artwork URL.');
   }
 
   const client = createPrintfulClient();

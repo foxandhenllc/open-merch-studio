@@ -31,6 +31,7 @@ export type CatalogProductDto = {
   categorySlug?: string | null;
   categoryTitle?: string | null;
   isSellable: boolean;
+  curationStatus?: string | null;
   variants: CatalogVariantDto[];
   placements: PlacementOption[];
 };
@@ -173,6 +174,7 @@ export type DesignMockup = {
   placementCodes: string[];
   designAssetId?: string;
   imageUrl: string;
+  errorMessage?: string;
   createdAt: string;
 };
 

@@ -2,15 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildQuoteBreakdown } from '../services/pricing.service.js';
 import { sampleCatalog } from '../services/catalog-fixtures.js';
+import { env } from '../config/env.js';
 import {
   buildPrintfulOrderPayload,
   mapPrintfulOrderStatus,
   normalizeCountryCode,
   normalizeStateCode,
+  submitPrintfulDraftOrder,
 } from '../services/printful.service.js';
 
 test('buildPrintfulOrderPayload keeps placement and retail quote details', () => {
-  const product = sampleCatalog.products[1];
+  const baseProduct = sampleCatalog.products[1];
+  const product = {
+    ...baseProduct,
+    variants: baseProduct.variants.map((variant) => ({
+      ...variant,
+      printfulVariantId: 123456,
+    })),
+  };
   const variant = product.variants[0];
   const quote = buildQuoteBreakdown(
     [product],
@@ -45,6 +54,113 @@ test('buildPrintfulOrderPayload keeps placement and retail quote details', () =>
   assert.equal(payload.order_items[0].placements[0].placement, 'embroidery_front');
   assert.equal(payload.order_items[0].placements[0].technique, 'embroidery');
   assert.equal(payload.retail_costs.total, (quote.totalCents / 100).toFixed(2));
+});
+
+test('buildPrintfulOrderPayload rejects missing fulfillment data', () => {
+  const product = sampleCatalog.products[1];
+  const variant = product.variants[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: ['embroidery_front'],
+      },
+    ]
+  );
+
+  assert.throws(
+    () =>
+      buildPrintfulOrderPayload({
+        quote,
+        artworkUrl: 'https://example.com/artwork.png',
+        recipient: {
+          name: 'Example Customer',
+          address1: '1 Main St',
+          city: 'Boston',
+          stateCode: 'MA',
+          countryCode: 'US',
+          zip: '02108',
+        },
+      }),
+    /catalog variant ID/
+  );
+  assert.throws(
+    () =>
+      buildPrintfulOrderPayload({
+        quote: { ...quote, items: [{ ...quote.items[0], printfulVariantId: 123456 }] },
+        artworkUrl: 'data:image/png;base64,abc123',
+        recipient: {
+          name: 'Example Customer',
+          address1: '1 Main St',
+          city: 'Boston',
+          stateCode: 'MA',
+          countryCode: 'US',
+          zip: '02108',
+        },
+      }),
+    /public HTTP/
+  );
+});
+
+test('submitPrintfulDraftOrder refuses auto-confirm during paid beta', async () => {
+  const original = {
+    printfulApiKey: env.printfulApiKey,
+    enableLivePrintful: env.enableLivePrintful,
+    allowLiveFulfillment: env.allowLiveFulfillment,
+    printfulAutoConfirmOrders: env.printfulAutoConfirmOrders,
+  };
+  const baseProduct = sampleCatalog.products[1];
+  const product = {
+    ...baseProduct,
+    variants: baseProduct.variants.map((variant) => ({
+      ...variant,
+      printfulVariantId: 123456,
+    })),
+  };
+  const variant = product.variants[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: ['embroidery_front'],
+      },
+    ]
+  );
+
+  env.printfulApiKey = 'test-printful-key';
+  env.enableLivePrintful = true;
+  env.allowLiveFulfillment = true;
+  env.printfulAutoConfirmOrders = true;
+  try {
+    await assert.rejects(
+      () =>
+        submitPrintfulDraftOrder({
+          quote,
+          orderNumber: 'OMS-TEST-AUTOCONFIRM',
+          artworkUrl: 'https://example.com/artwork.png',
+          recipient: {
+            name: 'Example Customer',
+            address1: '1 Main St',
+            city: 'Boston',
+            stateCode: 'MA',
+            countryCode: 'US',
+            zip: '02108',
+          },
+        }),
+      /auto-confirm is disabled/
+    );
+  } finally {
+    env.printfulApiKey = original.printfulApiKey;
+    env.enableLivePrintful = original.enableLivePrintful;
+    env.allowLiveFulfillment = original.allowLiveFulfillment;
+    env.printfulAutoConfirmOrders = original.printfulAutoConfirmOrders;
+  }
 });
 
 test('Printful helpers normalize shipping codes and provider statuses', () => {

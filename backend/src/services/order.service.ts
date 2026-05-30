@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import type { Prisma } from '@prisma/client';
 import { getProductBySlug, listProducts } from './catalog.service.js';
 import {
   buildPrintfulOrderPayload,
@@ -13,11 +14,13 @@ import {
   getRuntimeSettings,
   getStudioPassById,
   getStudioPassForSession,
+  listOrders,
+  saveQuote,
   runtimeId,
   runtimeNow,
   saveOrder,
 } from './runtime-store.js';
-import type { CheckoutSession, OrderSummary, QuoteBreakdown } from '../types/catalog.js';
+import type { CheckoutSession, MoneyLine, OrderSummary, QuoteBreakdown } from '../types/catalog.js';
 import {
   canCreateStripeCheckout,
   createMerchCheckoutSession,
@@ -38,6 +41,28 @@ type CheckoutInput = {
 const orderNumber = () =>
   `OMS-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
+const quoteInclude = {
+  items: {
+    include: {
+      product: true,
+      variant: true,
+    },
+  },
+} satisfies Prisma.QuoteInclude;
+
+type PersistedQuote = Prisma.QuoteGetPayload<{ include: typeof quoteInclude }>;
+
+const orderInclude = {
+  quote: {
+    include: quoteInclude,
+  },
+  transitions: {
+    orderBy: { createdAt: 'asc' },
+  },
+} satisfies Prisma.OrderInclude;
+
+type PersistedOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+
 const prismaOrderStatus = (status: OrderSummary['status']) => {
   if (status === 'checkout_pending') return 'PENDING_PAYMENT';
   if (status === 'paid' || status === 'needs_review' || status === 'failed') return 'PAID';
@@ -47,6 +72,200 @@ const prismaOrderStatus = (status: OrderSummary['status']) => {
   if (status === 'refunded') return 'REFUNDED';
   return 'DRAFT';
 };
+
+function runtimeOrderStatus(status: string): OrderSummary['status'] {
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return 'checkout_pending';
+    case 'PAID':
+      return 'paid';
+    case 'SUBMITTED':
+      return 'submitted';
+    case 'SHIPPED':
+      return 'shipped';
+    case 'CANCELLED':
+      return 'cancelled';
+    case 'REFUNDED':
+      return 'refunded';
+    case 'QUOTED':
+      return 'quoted';
+    case 'DRAFT':
+    default:
+      return 'draft';
+  }
+}
+
+function runtimeFulfillmentStatus(
+  status: string | null | undefined
+): OrderSummary['fulfillment']['status'] {
+  switch (status) {
+    case 'validated':
+    case 'submitted':
+    case 'failed':
+    case 'needs_review':
+      return status;
+    default:
+      return 'not_submitted';
+  }
+}
+
+function jsonArray<T>(value: Prisma.JsonValue | null | undefined, fallback: T[]): T[] {
+  return Array.isArray(value) ? (value as T[]) : fallback;
+}
+
+function estimateFlags(
+  value: Prisma.JsonValue | null | undefined
+): QuoteBreakdown['estimateFlags'] {
+  const flags = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    shipping: Boolean((flags as Partial<QuoteBreakdown['estimateFlags']>).shipping ?? true),
+    tax: Boolean((flags as Partial<QuoteBreakdown['estimateFlags']>).tax ?? true),
+    paymentFee: Boolean((flags as Partial<QuoteBreakdown['estimateFlags']>).paymentFee ?? true),
+  };
+}
+
+function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
+  return {
+    id: quote.id,
+    currency: quote.currency,
+    productCostCents: quote.productCostCents,
+    shippingEstimateCents: quote.shippingEstimateCents,
+    taxEstimateCents: quote.taxEstimateCents,
+    aiDesignFeeCents: quote.aiDesignFeeCents,
+    paymentFeeCents: quote.paymentFeeCents,
+    targetMarginCents: quote.targetMarginCents,
+    studioPassCreditCents: quote.studioPassCreditCents,
+    totalCents: quote.totalCents,
+    subtotalBeforeCreditsCents: quote.subtotalBeforeCreditsCents,
+    estimateFlags: estimateFlags(quote.estimateFlags),
+    costLines: jsonArray<MoneyLine>(quote.costLines, []),
+    expiresAt: quote.expiresAt.toISOString(),
+    items: quote.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      printfulVariantId: item.variant.printfulVariantId,
+      title: item.product.title,
+      variantName: item.variant.name,
+      quantity: item.quantity,
+      placementCodes: item.placementCodes,
+      designAssetId: item.designAssetId ?? undefined,
+      unitCostCents: item.unitCostCents,
+      unitRetailCents: item.unitRetailCents,
+    })),
+  };
+}
+
+async function loadQuoteForCheckout(quoteId?: string | null): Promise<QuoteBreakdown | undefined> {
+  const runtimeQuote = getQuote(quoteId);
+  if (runtimeQuote || !quoteId || !env.databaseUrl) return runtimeQuote;
+
+  try {
+    const persisted = await prisma.quote.findUnique({
+      where: { id: quoteId },
+      include: quoteInclude,
+    });
+    if (!persisted) return undefined;
+    return saveQuote(mapPersistedQuote(persisted));
+  } catch {
+    return undefined;
+  }
+}
+
+function mapPersistedOrder(order: PersistedOrder): OrderSummary {
+  const quote = order.quote ? mapPersistedQuote(order.quote) : undefined;
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: runtimeOrderStatus(order.status),
+    customerEmail: order.email ?? undefined,
+    totalCents: order.totalCents,
+    currency: order.currency,
+    quote,
+    designAssetId: quote?.items.find((item) => item.designAssetId)?.designAssetId,
+    fulfillment: {
+      provider: order.printfulOrderId ? 'printful' : 'printful-ready',
+      status: runtimeFulfillmentStatus(order.fulfillmentStatus),
+      message: order.printfulOrderId
+        ? `Printful order ${order.printfulOrderId} is attached.`
+        : 'Loaded from persistent checkout state.',
+    },
+    timeline: order.transitions.map((transition) => ({
+      at: transition.createdAt.toISOString(),
+      status: transition.status,
+      note: transition.note ?? '',
+    })),
+    createdAt: order.createdAt.toISOString(),
+  };
+}
+
+async function loadOrder(orderId: string): Promise<OrderSummary | undefined> {
+  const runtimeOrder = getOrder(orderId);
+  if (runtimeOrder || !env.databaseUrl) return runtimeOrder;
+
+  try {
+    const persisted = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: orderInclude,
+    });
+    if (!persisted) return undefined;
+    return saveOrder(mapPersistedOrder(persisted));
+  } catch {
+    return undefined;
+  }
+}
+
+type CheckoutDesignState = {
+  id: string;
+  imageUrl?: string | null;
+  generationStatus: string;
+  policyStatus: string;
+  readinessStatus: string;
+};
+
+async function loadDesignForCheckout(
+  designAssetId: string
+): Promise<CheckoutDesignState | undefined> {
+  const draft = getDraft(designAssetId);
+  if (draft) {
+    return {
+      id: designAssetId,
+      imageUrl: draft.imageUrl,
+      generationStatus: draft.id ? 'complete' : 'failed',
+      policyStatus: draft.policy.status,
+      readinessStatus: draft.readiness.status,
+    };
+  }
+
+  if (!env.databaseUrl) return undefined;
+  try {
+    const asset = await prisma.designAsset.findUnique({ where: { id: designAssetId } });
+    if (!asset) return undefined;
+    return {
+      id: asset.id,
+      imageUrl: asset.transparentUrl ?? asset.imageUrl,
+      generationStatus: asset.generationStatus,
+      policyStatus: asset.policyStatus,
+      readinessStatus: asset.readinessStatus,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function checkoutDesignIssue(design: CheckoutDesignState | undefined): string | null {
+  if (!design) return 'Selected artwork could not be verified for checkout.';
+  if (!design.imageUrl) return 'Selected artwork is missing a generated or uploaded image.';
+  if (design.generationStatus !== 'complete') {
+    return 'Selected artwork has not completed generation successfully.';
+  }
+  if (design.policyStatus !== 'pass') {
+    return 'Selected artwork needs policy review before checkout.';
+  }
+  if (design.readinessStatus !== 'pass') {
+    return 'Selected artwork must pass print-readiness checks before checkout.';
+  }
+  return null;
+}
 
 function transition(
   order: OrderSummary,
@@ -62,51 +281,85 @@ function transition(
 
 async function persistOrder(order: OrderSummary, stripeSessionId?: string): Promise<void> {
   if (!env.databaseUrl || !order.quote?.id) return;
-  await prisma.order.upsert({
-    where: { id: order.id },
-    update: {
-      email: order.customerEmail,
-      status: prismaOrderStatus(order.status),
-      stripeSessionId,
-      fulfillmentStatus: order.fulfillment.status,
-      totalCents: order.totalCents,
-      currency: order.currency,
-    },
-    create: {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      quoteId: order.quote.id,
-      email: order.customerEmail,
-      status: prismaOrderStatus(order.status),
-      stripeSessionId,
-      fulfillmentStatus: order.fulfillment.status,
-      totalCents: order.totalCents,
-      currency: order.currency,
-      items: {
-        create: order.quote.items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          designAssetId: item.designAssetId,
-          quantity: item.quantity,
-          placementCodes: item.placementCodes,
-          unitRetailCents: item.unitRetailCents,
-          printfulPayload: {},
-        })),
+  try {
+    await prisma.order.upsert({
+      where: { id: order.id },
+      update: {
+        email: order.customerEmail,
+        status: prismaOrderStatus(order.status),
+        stripeSessionId,
+        fulfillmentStatus: order.fulfillment.status,
+        totalCents: order.totalCents,
+        currency: order.currency,
       },
-      transitions: {
-        create: {
-          status: order.status,
-          note: 'Order persisted for checkout.',
+      create: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        quoteId: order.quote.id,
+        email: order.customerEmail,
+        status: prismaOrderStatus(order.status),
+        stripeSessionId,
+        fulfillmentStatus: order.fulfillment.status,
+        totalCents: order.totalCents,
+        currency: order.currency,
+        items: {
+          create: order.quote.items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            designAssetId: item.designAssetId,
+            quantity: item.quantity,
+            placementCodes: item.placementCodes,
+            unitRetailCents: item.unitRetailCents,
+            printfulPayload: {},
+          })),
+        },
+        transitions: {
+          create: {
+            status: order.status,
+            note: 'Order persisted for checkout.',
+          },
         },
       },
-    },
-  });
+    });
+  } catch {
+    // Runtime order state remains the fallback source if persistence is unavailable.
+  }
+}
+
+async function persistStudioPassPurchase(sessionId: string): Promise<void> {
+  if (!env.databaseUrl) return;
+  try {
+    await prisma.studioSession.upsert({
+      where: { id: sessionId },
+      update: {},
+      create: {
+        id: sessionId,
+        freeDraftLimit: env.freeDraftLimit,
+      },
+    });
+    const existingPass = await prisma.studioPass.findFirst({
+      where: { sessionId, status: 'purchased' },
+    });
+    if (!existingPass) {
+      await prisma.studioPass.create({
+        data: {
+          sessionId,
+          status: 'purchased',
+          priceCents: env.studioPassPriceCents,
+          creditCents: env.studioPassPriceCents,
+        },
+      });
+    }
+  } catch {
+    // Runtime pass state remains the fallback source if persistence is unavailable.
+  }
 }
 
 async function recordPaymentCompletion(
   orderId: string,
   session: Stripe.Checkout.Session,
-  fulfillmentStatus: string
+  fulfillmentStatus: string,
+  providerEventId = session.id
 ): Promise<void> {
   if (!env.databaseUrl) return;
   await prisma.order.update({
@@ -128,13 +381,14 @@ async function recordPaymentCompletion(
     where: {
       provider_providerEventId: {
         provider: 'stripe',
-        providerEventId: session.id,
+        providerEventId,
       },
     },
     update: {
       status: session.payment_status ?? 'paid',
       payload: {
         id: session.id,
+        eventId: providerEventId,
         payment_status: session.payment_status,
         metadata: session.metadata,
       },
@@ -142,41 +396,17 @@ async function recordPaymentCompletion(
     create: {
       orderId,
       provider: 'stripe',
-      providerEventId: session.id,
+      providerEventId,
       eventType: 'checkout.session.completed',
       status: session.payment_status ?? 'paid',
       payload: {
         id: session.id,
+        eventId: providerEventId,
         payment_status: session.payment_status,
         metadata: session.metadata,
       },
     },
   });
-}
-
-async function persistStudioPassPurchase(sessionId: string): Promise<void> {
-  if (!env.databaseUrl) return;
-  await prisma.studioSession.upsert({
-    where: { id: sessionId },
-    update: {},
-    create: {
-      id: sessionId,
-      freeDraftLimit: env.freeDraftLimit,
-    },
-  });
-  const existingPass = await prisma.studioPass.findFirst({
-    where: { sessionId, status: 'purchased' },
-  });
-  if (!existingPass) {
-    await prisma.studioPass.create({
-      data: {
-        sessionId,
-        status: 'purchased',
-        priceCents: env.studioPassPriceCents,
-        creditCents: env.studioPassPriceCents,
-      },
-    });
-  }
 }
 
 export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<string[]> {
@@ -201,7 +431,7 @@ export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<s
 
 export async function createCheckoutSession(input: CheckoutInput): Promise<CheckoutSession> {
   const settings = getRuntimeSettings();
-  const quote = getQuote(input.quoteId);
+  const quote = await loadQuoteForCheckout(input.quoteId);
   if (!quote) {
     return {
       id: runtimeId('checkout'),
@@ -215,20 +445,20 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
   const stripeBlocker = settings.liveStripeEnabled ? liveStripeBlocker() : null;
 
   const quoteIssues = await validateQuoteForCheckout(quote);
+  if (Date.now() > new Date(quote.expiresAt).getTime()) {
+    quoteIssues.push('Quote expired. Create a fresh quote before checkout.');
+  }
   const requiredDesignIds = new Set(
     quote.items.map((item) => item.designAssetId).filter(Boolean) as string[]
   );
   if (input.designAssetId) requiredDesignIds.add(input.designAssetId);
+  if (!requiredDesignIds.size) {
+    quoteIssues.push('Checkout requires generated or uploaded artwork.');
+  }
 
   for (const designAssetId of requiredDesignIds) {
-    const draft = getDraft(designAssetId);
-    if (!draft) {
-      quoteIssues.push('Selected artwork could not be verified for checkout.');
-      continue;
-    }
-    if (draft.policy.status === 'blocked' || draft.readiness.status === 'blocked') {
-      quoteIssues.push('Selected artwork is blocked by policy or print-readiness checks.');
-    }
+    const issue = checkoutDesignIssue(await loadDesignForCheckout(designAssetId));
+    if (issue) quoteIssues.push(issue);
   }
 
   if (!settings.checkoutEnabled || quoteIssues.length || stripeBlocker) {
@@ -408,7 +638,8 @@ function getArtworkUrl(order: OrderSummary): string | null {
 }
 
 export async function handleStripeCheckoutCompleted(
-  session: Stripe.Checkout.Session
+  session: Stripe.Checkout.Session,
+  providerEventId = session.id
 ): Promise<OrderSummary | undefined> {
   const kind = session.metadata?.kind;
   if (kind === 'studio_pass') {
@@ -423,9 +654,11 @@ export async function handleStripeCheckoutCompleted(
   if (kind !== 'merch_order') return undefined;
   const orderId = session.metadata?.orderId;
   if (!orderId) return undefined;
-  const order = getOrder(orderId);
+  const order = await loadOrder(orderId);
   if (!order) {
-    await recordPaymentCompletion(orderId, session, 'needs_review').catch(() => undefined);
+    await recordPaymentCompletion(orderId, session, 'needs_review', providerEventId).catch(
+      () => undefined
+    );
     return undefined;
   }
 
@@ -444,7 +677,7 @@ export async function handleStripeCheckoutCompleted(
         message: 'Payment is complete. Real Printful fulfillment is waiting for operator approval.',
       },
     };
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status);
+    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
     return saveOrder(next);
   }
 
@@ -462,7 +695,7 @@ export async function handleStripeCheckoutCompleted(
           'Payment is complete, but fulfillment needs review because recipient or artwork data is incomplete.',
       },
     };
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status);
+    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
     return saveOrder(next);
   }
 
@@ -488,7 +721,7 @@ export async function handleStripeCheckoutCompleted(
       },
     };
     next = transition(next, mappedStatus.orderStatus, next.fulfillment.message);
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status);
+    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
     if (env.databaseUrl) {
       await prisma.order.update({
         where: { id: next.id },
@@ -518,7 +751,7 @@ export async function handleStripeCheckoutCompleted(
         message: error instanceof Error ? error.message : 'Printful fulfillment submission failed.',
       },
     };
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status);
+    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
     return saveOrder(next);
   }
 }
@@ -549,8 +782,24 @@ export async function submitFixtureFulfillment(orderId: string): Promise<OrderSu
   return saveOrder(next);
 }
 
-export function getOrderSummary(orderId: string): OrderSummary | undefined {
-  return getOrder(orderId);
+export async function getOrderSummary(orderId: string): Promise<OrderSummary | undefined> {
+  return loadOrder(orderId);
+}
+
+export async function listOrderSummaries(limit = 50): Promise<OrderSummary[]> {
+  const inMemoryOrders = listOrders();
+  if (inMemoryOrders.length || !env.databaseUrl) return inMemoryOrders;
+
+  try {
+    const persisted = await prisma.order.findMany({
+      include: orderInclude,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return persisted.map((order) => saveOrder(mapPersistedOrder(order)));
+  } catch {
+    return inMemoryOrders;
+  }
 }
 
 export function buildFixturePayloadForQuote(quote: QuoteBreakdown, artworkUrl: string) {

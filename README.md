@@ -11,7 +11,7 @@ The current working title is temporary. The code, docs, and environment template
 - Runs basic print-readiness checks before quoting.
 - Produces transparent cost-plus quotes with product cost, design allocation, margin, shipping estimate, payment fee estimate, Studio Pass credit, and total.
 - Simulates a `$5` Studio Pass that unlocks deeper design work and applies to an eligible purchase.
-- Simulates checkout, order confirmation, and fixture fulfillment without creating live charges or provider orders. The backend also includes guarded Stripe Checkout/webhook, idempotent checkout creation, Printful mockup polling, duplicate draft-order recovery, and Printful draft-order adapters for private test activation.
+- Simulates checkout, order confirmation, and fixture fulfillment without creating live charges or provider orders. The backend also includes guarded Stripe Checkout/webhook, idempotent checkout creation, durable checkout state, Printful mockup polling, duplicate draft-order recovery, and draft-only Printful order adapters for private test activation.
 - Stores a normalized catalog and launch data model for categories, products, variants, placements, mockups, sessions, Studio Passes, AI spend events, quotes, orders, payment events, fulfillment attempts, settings, and audit logs.
 - Supports fixture-backed local development when Printful, Stripe, and OpenAI credentials are not configured.
 
@@ -21,7 +21,7 @@ The v1 curated catalog targets broad basics across apparel, hats, drinkware, wal
 
 ## Stack
 
-- Backend: Node.js, Express, TypeScript, Prisma, PostgreSQL
+- Backend: Node.js, Express, TypeScript, Prisma, PostgreSQL, full-stack Vercel `/api/*` routing
 - Frontend: React, Vite, TypeScript
 - Integrations: Printful catalog/order payloads and draft-order adapter, OpenAI image-generation adapter, Stripe Checkout/webhook adapter, and fixture providers for public-safe development. Live provider activation requires private credentials, database setup, explicit safety gates, and OPS review.
 

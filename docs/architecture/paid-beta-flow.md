@@ -1,6 +1,6 @@
 # Paid Beta Flow
 
-**Status:** Implemented in fixture mode  
+**Status:** Implemented in fixture mode; private provider testing requires credentials
 **Visibility:** Public  
 
 Open Merch Studio uses a mock-first architecture so contributors can run the full customer journey without private provider accounts.
@@ -20,17 +20,17 @@ Open Merch Studio uses a mock-first architecture so contributors can run the ful
 ## Runtime Safety
 
 - Live OpenAI, Stripe, and Printful behavior requires credentials, explicit enable flags, private OPS approval, and implementation verification. Current fixture mode does not create live provider calls.
-- AI spend is tracked through an internal fixture ledger. Production spend tracking still needs persistence and provider-call verification before live launch.
+- AI spend is tracked in the runtime ledger and persisted to `AiSpendEvent` when `DATABASE_URL` is configured. Provider-call verification and spend alerts still need private test runs before live launch.
 - Studio Pass allowance is tracked separately from customer-facing price copy.
-- Checkout and fulfillment can be paused independently.
+- Checkout refuses unknown or expired quotes, missing artwork, failed generation, policy-review artwork, and print-readiness warnings. Checkout and fulfillment can be paused independently.
 
 ## Admin Flow
 
 - `/api/admin/settings` exposes current safe runtime settings only when `ADMIN_ACCESS_CODE` is configured and supplied via `x-admin-access`.
-- `/api/admin/orders` lists order summaries.
+- `/api/admin/orders` lists order summaries from runtime state or the database fallback.
 - `/api/admin/report` returns sessions, passes, drafts, orders, estimated AI spend, and launch gates.
 - `/api/admin/launch-readiness` returns the current paid-beta gate state.
 
 ## Persistence Path
 
-Fixture mode uses an in-memory runtime store. The Prisma schema now documents the production persistence path for sessions, Studio Passes, AI spend events, mockups, quotes, orders, transitions, payment events, fulfillment attempts, admin settings, and audit logs, but production persistence still needs migration/runbook verification before paid beta.
+Fixture mode uses an in-memory runtime store. When `DATABASE_URL` is configured, the Prisma path persists sessions, AI spend events, design assets, mockup task outcomes, quotes, orders, transitions, payment events, fulfillment attempts, admin settings, and audit logs. Production persistence still needs migration/runbook verification against the dedicated paid-beta database.

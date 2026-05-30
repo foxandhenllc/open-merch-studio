@@ -31,7 +31,17 @@ type DesignContext = {
   skipAllowanceSpend?: boolean;
 };
 
+type DesignArtwork = {
+  id: string;
+  imageUrl: string;
+  policyStatus: DesignDraft['policy']['status'];
+  readinessStatus: DesignDraft['readiness']['status'];
+};
+
 const blockedTerms = ['nike', 'disney', 'marvel', 'pokemon', 'supreme'];
+
+const estimatedGenerationCostCents = (qualityTier: 'rough' | 'final') =>
+  canUseLiveOpenAi() ? (qualityTier === 'final' ? 36 : 6) : 1;
 
 function evaluatePolicy(prompt: string): DesignDraft['policy'] {
   const lowered = prompt.toLowerCase();
@@ -84,6 +94,72 @@ function buildReadiness(prompt: string, placementCodes: string[]): DesignDraft['
   };
 }
 
+function publicArtworkUrl(id: string, imageUrl: string): string {
+  return /^https?:\/\//.test(imageUrl)
+    ? imageUrl
+    : `${env.backendUrl}/api/design/assets/${encodeURIComponent(id)}.png`;
+}
+
+async function getArtworkForProvider(designAssetId?: string): Promise<DesignArtwork | null> {
+  if (!designAssetId) return null;
+  const draft = getDraft(designAssetId);
+  if (draft?.id && draft.imageUrl) {
+    return {
+      id: draft.id,
+      imageUrl: publicArtworkUrl(draft.id, draft.imageUrl),
+      policyStatus: draft.policy.status,
+      readinessStatus: draft.readiness.status,
+    };
+  }
+
+  if (!env.databaseUrl) return null;
+  const asset = await prisma.designAsset.findUnique({ where: { id: designAssetId } });
+  const imageUrl = asset?.transparentUrl ?? asset?.imageUrl;
+  if (!asset || !imageUrl) return null;
+  return {
+    id: asset.id,
+    imageUrl: publicArtworkUrl(asset.id, imageUrl),
+    policyStatus: asset.policyStatus as DesignDraft['policy']['status'],
+    readinessStatus: asset.readinessStatus as DesignDraft['readiness']['status'],
+  };
+}
+
+async function persistMockup(mockup: DesignMockup, providerTaskId?: string): Promise<DesignMockup> {
+  const saved = saveMockup(mockup);
+  if (!env.databaseUrl) return saved;
+  try {
+    await prisma.mockupTask.upsert({
+      where: { id: saved.id },
+      update: {
+        productId: saved.productId,
+        variantId: saved.variantId,
+        designAssetId: saved.designAssetId,
+        provider: saved.provider,
+        status: saved.status,
+        placementCodes: saved.placementCodes,
+        imageUrl: saved.imageUrl,
+        providerTaskId,
+        errorMessage: saved.errorMessage,
+      },
+      create: {
+        id: saved.id,
+        productId: saved.productId,
+        variantId: saved.variantId,
+        designAssetId: saved.designAssetId,
+        provider: saved.provider,
+        status: saved.status,
+        placementCodes: saved.placementCodes,
+        imageUrl: saved.imageUrl,
+        providerTaskId,
+        errorMessage: saved.errorMessage,
+      },
+    });
+  } catch {
+    // Runtime mockup state remains available if persistence is unavailable.
+  }
+  return saved;
+}
+
 export async function createDesignIdea(params: {
   prompt: string;
   sessionId?: string;
@@ -110,7 +186,7 @@ export async function createDesignIdea(params: {
         : [],
     createdAt: runtimeNow(),
   };
-  recordDesignSpend({
+  await recordDesignSpend({
     sessionId: session.id,
     action: 'idea',
     provider: canUseLiveOpenAi() ? 'openai-ready' : 'mock',
@@ -128,7 +204,11 @@ export async function createDesignDraft(
   const qualityTier = context.qualityTier ?? 'rough';
   const authorization = context.skipAllowanceSpend
     ? { allowed: true, allowance: getAllowanceState(session.id) }
-    : authorizeDesignAction(session.id, qualityTier === 'final' ? 'final' : 'rough_draft');
+    : await authorizeDesignAction(
+        session.id,
+        qualityTier === 'final' ? 'final' : 'rough_draft',
+        estimatedGenerationCostCents(qualityTier)
+      );
   const provider = canUseLiveOpenAi() ? 'openai-ready' : 'mock';
   const policy = evaluatePolicy(normalizedPrompt);
   if (!authorization.allowed || policy.status === 'blocked') {
@@ -165,6 +245,53 @@ export async function createDesignDraft(
       qualityTier,
     });
   } catch (error) {
+    const failedReadiness: DesignDraft['readiness'] = {
+      status: 'blocked',
+      checks: [
+        {
+          label: 'Live generation',
+          result:
+            'OpenAI generation was requested but did not complete. No checkout should proceed with this draft.',
+          severity: 'block',
+        },
+      ],
+    };
+    const failureReason = error instanceof Error ? error.message : 'OpenAI generation failed.';
+    if (env.databaseUrl) {
+      try {
+        const failedAsset = await prisma.designAsset.create({
+          data: {
+            prompt: normalizedPrompt,
+            provider: 'openai-ready',
+            imageUrl: createMockDesignImage('Generation paused').imageUrl,
+            transparentUrl: null,
+            generationStatus: 'failed',
+            policyStatus: 'needs_review',
+            policyReport: { status: 'needs_review', reasons: [failureReason] },
+            failureReason,
+            readinessStatus: 'blocked',
+            readinessReport: failedReadiness,
+          },
+        });
+        return saveDraft({
+          id: failedAsset.id,
+          sessionId: session.id,
+          provider: 'openai-ready',
+          prompt: normalizedPrompt,
+          imageUrl: `${env.backendUrl}/api/design/assets/${failedAsset.id}.png`,
+          qualityTier,
+          allowance: authorization.allowance,
+          policy: {
+            status: 'needs_review',
+            reasons: [failureReason],
+          },
+          readiness: failedReadiness,
+          createdAt: runtimeNow(),
+        });
+      } catch {
+        // Fall through to the runtime-only failed draft.
+      }
+    }
     return {
       id: null,
       sessionId: session.id,
@@ -175,35 +302,17 @@ export async function createDesignDraft(
       allowance: authorization.allowance,
       policy: {
         status: 'needs_review',
-        reasons: [error instanceof Error ? error.message : 'OpenAI generation failed.'],
+        reasons: [failureReason],
       },
-      readiness: {
-        status: 'blocked',
-        checks: [
-          {
-            label: 'Live generation',
-            result:
-              'OpenAI generation was requested but did not complete. No checkout should proceed with this draft.',
-            severity: 'block',
-          },
-        ],
-      },
+      readiness: failedReadiness,
       createdAt: runtimeNow(),
     };
   }
   const readiness = buildReadiness(normalizedPrompt, context.placementCodes ?? []);
-  if (!context.skipAllowanceSpend) {
-    recordDesignSpend({
-      sessionId: session.id,
-      action: qualityTier === 'final' ? 'final' : 'rough_draft',
-      provider: generated.provider,
-      estimatedCostCents: generated.estimatedCostCents,
-    });
-  }
   const allowance = getAllowanceState(session.id);
 
   if (!env.databaseUrl) {
-    return saveDraft({
+    const draft = saveDraft({
       id: runtimeId('draft'),
       sessionId: session.id,
       provider: generated.provider,
@@ -215,6 +324,16 @@ export async function createDesignDraft(
       readiness,
       createdAt: runtimeNow(),
     });
+    if (!context.skipAllowanceSpend) {
+      await recordDesignSpend({
+        sessionId: session.id,
+        designAssetId: draft.id ?? undefined,
+        action: qualityTier === 'final' ? 'final' : 'rough_draft',
+        provider: generated.provider,
+        estimatedCostCents: generated.estimatedCostCents,
+      });
+    }
+    return draft;
   }
 
   try {
@@ -224,10 +343,22 @@ export async function createDesignDraft(
         provider: generated.provider,
         imageUrl: generated.imageUrl,
         transparentUrl: generated.imageUrl,
+        generationStatus: 'complete',
+        policyStatus: policy.status,
+        policyReport: policy,
         readinessStatus: readiness.status,
         readinessReport: readiness,
       },
     });
+    if (!context.skipAllowanceSpend) {
+      await recordDesignSpend({
+        sessionId: session.id,
+        designAssetId: asset.id,
+        action: qualityTier === 'final' ? 'final' : 'rough_draft',
+        provider: generated.provider,
+        estimatedCostCents: generated.estimatedCostCents,
+      });
+    }
     return saveDraft({
       id: asset.id,
       sessionId: session.id,
@@ -241,6 +372,14 @@ export async function createDesignDraft(
       createdAt: runtimeNow(),
     });
   } catch {
+    if (!context.skipAllowanceSpend) {
+      await recordDesignSpend({
+        sessionId: session.id,
+        action: qualityTier === 'final' ? 'final' : 'rough_draft',
+        provider: generated.provider,
+        estimatedCostCents: generated.estimatedCostCents,
+      });
+    }
     return saveDraft({
       id: runtimeId('draft'),
       sessionId: session.id,
@@ -263,7 +402,11 @@ export async function reviseDesignDraft(params: {
 }): Promise<DesignDraft> {
   const base = getDraft(params.draftId);
   const session = getOrCreateSession(params.sessionId ?? base?.sessionId);
-  const authorization = authorizeDesignAction(session.id, 'edit');
+  const authorization = await authorizeDesignAction(
+    session.id,
+    'edit',
+    canUseLiveOpenAi() ? 12 : 1
+  );
   if (!authorization.allowed) {
     return {
       id: null,
@@ -290,7 +433,7 @@ export async function reviseDesignDraft(params: {
       createdAt: runtimeNow(),
     };
   }
-  recordDesignSpend({
+  await recordDesignSpend({
     sessionId: session.id,
     action: 'edit',
     provider: canUseLiveOpenAi() ? 'openai-ready' : 'mock',
@@ -321,43 +464,50 @@ export async function createDesignMockup(params: {
   designAssetId?: string;
 }): Promise<DesignMockup> {
   const session = getOrCreateSession(params.sessionId);
-  recordDesignSpend({
+  await recordDesignSpend({
     sessionId: session.id,
+    designAssetId: params.designAssetId,
     action: 'mockup',
     provider: env.printfulApiKey && env.enableLivePrintful ? 'printful-ready' : 'fixture',
     estimatedCostCents: 1,
   });
-  const draft = getDraft(params.designAssetId);
+  const artwork = await getArtworkForProvider(params.designAssetId);
   if (env.printfulApiKey && env.enableLivePrintful) {
     try {
       const [product] = await getProductsByIds([params.productId]);
       const variant = product?.variants.find((candidate) => candidate.id === params.variantId);
       const placement = params.placementCodes[0];
-      if (!product?.printfulId || !variant?.printfulVariantId || !placement || !draft?.imageUrl) {
+      if (!product?.printfulId || !variant?.printfulVariantId || !placement || !artwork?.imageUrl) {
         throw new Error(
           'Live Printful mockup requires synced product, variant, placement, and artwork.'
         );
+      }
+      if (artwork.policyStatus !== 'pass' || artwork.readinessStatus !== 'pass') {
+        throw new Error('Live Printful mockup requires policy-passing, print-ready artwork.');
       }
       const mockup = await generatePrintfulMockupPreview({
         printfulProductId: String(product.printfulId),
         printfulVariantId: variant.printfulVariantId,
         placement,
-        designImageUrl: draft.imageUrl,
+        designImageUrl: artwork.imageUrl,
         technique: placement.includes('embroidery') ? 'embroidery' : 'dtg',
       });
-      return saveMockup({
-        id: mockup.taskKey,
-        status: 'complete',
-        provider: 'printful',
-        productId: params.productId,
-        variantId: params.variantId,
-        placementCodes: params.placementCodes,
-        designAssetId: params.designAssetId,
-        imageUrl: mockup.imageUrl,
-        createdAt: runtimeNow(),
-      });
-    } catch {
-      return saveMockup({
+      return persistMockup(
+        {
+          id: mockup.taskKey,
+          status: 'complete',
+          provider: 'printful',
+          productId: params.productId,
+          variantId: params.variantId,
+          placementCodes: params.placementCodes,
+          designAssetId: params.designAssetId,
+          imageUrl: mockup.imageUrl,
+          createdAt: runtimeNow(),
+        },
+        mockup.taskKey
+      );
+    } catch (error) {
+      return persistMockup({
         id: runtimeId('mockup'),
         status: 'failed',
         provider: 'printful-ready',
@@ -365,12 +515,13 @@ export async function createDesignMockup(params: {
         variantId: params.variantId,
         placementCodes: params.placementCodes,
         designAssetId: params.designAssetId,
-        imageUrl: draft?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
+        imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
+        errorMessage: error instanceof Error ? error.message : 'Printful mockup generation failed.',
         createdAt: runtimeNow(),
       });
     }
   }
-  return saveMockup({
+  return persistMockup({
     id: runtimeId('mockup'),
     status: 'complete',
     provider: env.printfulApiKey && env.enableLivePrintful ? 'printful-ready' : 'fixture',
@@ -378,7 +529,7 @@ export async function createDesignMockup(params: {
     variantId: params.variantId,
     placementCodes: params.placementCodes,
     designAssetId: params.designAssetId,
-    imageUrl: draft?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
+    imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
     createdAt: runtimeNow(),
   });
 }
