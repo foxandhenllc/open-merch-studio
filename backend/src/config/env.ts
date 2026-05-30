@@ -22,6 +22,7 @@ export const env = {
   printfulApiKey: process.env.PRINTFUL_API_KEY,
   printfulStoreId: process.env.PRINTFUL_STORE_ID,
   printfulSellingRegion: process.env.PRINTFUL_SELLING_REGION || 'north_america',
+  printfulMockupTimeoutMs: numberFromEnv('PRINTFUL_MOCKUP_TIMEOUT_MS', 180000),
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiDesignModel: process.env.OPENAI_DESIGN_MODEL || 'gpt-image-1',
   openaiTextModel: process.env.OPENAI_TEXT_MODEL || 'gpt-5-nano',

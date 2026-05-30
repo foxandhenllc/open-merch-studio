@@ -31,6 +31,8 @@ Keep live behavior disabled until the private OPS checklist is complete.
 
 Preview deployments should not use production provider settings. Production checkout, live generation, and real fulfillment must remain separate switches. The backend contains guarded live adapters, but the Vercel fixture API remains public-safe and does not create live provider sessions.
 
+Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Keep it conservative in serverless environments and prefer long-running backend workers for production mockup generation.
+
 ## Database Migration
 
 Apply migrations only against the intended database environment:

@@ -4,7 +4,7 @@
 **Visibility:** Public  
 **Private ops companion:** `/Users/chrisfox/git/staging/private/open-merch-studio-launch/`
 
-Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, Studio Pass simulation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, and Printful draft orders. It is suitable for OSS/product review and private provider testing, not unattended real-money launch.
+Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, Studio Pass simulation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and private provider testing, not unattended real-money launch.
 
 ## Provider Gates
 
@@ -16,6 +16,7 @@ Live provider behavior must stay behind explicit environment gates.
 - `ALLOW_LIVE_PAYMENTS=false` prevents accidental live Stripe charges if a live key is configured.
 - `ALLOW_LIVE_FULFILLMENT=false` prevents accidental Printful order creation if a live store token is configured.
 - `PRINTFUL_AUTO_CONFIRM_ORDERS=false` keeps Printful orders as drafts unless explicitly approved.
+- `PRINTFUL_MOCKUP_TIMEOUT_MS=180000` caps live Printful mockup task polling.
 - `FULFILLMENT_ENABLED=false` prevents real fulfillment activation.
 
 Do not enable these gates until the matching private OPS tickets are reviewed, the database migration has been applied, Stripe webhooks are verified, and provider test runs are captured.
@@ -45,9 +46,9 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 - Fixture mode works from a clean clone.
 - `backend/prisma/migrations/20260529180000_paid_beta_foundation/migration.sql` has been applied to the intended database.
 - Preview and production environments are separated.
-- Stripe Checkout Sessions and webhooks are implemented in the backend and must be verified with Stripe test mode before live checkout. Refunds, tax/accounting handling, and support paths still require private operator sign-off.
-- OpenAI provider calls are implemented behind a gate. Budget caps, spend alerts, and pause steps must be verified before live generation.
-- Printful catalog sync and draft-order creation are implemented behind gates. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.
+- Stripe Checkout Sessions and webhooks are implemented in the backend with idempotent session creation and must be verified with Stripe test mode before live checkout. Refunds, tax/accounting handling, and support paths still require private operator sign-off.
+- OpenAI provider calls are implemented behind a gate with prompt moderation and product-neutral print prompt shaping. Budget caps, spend alerts, and pause steps must be verified before live generation.
+- Printful catalog sync, mockup task polling, duplicate draft-order recovery, confirmation polling, and draft-order creation are implemented behind gates. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.
 - Tax, shipping, and Studio Pass accounting assumptions are reviewed before real-money launch.
 - `OMS-094` is reviewed with the private OPS checklist before inviting paid beta customers.
 

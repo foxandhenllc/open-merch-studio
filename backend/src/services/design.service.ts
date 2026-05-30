@@ -7,6 +7,8 @@ import {
   generateDesignImage,
   canUseLiveOpenAi,
 } from './openai-design-provider.js';
+import { getProductsByIds } from './catalog.service.js';
+import { generatePrintfulMockupPreview } from './printful.service.js';
 import {
   authorizeDesignAction,
   getAllowanceState,
@@ -311,13 +313,13 @@ export function checkReadiness(params: {
   return buildReadiness(params.prompt, params.placementCodes ?? []);
 }
 
-export function createDesignMockup(params: {
+export async function createDesignMockup(params: {
   sessionId?: string;
   productId: string;
   variantId: string;
   placementCodes: string[];
   designAssetId?: string;
-}): DesignMockup {
+}): Promise<DesignMockup> {
   const session = getOrCreateSession(params.sessionId);
   recordDesignSpend({
     sessionId: session.id,
@@ -326,6 +328,48 @@ export function createDesignMockup(params: {
     estimatedCostCents: 1,
   });
   const draft = getDraft(params.designAssetId);
+  if (env.printfulApiKey && env.enableLivePrintful) {
+    try {
+      const [product] = await getProductsByIds([params.productId]);
+      const variant = product?.variants.find((candidate) => candidate.id === params.variantId);
+      const placement = params.placementCodes[0];
+      if (!product?.printfulId || !variant?.printfulVariantId || !placement || !draft?.imageUrl) {
+        throw new Error(
+          'Live Printful mockup requires synced product, variant, placement, and artwork.'
+        );
+      }
+      const mockup = await generatePrintfulMockupPreview({
+        printfulProductId: String(product.printfulId),
+        printfulVariantId: variant.printfulVariantId,
+        placement,
+        designImageUrl: draft.imageUrl,
+        technique: placement.includes('embroidery') ? 'embroidery' : 'dtg',
+      });
+      return saveMockup({
+        id: mockup.taskKey,
+        status: 'complete',
+        provider: 'printful',
+        productId: params.productId,
+        variantId: params.variantId,
+        placementCodes: params.placementCodes,
+        designAssetId: params.designAssetId,
+        imageUrl: mockup.imageUrl,
+        createdAt: runtimeNow(),
+      });
+    } catch {
+      return saveMockup({
+        id: runtimeId('mockup'),
+        status: 'failed',
+        provider: 'printful-ready',
+        productId: params.productId,
+        variantId: params.variantId,
+        placementCodes: params.placementCodes,
+        designAssetId: params.designAssetId,
+        imageUrl: draft?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
+        createdAt: runtimeNow(),
+      });
+    }
+  }
   return saveMockup({
     id: runtimeId('mockup'),
     status: 'complete',

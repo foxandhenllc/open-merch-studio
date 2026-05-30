@@ -33,6 +33,60 @@ export function canUseLiveOpenAi(): boolean {
   return Boolean(env.openaiApiKey && env.enableLiveOpenAi);
 }
 
+function detectTextIntent(prompt: string): boolean {
+  return (
+    prompt.includes('"') ||
+    prompt.includes("'") ||
+    /\b(says|say|text|quote|quoted|caption|wording|words|letters|typography|font)\b/i.test(prompt)
+  );
+}
+
+export function normalizePromptForPrint(prompt: string): string {
+  return String(prompt || '')
+    .replace(
+      /\b(on|for)\s+(a|the)\s+(t\s*-?\s*shirt|tshirt|tee\s*-?\s*shirt|tee|shirt|hoodie|sweatshirt|mug|poster|sticker|tote|bag|hat|cap|phone case)\b/gi,
+      ''
+    )
+    .replace(
+      /\b(t\s*-?\s*shirt|tshirt|tee\s*-?\s*shirt|tee|shirt|hoodie|sweatshirt|mug|poster|sticker|tote|bag|hat|cap|phone case|mockup|mannequin|hanger)\b/gi,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function buildPrintReadyPrompt(prompt: string): string {
+  const cleaned = normalizePromptForPrint(prompt) || prompt;
+  const expectsText = detectTextIntent(prompt);
+  const textGuidance = expectsText
+    ? 'If lettering is requested, keep text short, legible, correctly spelled, and high contrast.'
+    : 'Do not add words, slogans, signatures, logos, or random typography unless requested.';
+
+  return [
+    cleaned,
+    'Create one original print-ready merchandise graphic, not a product photo or mockup.',
+    'Use a centered composition, transparent background, strong silhouette, and simple readable shapes.',
+    'Avoid brand logos, celebrities, protected characters, private data, watermarks, tiny unreadable text, and photographic backgrounds.',
+    textGuidance,
+  ].join(' ');
+}
+
+async function assertPromptAllowed(client: OpenAI, prompt: string): Promise<void> {
+  const moderation = await client.moderations.create({
+    model: 'omni-moderation-latest',
+    input: prompt,
+  });
+  const result = moderation.results?.[0];
+  if (result?.flagged) {
+    const categories = Object.entries(result.categories ?? {})
+      .filter(([, value]) => value)
+      .map(([key]) => key);
+    throw new Error(
+      `OpenAI moderation blocked this prompt${categories.length ? ` (${categories.join(', ')})` : ''}.`
+    );
+  }
+}
+
 export async function generateDesignImage(params: {
   prompt: string;
   sessionId: string;
@@ -44,13 +98,11 @@ export async function generateDesignImage(params: {
 
   const client = new OpenAI({ apiKey: env.openaiApiKey });
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
+  const finalPrompt = buildPrintReadyPrompt(params.prompt);
+  await assertPromptAllowed(client, finalPrompt);
   const response = await client.images.generate({
     model: env.openaiDesignModel,
-    prompt: [
-      params.prompt,
-      'Create original, rights-safe merchandise artwork with a transparent-ready centered composition.',
-      'Avoid brand logos, celebrities, protected characters, private data, and tiny unreadable text.',
-    ].join(' '),
+    prompt: finalPrompt,
     n: 1,
     size: '1024x1024',
     quality,
@@ -70,7 +122,7 @@ export async function generateDesignImage(params: {
   return {
     provider: 'openai',
     imageUrl,
-    revisedPrompt: image?.revised_prompt,
+    revisedPrompt: image?.revised_prompt ?? finalPrompt,
     estimatedCostCents: params.qualityTier === 'final' ? 36 : 6,
   };
 }

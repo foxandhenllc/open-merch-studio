@@ -51,6 +51,43 @@ type PrintfulListResponse<T> = {
   };
 };
 
+type PrintfulOrderResponse = {
+  id?: number | string;
+  order_id?: number | string;
+  external_id?: string;
+  status?: string;
+  retail_costs?: {
+    calculation_status?: string;
+  };
+};
+
+type PrintfulPrintfile = {
+  printfile_id: number;
+  width: number;
+  height: number;
+};
+
+type PrintfulPrintfilesResult = {
+  available_placements?: Record<string, string>;
+  printfiles?: PrintfulPrintfile[];
+  variant_printfiles?: Array<{
+    variant_id: number;
+    placements: Record<string, number>;
+  }>;
+};
+
+type PrintfulMockupTaskCreateResult = {
+  task_key?: string;
+  status?: string;
+};
+
+type PrintfulMockupTaskResult = {
+  task_key?: string;
+  status?: 'pending' | 'completed' | 'failed';
+  error?: string;
+  mockups?: unknown[];
+};
+
 const createPrintfulClient = (): AxiosInstance => {
   if (!env.printfulApiKey) {
     throw new Error('PRINTFUL_API_KEY is not configured.');
@@ -66,6 +103,94 @@ const createPrintfulClient = (): AxiosInstance => {
     timeout: 30000,
   });
 };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function unwrapPrintfulResponse<T>(data: unknown): T {
+  const response = data as { result?: T; data?: T };
+  return (response?.result ?? response?.data ?? data) as T;
+}
+
+const COUNTRY_CODE_MAP: Record<string, string> = {
+  'UNITED STATES': 'US',
+  'UNITED STATES OF AMERICA': 'US',
+  USA: 'US',
+  US: 'US',
+  CANADA: 'CA',
+  CA: 'CA',
+  AUSTRALIA: 'AU',
+  AU: 'AU',
+  'UNITED KINGDOM': 'GB',
+  UK: 'GB',
+  GB: 'GB',
+};
+
+const STATE_CODE_MAP: Record<string, string> = {
+  ALABAMA: 'AL',
+  ALASKA: 'AK',
+  ARIZONA: 'AZ',
+  ARKANSAS: 'AR',
+  CALIFORNIA: 'CA',
+  COLORADO: 'CO',
+  CONNECTICUT: 'CT',
+  DELAWARE: 'DE',
+  FLORIDA: 'FL',
+  GEORGIA: 'GA',
+  HAWAII: 'HI',
+  IDAHO: 'ID',
+  ILLINOIS: 'IL',
+  INDIANA: 'IN',
+  IOWA: 'IA',
+  KANSAS: 'KS',
+  KENTUCKY: 'KY',
+  LOUISIANA: 'LA',
+  MAINE: 'ME',
+  MARYLAND: 'MD',
+  MASSACHUSETTS: 'MA',
+  MICHIGAN: 'MI',
+  MINNESOTA: 'MN',
+  MISSISSIPPI: 'MS',
+  MISSOURI: 'MO',
+  MONTANA: 'MT',
+  NEBRASKA: 'NE',
+  NEVADA: 'NV',
+  'NEW HAMPSHIRE': 'NH',
+  'NEW JERSEY': 'NJ',
+  'NEW MEXICO': 'NM',
+  'NEW YORK': 'NY',
+  'NORTH CAROLINA': 'NC',
+  'NORTH DAKOTA': 'ND',
+  OHIO: 'OH',
+  OKLAHOMA: 'OK',
+  OREGON: 'OR',
+  PENNSYLVANIA: 'PA',
+  'RHODE ISLAND': 'RI',
+  'SOUTH CAROLINA': 'SC',
+  'SOUTH DAKOTA': 'SD',
+  TENNESSEE: 'TN',
+  TEXAS: 'TX',
+  UTAH: 'UT',
+  VERMONT: 'VT',
+  VIRGINIA: 'VA',
+  WASHINGTON: 'WA',
+  'WEST VIRGINIA': 'WV',
+  WISCONSIN: 'WI',
+  WYOMING: 'WY',
+};
+
+export function normalizeCountryCode(country: string | null | undefined): string {
+  if (!country) return '';
+  const normalized = country.trim().toUpperCase();
+  return (
+    COUNTRY_CODE_MAP[normalized] || (normalized.length === 2 ? normalized : normalized.slice(0, 2))
+  );
+}
+
+export function normalizeStateCode(state: string | null | undefined): string | undefined {
+  if (!state) return undefined;
+  const normalized = state.trim().toUpperCase();
+  return STATE_CODE_MAP[normalized] || normalized;
+}
 
 const providerPriceToAmount = (variant: PrintfulVariant): number => {
   const value = variant.price ?? variant.catalog_price ?? variant.retail_price;
@@ -476,8 +601,8 @@ export function buildPrintfulOrderPayload(params: {
       name: params.recipient.name,
       address1: params.recipient.address1,
       city: params.recipient.city,
-      state_code: params.recipient.stateCode,
-      country_code: params.recipient.countryCode,
+      state_code: normalizeStateCode(params.recipient.stateCode),
+      country_code: normalizeCountryCode(params.recipient.countryCode),
       zip: params.recipient.zip,
       email: params.recipient.email,
     },
@@ -508,6 +633,44 @@ export function buildPrintfulOrderPayload(params: {
   };
 }
 
+async function fetchPrintfulOrderByExternalId(
+  client: AxiosInstance,
+  externalId: string
+): Promise<PrintfulOrderResponse | null> {
+  try {
+    const response = await client.get(`/v2/orders/@${encodeURIComponent(externalId)}`);
+    return unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
+  } catch {
+    return null;
+  }
+}
+
+async function waitForPrintfulOrderReady(
+  client: AxiosInstance,
+  providerOrderId: string,
+  attempts = 6,
+  delayMs = 3000
+): Promise<PrintfulOrderResponse | null> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const response = await client.get(`/v2/orders/${providerOrderId}`);
+    const order = unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
+    const calculationStatus = order?.retail_costs?.calculation_status;
+    if (!calculationStatus || calculationStatus === 'done') {
+      return order;
+    }
+    await sleep(delayMs);
+  }
+  return null;
+}
+
+async function confirmPrintfulOrder(
+  client: AxiosInstance,
+  providerOrderId: string
+): Promise<PrintfulOrderResponse> {
+  const response = await client.post(`/v2/orders/${providerOrderId}/confirmation`);
+  return unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
+}
+
 export async function submitPrintfulDraftOrder(params: {
   quote: QuoteBreakdown;
   orderNumber: string;
@@ -534,12 +697,32 @@ export async function submitPrintfulDraftOrder(params: {
     recipient: params.recipient,
     artworkUrl: params.artworkUrl,
   });
-  const response = await client.post('/v2/orders', {
-    external_id: params.orderNumber,
-    shipping: 'STANDARD',
-    ...payload,
-  });
-  const order = response.data?.data ?? response.data?.result ?? response.data;
+  let order: PrintfulOrderResponse;
+  try {
+    const response = await client.post('/v2/orders', {
+      external_id: params.orderNumber,
+      shipping: 'STANDARD',
+      ...payload,
+    });
+    order = unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
+  } catch (error) {
+    const message =
+      axios.isAxiosError(error) && typeof error.response?.data === 'object'
+        ? JSON.stringify(error.response.data)
+        : error instanceof Error
+          ? error.message
+          : 'Printful order creation failed.';
+    if (message.includes('External ID') || message.includes('external_id')) {
+      const existing = await fetchPrintfulOrderByExternalId(client, params.orderNumber);
+      if (existing?.id ?? existing?.order_id) {
+        order = existing;
+      } else {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
   const providerOrderId = String(order?.id ?? order?.order_id ?? '');
   if (!providerOrderId) {
     throw new Error('Printful order creation did not return an order ID.');
@@ -548,11 +731,37 @@ export async function submitPrintfulDraftOrder(params: {
   let status = String(order?.status ?? 'draft');
   let confirmed = false;
   if (env.printfulAutoConfirmOrders) {
-    const confirmation = await client.post(`/v2/orders/${providerOrderId}/confirmation`);
-    const confirmedOrder =
-      confirmation.data?.data ?? confirmation.data?.result ?? confirmation.data;
-    status = String(confirmedOrder?.status ?? 'pending');
-    confirmed = true;
+    await waitForPrintfulOrderReady(client, providerOrderId);
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 8; attempt += 1) {
+      try {
+        const confirmedOrder = await confirmPrintfulOrder(client, providerOrderId);
+        status = String(confirmedOrder?.status ?? 'pending');
+        confirmed = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        const message =
+          axios.isAxiosError(error) && typeof error.response?.data === 'object'
+            ? JSON.stringify(error.response.data)
+            : error instanceof Error
+              ? error.message
+              : 'Printful confirmation failed.';
+        if (
+          !message.includes('calculations still running') &&
+          !message.includes('design is still processing')
+        ) {
+          throw error;
+        }
+        await waitForPrintfulOrderReady(client, providerOrderId, 3, 5000);
+        await sleep(Math.min(15000, 3000 * attempt));
+      }
+    }
+    if (!confirmed) {
+      throw lastError instanceof Error
+        ? lastError
+        : new Error('Failed to confirm Printful order after retries.');
+    }
   }
 
   return { providerOrderId, status, confirmed };
@@ -567,5 +776,164 @@ export async function fetchPrintfulOrderStatus(
   return {
     providerOrderId,
     status: String(order?.status ?? 'unknown'),
+  };
+}
+
+export function mapPrintfulOrderStatus(status?: string): {
+  orderStatus: 'submitted' | 'shipped' | 'delivered' | 'failed' | 'needs_review';
+  fulfillmentStatus: 'submitted' | 'failed' | 'needs_review';
+} {
+  switch (status) {
+    case 'draft':
+    case 'pending':
+    case 'being_fulfilled':
+    case 'inprocess':
+      return { orderStatus: 'submitted', fulfillmentStatus: 'submitted' };
+    case 'partial':
+    case 'fulfilled':
+    case 'shipped':
+      return { orderStatus: 'shipped', fulfillmentStatus: 'submitted' };
+    case 'delivered':
+      return { orderStatus: 'delivered', fulfillmentStatus: 'submitted' };
+    case 'failed':
+    case 'canceled':
+    case 'cancelled':
+      return { orderStatus: 'failed', fulfillmentStatus: 'failed' };
+    default:
+      return { orderStatus: 'needs_review', fulfillmentStatus: 'needs_review' };
+  }
+}
+
+function computeCenteredSquarePosition(printfile: PrintfulPrintfile) {
+  const areaWidth = printfile.width;
+  const areaHeight = printfile.height;
+  const size = Math.min(areaWidth, areaHeight);
+
+  return {
+    area_width: areaWidth,
+    area_height: areaHeight,
+    width: size,
+    height: size,
+    top: Math.max(0, Math.round((areaHeight - size) / 2)),
+    left: Math.max(0, Math.round((areaWidth - size) / 2)),
+  };
+}
+
+async function fetchPrintfileForVariant(params: {
+  client: AxiosInstance;
+  printfulProductId: string;
+  printfulVariantId: number;
+  placement: string;
+  technique?: string;
+}): Promise<PrintfulPrintfile> {
+  const response = await params.client.get(
+    `/mockup-generator/printfiles/${params.printfulProductId}`,
+    {
+      params: params.technique ? { technique: params.technique } : undefined,
+    }
+  );
+  const result = unwrapPrintfulResponse<PrintfulPrintfilesResult>(response.data);
+  const mapping = result.variant_printfiles?.find(
+    (variant) => variant.variant_id === params.printfulVariantId
+  );
+  const printfileId = mapping?.placements?.[params.placement];
+  if (!printfileId) {
+    throw new Error(
+      `Printful printfile mapping not found for variant ${params.printfulVariantId} placement ${params.placement}.`
+    );
+  }
+  const printfile = result.printfiles?.find((candidate) => candidate.printfile_id === printfileId);
+  if (!printfile) {
+    throw new Error(`Printful printfile ${printfileId} was not found.`);
+  }
+  return printfile;
+}
+
+async function createPrintfulMockupTask(params: {
+  client: AxiosInstance;
+  printfulProductId: string;
+  printfulVariantId: number;
+  placement: string;
+  designImageUrl: string;
+  technique?: string;
+}): Promise<string> {
+  const printfile = await fetchPrintfileForVariant(params);
+  const response = await params.client.post(
+    `/mockup-generator/create-task/${params.printfulProductId}`,
+    {
+      variant_ids: [params.printfulVariantId],
+      format: 'png',
+      width: 0,
+      files: [
+        {
+          placement: params.placement,
+          image_url: params.designImageUrl,
+          position: computeCenteredSquarePosition(printfile),
+        },
+      ],
+    }
+  );
+  const result = unwrapPrintfulResponse<PrintfulMockupTaskCreateResult>(response.data);
+  if (!result.task_key) {
+    throw new Error('Printful mockup task did not return a task key.');
+  }
+  return result.task_key;
+}
+
+async function pollPrintfulMockupTask(
+  client: AxiosInstance,
+  taskKey: string
+): Promise<PrintfulMockupTaskResult> {
+  const timeoutMs = Math.max(30000, env.printfulMockupTimeoutMs);
+  const start = Date.now();
+  await sleep(10000);
+  while (Date.now() - start < timeoutMs) {
+    const response = await client.get('/mockup-generator/task', {
+      params: { task_key: taskKey },
+    });
+    const result = unwrapPrintfulResponse<PrintfulMockupTaskResult>(response.data);
+    if (result.status === 'completed') return result;
+    if (result.status === 'failed') {
+      throw new Error(result.error || 'Printful mockup generation failed.');
+    }
+    await sleep(5000);
+  }
+  throw new Error('Timed out waiting for Printful mockup generation.');
+}
+
+function extractMockupUrl(taskResult: PrintfulMockupTaskResult, placement: string): string {
+  const mockups = Array.isArray(taskResult.mockups) ? taskResult.mockups : [];
+  const candidates = mockups as Array<Record<string, unknown>>;
+  const match =
+    candidates.find((candidate) => String(candidate.placement ?? '') === placement) ??
+    candidates[0];
+  const directUrl = match?.mockup_url ?? match?.mockupUrl ?? match?.url;
+  if (typeof directUrl === 'string' && directUrl) return directUrl;
+  const extra = Array.isArray(match?.extra) ? (match.extra as Array<Record<string, unknown>>) : [];
+  const extraUrl = extra.find((entry) => typeof entry.url === 'string')?.url;
+  if (typeof extraUrl === 'string' && extraUrl) return extraUrl;
+  throw new Error('Unable to extract Printful mockup URL.');
+}
+
+export async function generatePrintfulMockupPreview(params: {
+  printfulProductId: string;
+  printfulVariantId: number;
+  placement: string;
+  designImageUrl: string;
+  technique?: string;
+}): Promise<{ taskKey: string; imageUrl: string }> {
+  if (!env.printfulApiKey || !env.enableLivePrintful) {
+    throw new Error('Printful live mockups require PRINTFUL_API_KEY and ENABLE_LIVE_PRINTFUL.');
+  }
+  if (!/^https?:\/\//.test(params.designImageUrl)) {
+    throw new Error('Printful live mockups require a public HTTP artwork URL.');
+  }
+
+  const client = createPrintfulClient();
+  const taskKey = await createPrintfulMockupTask({ client, ...params });
+  const taskResult = await pollPrintfulMockupTask(client, taskKey);
+  return {
+    taskKey,
+    imageUrl: extractMockupUrl(taskResult, params.placement),
   };
 }

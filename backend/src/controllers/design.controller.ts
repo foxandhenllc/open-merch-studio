@@ -82,7 +82,7 @@ export const postDesignMockup = asyncHandler(async (req: Request, res: Response)
   if (!productId || !variantId || !placementCodes.length) {
     throw new HttpError('Product, variant, and placement are required for mockup.', 400);
   }
-  const mockup = createDesignMockup({
+  const mockup = await createDesignMockup({
     sessionId: String(req.body?.sessionId ?? '') || undefined,
     productId,
     variantId,

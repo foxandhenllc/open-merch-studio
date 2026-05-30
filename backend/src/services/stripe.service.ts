@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import type { QuoteBreakdown } from '../types/catalog.js';
 
@@ -35,6 +36,17 @@ function getStripe(): Stripe {
   return new Stripe(env.stripeSecretKey);
 }
 
+function buildCheckoutIdempotencyKey(params: CreateStripeCheckoutParams): string {
+  const stablePayload = {
+    kind: params.kind,
+    amountCents: params.amountCents,
+    currency: params.currency,
+    customerEmail: params.customerEmail,
+    metadata: params.metadata,
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(stablePayload)).digest('hex');
+}
+
 export async function createStripeCheckoutSession(
   params: CreateStripeCheckoutParams
 ): Promise<Stripe.Checkout.Session> {
@@ -53,34 +65,57 @@ export async function createStripeCheckoutSession(
     if (value) metadata[key] = value;
   }
 
-  return stripe.checkout.sessions.create({
-    mode: 'payment',
-    customer_email: params.customerEmail,
-    client_reference_id: metadata.orderId ?? metadata.sessionId,
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    billing_address_collection: 'required',
-    shipping_address_collection: params.collectShipping
-      ? { allowed_countries: ['US', 'CA'] }
-      : undefined,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: params.currency.toLowerCase(),
-          unit_amount: params.amountCents,
-          product_data: {
-            name: params.name,
-            description: params.description,
+  return stripe.checkout.sessions.create(
+    {
+      mode: 'payment',
+      customer_email: params.customerEmail,
+      client_reference_id: metadata.orderId ?? metadata.sessionId,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      billing_address_collection: 'required',
+      shipping_address_collection: params.collectShipping
+        ? { allowed_countries: ['US', 'CA'] }
+        : undefined,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: params.currency.toLowerCase(),
+            unit_amount: params.amountCents,
+            product_data: {
+              name: params.name,
+              description: params.description,
+            },
           },
         },
-      },
-    ],
-    metadata,
-    payment_intent_data: {
+      ],
       metadata,
+      payment_intent_data: {
+        metadata,
+      },
     },
-  });
+    { idempotencyKey: buildCheckoutIdempotencyKey(params) }
+  );
+}
+
+export async function fetchStripeCheckoutSession(sessionId: string): Promise<{
+  id: string;
+  url: string | null;
+  status: Stripe.Checkout.Session.Status | null;
+  paymentStatus: Stripe.Checkout.Session.PaymentStatus | null;
+} | null> {
+  if (!sessionId || liveStripeBlocker()) return null;
+  try {
+    const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    return {
+      id: session.id,
+      url: session.url ?? null,
+      status: session.status ?? null,
+      paymentStatus: session.payment_status ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function createMerchCheckoutSession(params: {

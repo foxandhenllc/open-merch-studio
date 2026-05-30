@@ -1,6 +1,10 @@
 import { env } from '../config/env.js';
 import { getProductBySlug, listProducts } from './catalog.service.js';
-import { buildPrintfulOrderPayload, submitPrintfulDraftOrder } from './printful.service.js';
+import {
+  buildPrintfulOrderPayload,
+  mapPrintfulOrderStatus,
+  submitPrintfulDraftOrder,
+} from './printful.service.js';
 import {
   createStudioPass,
   getDraft,
@@ -458,6 +462,7 @@ export async function handleStripeCheckoutCompleted(
           'Payment is complete, but fulfillment needs review because recipient or artwork data is incomplete.',
       },
     };
+    await recordPaymentCompletion(next.id, session, next.fulfillment.status);
     return saveOrder(next);
   }
 
@@ -469,21 +474,20 @@ export async function handleStripeCheckoutCompleted(
       recipient,
       artworkUrl,
     });
+    const mappedStatus = printfulOrder.confirmed
+      ? mapPrintfulOrderStatus(printfulOrder.status)
+      : { orderStatus: 'needs_review' as const, fulfillmentStatus: 'needs_review' as const };
     next = {
       ...next,
       fulfillment: {
         provider: 'printful',
-        status: 'submitted',
+        status: mappedStatus.fulfillmentStatus,
         message: printfulOrder.confirmed
           ? `Printful order ${printfulOrder.providerOrderId} confirmed.`
           : `Printful draft order ${printfulOrder.providerOrderId} created for review.`,
       },
     };
-    next = transition(
-      next,
-      printfulOrder.confirmed ? 'submitted' : 'needs_review',
-      next.fulfillment.message
-    );
+    next = transition(next, mappedStatus.orderStatus, next.fulfillment.message);
     await recordPaymentCompletion(next.id, session, next.fulfillment.status);
     if (env.databaseUrl) {
       await prisma.order.update({

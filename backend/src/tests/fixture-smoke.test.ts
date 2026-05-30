@@ -40,7 +40,7 @@ test('fixture paid-beta path reaches checkout and fulfillment without credential
   const passCheckout = await createStudioPassCheckout(session.id);
   assert.equal(passCheckout.status, 'paid');
 
-  const mockup = createDesignMockup({
+  const mockup = await createDesignMockup({
     sessionId: session.id,
     productId: product.id,
     variantId: variant.id,
