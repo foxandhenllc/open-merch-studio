@@ -4,12 +4,13 @@
   "description": "Open-source AI-first custom merch studio for curated Printful catalog fulfillment.",
   "private": false,
   "license": "MIT",
+  "packageManager": "npm@10.9.2",
   "workspaces": [
     "backend",
     "frontend"
   ],
   "engines": {
-    "node": ">=20.19 <23",
+    "node": ">=20.19 <26",
     "npm": ">=10"
   },
   "scripts": {
