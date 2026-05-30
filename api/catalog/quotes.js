@@ -9,7 +9,7 @@ module.exports = async function handler(req, res) {
     if (!Array.isArray(body.items) || body.items.length === 0) {
       return json(res, 400, { success: false, error: 'Quote requires at least one item.' });
     }
-    return json(res, 201, { success: true, data: buildQuote(body.items) });
+    return json(res, 201, { success: true, data: buildQuote(body.items, body.studioPassId) });
   } catch (error) {
     return json(res, 400, { success: false, error: error.message || 'Invalid quote request.' });
   }

@@ -11,6 +11,7 @@ import type {
   QuoteLineInput,
 } from '../types/catalog.js';
 import { buildQuoteBreakdown } from './pricing.service.js';
+import { getStudioPassById, getStudioPassForSession, saveQuote } from './runtime-store.js';
 
 const launchCategorySlugs = new Set(sampleCatalog.categories.map((category) => category.slug));
 
@@ -174,13 +175,22 @@ export async function getProductsByIds(productIds: string[]): Promise<CatalogPro
 }
 
 export async function createQuote(
-  inputItems: QuoteLineInput[]
+  inputItems: QuoteLineInput[],
+  options: { sessionId?: string; studioPassId?: string } = {}
 ): Promise<QuoteBreakdown & { id: string | null }> {
   const products = await getProductsByIds(inputItems.map((item) => item.productId));
-  const quote = buildQuoteBreakdown(products, inputItems);
+  const pass =
+    options.sessionId || options.studioPassId
+      ? (getStudioPassForSession(options.sessionId ?? '') ??
+        getStudioPassById(options.studioPassId))
+      : undefined;
+  const quote = buildQuoteBreakdown(products, inputItems, undefined, {
+    studioPassCreditCents: pass && pass.status !== 'applied' ? pass.creditCents : 0,
+  });
+  const runtimeQuote = saveQuote(quote);
 
   if (!env.databaseUrl) {
-    return { ...quote, id: null };
+    return { ...runtimeQuote, id: runtimeQuote.id ?? null };
   }
 
   try {
@@ -193,12 +203,17 @@ export async function createQuote(
         aiDesignFeeCents: quote.aiDesignFeeCents,
         paymentFeeCents: quote.paymentFeeCents,
         targetMarginCents: quote.targetMarginCents,
-        totalCents: quote.totalCents,
+        studioPassCreditCents: quote.studioPassCreditCents,
+        subtotalBeforeCreditsCents: quote.subtotalBeforeCreditsCents,
+        costLines: quote.costLines,
+        estimateFlags: quote.estimateFlags,
+        totalCents: runtimeQuote.totalCents,
         expiresAt: new Date(quote.expiresAt),
         items: {
           create: quote.items.map((item) => ({
             productId: item.productId,
             variantId: item.variantId,
+            designAssetId: item.designAssetId,
             quantity: item.quantity,
             placementCodes: item.placementCodes,
             unitCostCents: item.unitCostCents,
@@ -207,9 +222,10 @@ export async function createQuote(
         },
       },
     });
-    return { ...quote, id: created.id };
+    const saved = saveQuote({ ...runtimeQuote, id: created.id });
+    return { ...saved, id: created.id };
   } catch {
-    return { ...quote, id: null };
+    return { ...runtimeQuote, id: runtimeQuote.id ?? null };
   }
 }
 

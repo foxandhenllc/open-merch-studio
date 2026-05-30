@@ -154,8 +154,100 @@ model DesignAsset {
   updatedAt       DateTime    @updatedAt
   quoteItems      QuoteItem[]
   orderItems      OrderItem[]
+  spendEvents     AiSpendEvent[]
 
   @@map("design_assets")
+}
+
+model StudioSession {
+  id              String        @id @default(uuid())
+  status          String        @default("guest")
+  freeDraftsUsed  Int           @default(0)
+  freeDraftLimit  Int           @default(1)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  passes          StudioPass[]
+  spendEvents     AiSpendEvent[]
+
+  @@index([status, createdAt])
+  @@map("studio_sessions")
+}
+
+model StudioPass {
+  id                   String         @id @default(uuid())
+  sessionId            String
+  status               String         @default("simulated")
+  priceCents           Int            @default(500)
+  creditCents          Int            @default(500)
+  includedRoughDrafts  Int            @default(8)
+  includedEdits        Int            @default(2)
+  includedFinals       Int            @default(1)
+  roughDraftsUsed      Int            @default(0)
+  editsUsed            Int            @default(0)
+  finalsUsed           Int            @default(0)
+  appliedOrderId       String?
+  createdAt            DateTime       @default(now())
+  expiresAt            DateTime?
+  session              StudioSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, status])
+  @@map("studio_passes")
+}
+
+model AiSpendEvent {
+  id                 String         @id @default(uuid())
+  sessionId          String
+  designAssetId      String?
+  action             String
+  provider           String
+  estimatedCostCents Int            @default(0)
+  createdAt          DateTime       @default(now())
+  session            StudioSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  designAsset        DesignAsset?   @relation(fields: [designAssetId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([action, provider, createdAt])
+  @@map("ai_spend_events")
+}
+
+model MockupTask {
+  id              String   @id @default(uuid())
+  productId       String
+  variantId       String
+  designAssetId   String?
+  provider        String   @default("fixture")
+  status          String   @default("queued")
+  placementCodes  String[]
+  imageUrl        String?
+  providerTaskId  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("mockup_tasks")
+}
+
+model AdminSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admin_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actor     String?
+  action    String
+  target    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@map("audit_logs")
 }
 
 model Quote {
@@ -167,6 +259,10 @@ model Quote {
   aiDesignFeeCents     Int
   paymentFeeCents      Int
   targetMarginCents    Int
+  studioPassCreditCents Int       @default(0)
+  subtotalBeforeCreditsCents Int  @default(0)
+  costLines             Json?
+  estimateFlags         Json?
   totalCents           Int
   expiresAt            DateTime
   createdAt            DateTime    @default(now())
@@ -204,14 +300,62 @@ model Order {
   status          OrderStatus @default(DRAFT)
   stripeSessionId String?
   printfulOrderId String?
+  fulfillmentStatus String      @default("not_submitted")
+  failureReason     String?
   totalCents      Int
   currency        String      @default("USD")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   items           OrderItem[]
+  transitions     OrderTransition[]
+  paymentEvents   PaymentEvent[]
+  fulfillmentAttempts FulfillmentAttempt[]
 
   @@index([status, createdAt])
   @@map("orders")
+}
+
+model OrderTransition {
+  id        String   @id @default(uuid())
+  orderId   String
+  status    String
+  note      String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_transitions")
+}
+
+model PaymentEvent {
+  id              String   @id @default(uuid())
+  orderId         String
+  provider        String   @default("stripe")
+  providerEventId String?
+  eventType       String
+  status          String
+  payload         Json?
+  createdAt       DateTime @default(now())
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerEventId])
+  @@index([orderId, createdAt])
+  @@map("payment_events")
+}
+
+model FulfillmentAttempt {
+  id              String   @id @default(uuid())
+  orderId         String
+  provider        String   @default("printful")
+  providerOrderId String?
+  status          String
+  payload         Json?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("fulfillment_attempts")
 }
 
 model OrderItem {

@@ -8,6 +8,7 @@ export type PricingSettings = {
   aiDesignFeeCents: number;
   paymentFeePercent: number;
   paymentFeeFixedCents: number;
+  studioPassCreditCents: number;
 };
 
 export const pricingSettingsFromEnv = (): PricingSettings => ({
@@ -17,6 +18,7 @@ export const pricingSettingsFromEnv = (): PricingSettings => ({
   aiDesignFeeCents: env.aiDesignFeeCents,
   paymentFeePercent: env.paymentFeePercent,
   paymentFeeFixedCents: env.paymentFeeFixedCents,
+  studioPassCreditCents: env.studioPassPriceCents,
 });
 
 const roundCents = (value: number) => Math.max(0, Math.round(value));
@@ -37,18 +39,28 @@ export function calculatePaymentFeeCents(
 
 export function calculateTargetMarginCents(
   productCostCents: number,
+  productType?: string | null,
   settings = pricingSettingsFromEnv()
 ): number {
+  const categoryMultiplier =
+    productType === 'sticker'
+      ? 1.45
+      : productType === 'wall-art'
+        ? 1.2
+        : productType === 'phone-case'
+          ? 1.15
+          : 1;
   return Math.max(
     settings.minMarginCents,
-    roundCents(productCostCents * (settings.targetMarginPercent / 100))
+    roundCents(productCostCents * (settings.targetMarginPercent / 100) * categoryMultiplier)
   );
 }
 
 export function buildQuoteBreakdown(
   products: CatalogProductDto[],
   inputItems: QuoteLineInput[],
-  settings = pricingSettingsFromEnv()
+  settings = pricingSettingsFromEnv(),
+  options: { studioPassCreditCents?: number } = {}
 ): QuoteBreakdown {
   const productMap = new Map(products.map((product) => [product.id, product]));
   const items = inputItems.map((input) => {
@@ -74,7 +86,14 @@ export function buildQuoteBreakdown(
 
     const quantity = Math.max(1, Math.floor(input.quantity || 1));
     const unitCostCents = variant.costCents;
-    const unitMarginCents = calculateTargetMarginCents(unitCostCents, settings);
+    const unavailablePlacement = placementCodes.find(
+      (placementCode) => !product.placements.some((placement) => placement.code === placementCode)
+    );
+    if (unavailablePlacement) {
+      throw new Error(`Placement ${unavailablePlacement} is unavailable for ${product.title}`);
+    }
+
+    const unitMarginCents = calculateTargetMarginCents(unitCostCents, product.type, settings);
     const unitRetailCents = unitCostCents + unitMarginCents + settings.aiDesignFeeCents;
 
     return {
@@ -85,6 +104,7 @@ export function buildQuoteBreakdown(
       variantName: variant.name,
       quantity,
       placementCodes,
+      designAssetId: input.designAssetId,
       unitCostCents,
       unitRetailCents,
     };
@@ -111,11 +131,63 @@ export function buildQuoteBreakdown(
   );
   const targetMarginCents = items.reduce(
     (total, item) =>
-      total + calculateTargetMarginCents(item.unitCostCents, settings) * item.quantity,
+      total +
+      calculateTargetMarginCents(
+        item.unitCostCents,
+        productMap.get(item.productId)?.type,
+        settings
+      ) *
+        item.quantity,
     0
   );
-  const totalCents = itemRetailBeforeFees + shippingEstimateCents + paymentFeeCents;
+  const subtotalBeforeCreditsCents = itemRetailBeforeFees + shippingEstimateCents + paymentFeeCents;
+  const studioPassCreditCents = Math.min(
+    options.studioPassCreditCents ?? 0,
+    settings.studioPassCreditCents,
+    subtotalBeforeCreditsCents
+  );
+  const totalCents = Math.max(0, subtotalBeforeCreditsCents - studioPassCreditCents);
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+  const costLines: QuoteBreakdown['costLines'] = [
+    {
+      code: 'product-cost',
+      label: 'Product and fulfillment base',
+      amountCents: productCostCents,
+      kind: 'cost',
+    },
+    {
+      code: 'design-allocation',
+      label: 'Design readiness allocation',
+      amountCents: aiDesignFeeCents,
+      kind: 'fee',
+    },
+    {
+      code: 'margin',
+      label: 'Studio margin',
+      amountCents: targetMarginCents,
+      kind: 'margin',
+    },
+    {
+      code: 'shipping-estimate',
+      label: 'Shipping estimate',
+      amountCents: shippingEstimateCents,
+      kind: 'estimate',
+    },
+    {
+      code: 'payment-fee-estimate',
+      label: 'Payment fee estimate',
+      amountCents: paymentFeeCents,
+      kind: 'estimate',
+    },
+  ];
+  if (studioPassCreditCents > 0) {
+    costLines.push({
+      code: 'studio-pass-credit',
+      label: 'Studio Pass credit',
+      amountCents: -studioPassCreditCents,
+      kind: 'credit',
+    });
+  }
 
   return {
     currency: settings.currency,
@@ -125,7 +197,15 @@ export function buildQuoteBreakdown(
     aiDesignFeeCents,
     paymentFeeCents,
     targetMarginCents,
+    studioPassCreditCents,
+    subtotalBeforeCreditsCents,
     totalCents,
+    estimateFlags: {
+      shipping: true,
+      tax: true,
+      paymentFee: true,
+    },
+    costLines,
     expiresAt,
     items,
   };

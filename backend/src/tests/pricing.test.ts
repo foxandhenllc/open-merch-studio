@@ -23,6 +23,7 @@ test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
       aiDesignFeeCents: 300,
       paymentFeePercent: 2.9,
       paymentFeeFixedCents: 30,
+      studioPassCreditCents: 500,
     }
   );
 
@@ -30,7 +31,37 @@ test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
   assert.equal(quote.aiDesignFeeCents, 600);
   assert.equal(quote.targetMarginCents, 1000);
   assert.ok(quote.paymentFeeCents > 0);
+  assert.equal(quote.studioPassCreditCents, 0);
+  assert.equal(
+    quote.costLines.some((line) => line.code === 'margin'),
+    true
+  );
   assert.ok(quote.totalCents > quote.productCostCents);
+});
+
+test('buildQuoteBreakdown applies Studio Pass credit once', () => {
+  const product = sampleCatalog.products[0];
+  const variant = product.variants[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: ['front'],
+      },
+    ],
+    undefined,
+    { studioPassCreditCents: 500 }
+  );
+
+  assert.equal(quote.studioPassCreditCents, 500);
+  assert.equal(quote.totalCents, quote.subtotalBeforeCreditsCents - 500);
+  assert.equal(
+    quote.costLines.some((line) => line.kind === 'credit'),
+    true
+  );
 });
 
 test('buildQuoteBreakdown rejects unknown variants', () => {

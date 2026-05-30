@@ -1,0 +1,36 @@
+# Paid Beta Flow
+
+**Status:** Implemented in fixture mode  
+**Visibility:** Public  
+
+Open Merch Studio uses a mock-first architecture so contributors can run the full customer journey without private provider accounts.
+
+## Customer Flow
+
+1. Browse curated launch products from `/api/catalog/products`.
+2. Select product, variant, and placement.
+3. Create or refine an idea through `/api/design/ideas`.
+4. Generate a rough draft through `/api/design/drafts`.
+5. Optionally simulate a `$5` Studio Pass through `/api/studio-passes/checkout`.
+6. Generate a fixture mockup through `/api/design/mockups`.
+7. Create a quote through `/api/catalog/quotes`.
+8. Simulate checkout through `/api/checkout/sessions`.
+9. View order confirmation through `/api/orders/:orderId`.
+
+## Runtime Safety
+
+- Live OpenAI, Stripe, and Printful behavior requires credentials, explicit enable flags, private OPS approval, and implementation verification. Current fixture mode does not create live provider calls.
+- AI spend is tracked through an internal fixture ledger. Production spend tracking still needs persistence and provider-call verification before live launch.
+- Studio Pass allowance is tracked separately from customer-facing price copy.
+- Checkout and fulfillment can be paused independently.
+
+## Admin Flow
+
+- `/api/admin/settings` exposes current safe runtime settings only when `ADMIN_ACCESS_CODE` is configured and supplied via `x-admin-access`.
+- `/api/admin/orders` lists order summaries.
+- `/api/admin/report` returns sessions, passes, drafts, orders, estimated AI spend, and launch gates.
+- `/api/admin/launch-readiness` returns the current paid-beta gate state.
+
+## Persistence Path
+
+Fixture mode uses an in-memory runtime store. The Prisma schema now documents the production persistence path for sessions, Studio Passes, AI spend events, mockups, quotes, orders, transitions, payment events, fulfillment attempts, admin settings, and audit logs, but production persistence still needs migration/runbook verification before paid beta.

@@ -44,6 +44,9 @@ export const postQuote = asyncHandler(async (req: Request, res: Response) => {
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpError('Quote requires at least one item.', 400);
   }
-  const quote = await createQuote(items);
+  const quote = await createQuote(items, {
+    sessionId: String(req.body?.sessionId ?? '') || undefined,
+    studioPassId: String(req.body?.studioPassId ?? '') || undefined,
+  });
   res.status(201).json({ success: true, data: quote });
 });

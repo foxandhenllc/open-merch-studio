@@ -7,10 +7,12 @@ The current working title is temporary. The code, docs, and environment template
 ## What It Does
 
 - Browses a curated multi-category Printful launch catalog.
-- Creates mock or provider-backed design drafts.
+- Creates fixture design drafts by default, with a guarded OpenAI image-generation adapter available only when live generation is explicitly enabled.
 - Runs basic print-readiness checks before quoting.
-- Produces transparent cost-plus quotes with product cost, AI/design fee, margin, shipping estimate, payment fee estimate, and total.
-- Stores a normalized catalog data model for categories, products, variants, placements, mockup styles, price snapshots, sync runs, quotes, and order items.
+- Produces transparent cost-plus quotes with product cost, design allocation, margin, shipping estimate, payment fee estimate, Studio Pass credit, and total.
+- Simulates a `$5` Studio Pass that unlocks deeper design work and applies to an eligible purchase.
+- Simulates checkout, order confirmation, and fixture fulfillment without creating live charges or provider orders. The backend also includes guarded Stripe Checkout/webhook and Printful draft-order adapters for private test activation.
+- Stores a normalized catalog and launch data model for categories, products, variants, placements, mockups, sessions, Studio Passes, AI spend events, quotes, orders, payment events, fulfillment attempts, settings, and audit logs.
 - Supports fixture-backed local development when Printful, Stripe, and OpenAI credentials are not configured.
 
 ## Launch Catalog
@@ -21,7 +23,7 @@ The v1 curated catalog targets broad basics across apparel, hats, drinkware, wal
 
 - Backend: Node.js, Express, TypeScript, Prisma, PostgreSQL
 - Frontend: React, Vite, TypeScript
-- Integrations: Printful catalog/order payloads, optional OpenAI design provider, optional Stripe checkout
+- Integrations: Printful catalog/order payloads and draft-order adapter, OpenAI image-generation adapter, Stripe Checkout/webhook adapter, and fixture providers for public-safe development. Live provider activation requires private credentials, database setup, explicit safety gates, and OPS review.
 
 ## Local Setup
 
@@ -52,8 +54,29 @@ npm run dev:frontend
 - `GET /api/catalog/products`
 - `GET /api/catalog/products/:slug`
 - `POST /api/catalog/quotes`
+- `POST /api/design/sessions`
+- `POST /api/design/ideas`
 - `POST /api/design/drafts`
+- `POST /api/design/drafts/:id/revisions`
+- `GET /api/design/assets/:assetId.png`
+- `POST /api/design/readiness`
+- `POST /api/design/mockups`
+- `POST /api/studio-passes/checkout`
+- `POST /api/checkout/sessions`
+- `POST /api/stripe/webhook`
+- `GET /api/orders/:orderId`
 - `POST /api/admin/catalog/sync`
+- `GET /api/admin/settings`
+- `GET /api/admin/orders`
+- `GET /api/admin/report`
+- `GET /api/admin/launch-readiness`
+
+## Paid Beta Runbook
+
+- Public launch tickets: [docs/tickets/launch/README.md](./docs/tickets/launch/README.md)
+- Paid beta flow: [docs/architecture/paid-beta-flow.md](./docs/architecture/paid-beta-flow.md)
+- Runbook: [docs/launch/paid-beta-runbook.md](./docs/launch/paid-beta-runbook.md)
+- Audit template: [docs/launch/launch-audit-template.md](./docs/launch/launch-audit-template.md)
 
 ## Printful References
 
