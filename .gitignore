@@ -155,3 +155,5 @@ frontend/scripts/capture-utils/*
 *.dump
 artifacts/private/
 staging/private/
+.vercel
+.env*.local
