@@ -17,6 +17,7 @@ import type {
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
+import type { PolicyRoute } from './App.types';
 
 const formatMoney = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
@@ -49,13 +50,6 @@ const WORKFLOW = [
   { label: 'Preview', hint: 'See it on a mockup' },
   { label: 'Checkout', hint: 'Transparent price' },
 ] as const;
-
-type PolicyRoute = {
-  title: string;
-  eyebrow: string;
-  summary: string;
-  sections: Array<{ heading: string; body: string }>;
-};
 
 const policyRoutes: Record<string, PolicyRoute> = {
   '/privacy': {
@@ -335,6 +329,7 @@ export default function App() {
   const step = quote ? 5 : mockup ? 4 : design ? 3 : idea ? 2 : selectedProduct ? 1 : 0;
   const selectedCategoryTitle =
     categories.find((category) => category.slug === selectedCategory)?.title ?? 'All products';
+  const hasQuote = Boolean(quote);
   const checkoutUnavailable =
     publicConfig.isProductionMode && !publicConfig.enablePublicCheckout
       ? 'Paid checkout opens after final provider and support review.'
@@ -568,16 +563,9 @@ export default function App() {
   }
 
   const passActive = Boolean(studioPass);
-  const passBenefits = [
-    'Counts as a $5 credit toward your order',
-    'Up to 8 AI rough drafts to explore',
-    '2 guided edits to refine your favorite',
-    '1 final, print-ready artwork file',
-  ];
-
   return (
     <main className="app-shell">
-      <header className="hero">
+      <header className="hero hero-compact">
         <div className="hero-top">
           <div className="hero-brand">
             <span className="brand-mark" aria-hidden="true">
@@ -607,21 +595,23 @@ export default function App() {
             : 'Dream it, generate it, wear it. Pick a product, describe your idea, and watch AI turn it into print-ready art on a real mockup.'}{' '}
           <strong>Free to start — no account needed.</strong>
         </p>
-        <ul className="value-pills" aria-label="What to expect">
-          <li>
-            <span aria-hidden="true">✨</span> Start free
-          </li>
-          <li>
-            <span aria-hidden="true">🎟️</span>{' '}
-            {checkoutUnavailable ? '$5 Studio Pass · opening soon' : "$5 Studio Pass when you're ready"}
-          </li>
-          <li>
-            <span aria-hidden="true">📦</span> 8 product types &amp; growing
-          </li>
-          <li>
-            <span aria-hidden="true">💸</span> See the full price before you pay
-          </li>
-        </ul>
+        {!publicConfig.isProductionMode && (
+          <ul className="value-pills" aria-label="What to expect">
+            <li>
+              <span aria-hidden="true">✨</span> Start free
+            </li>
+            <li>
+              <span aria-hidden="true">🎟️</span>{' '}
+              {checkoutUnavailable ? '$5 Studio Pass · opening soon' : "$5 Studio Pass when you're ready"}
+            </li>
+            <li>
+              <span aria-hidden="true">📦</span> 8 product types &amp; growing
+            </li>
+            <li>
+              <span aria-hidden="true">💸</span> See the full price before you pay
+            </li>
+          </ul>
+        )}
       </header>
 
       {error && (
@@ -632,11 +622,11 @@ export default function App() {
       )}
 
       {checkoutUnavailable && (
-        <section className="customer-note" aria-label="Checkout status">
-          <strong>Paid checkout is not open yet.</strong>
+        <section className="customer-note customer-note--quiet" aria-label="Checkout status">
+          <strong>Checkout opens soon.</strong>
           <span>
-            You can still browse products, shape a design prompt, preview mockups, and review
-            pricing. Live payment and fulfillment will open after final provider review.
+            Browse products, shape a design, and get a transparent estimate while live payment and
+            fulfillment finish review.
           </span>
         </section>
       )}
@@ -675,7 +665,7 @@ export default function App() {
         ))}
       </ol>
 
-      <section className="shop-grid">
+      <section className={`shop-grid ${hasQuote ? 'has-quote' : 'is-guided'}`}>
         <aside className="panel catalog-panel" aria-label="Catalog">
           <div className="panel-heading">
             <div>
@@ -857,9 +847,25 @@ export default function App() {
                   {busy === 'mockup' ? 'Building…' : 'Preview on product'}
                 </button>
                 <button className="btn" onClick={createQuote} disabled={busy !== null} type="button">
-                  {busy === 'quote' ? 'Pricing…' : 'See the price'}
+                  {busy === 'quote' ? 'Pricing...' : quote ? 'Update price' : 'See the price'}
                 </button>
               </div>
+
+              {quote && (
+                <section className="inline-quote" aria-live="polite">
+                  <div>
+                    <span>Estimated total</span>
+                    <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
+                  </div>
+                  <button
+                    className="btn btn-soft"
+                    type="button"
+                    onClick={() => document.querySelector('.checkout-panel')?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    View details
+                  </button>
+                </section>
+              )}
 
               {idea && (
                 <section className="insight-box insight-box--idea">
@@ -939,84 +945,60 @@ export default function App() {
           )}
         </section>
 
+        {quote && (
         <aside className="panel checkout-panel" aria-label="Quote and checkout">
           <div className="panel-heading">
             <div>
               <h2>Your order</h2>
-              <p>
-                {quote?.id
-                  ? `Quote ${quote.id.slice(0, 12)} · locked in`
-                  : 'Transparent pricing — nothing hidden'}
-              </p>
+              <p>{`Quote ${quote.id?.slice(0, 12) ?? 'ready'} · estimate locked in`}</p>
             </div>
           </div>
 
-          <div className={`studio-pass-card ${passActive ? 'is-active' : ''}`}>
-            <div className="studio-pass-card__head">
-              <div>
-                <span className="studio-pass-card__kicker">
-                  {passActive ? '🎟️ Studio Pass active' : '🎟️ $5 Studio Pass'}
-                </span>
-                <strong>{passActive ? 'Ready on this session' : 'Optional — unlock when ready'}</strong>
-              </div>
-              <span className="studio-pass-card__price">$5</span>
+          <div className={`studio-pass-card studio-pass-card--compact ${passActive ? 'is-active' : ''}`}>
+            <div>
+              <span className="studio-pass-card__kicker">
+                {passActive ? 'Studio Pass active' : '$5 Studio Pass'}
+              </span>
+              <p>
+                {checkoutUnavailable
+                  ? 'Applied to purchase when checkout opens.'
+                  : 'Optional design credit, applied to an eligible purchase.'}
+              </p>
             </div>
-            <ul className="studio-pass-card__list">
-              {passBenefits.map((benefit) => (
-                <li key={benefit}>
-                  <span aria-hidden="true">✓</span> {benefit}
-                </li>
-              ))}
-            </ul>
             <button
-              className="btn btn-primary btn-block"
+              className="btn btn-soft"
               onClick={buyStudioPass}
               disabled={busy !== null || passActive || !canUseCustomerCheckout}
               type="button"
             >
               {passActive
-                ? 'Pass active ✓'
+                ? 'Pass active'
                 : checkoutUnavailable
-                  ? 'Pass checkout opens soon'
+                  ? 'Opening soon'
                   : busy === 'pass'
-                    ? 'Activating…'
-                    : 'Get the Studio Pass'}
+                    ? 'Activating...'
+                    : 'Get pass'}
             </button>
-            <small className="studio-pass-card__note">
-              {checkoutUnavailable
-                ? 'Your first draft stays free while we finish live checkout and fulfillment review.'
-                : 'Your first draft is always free. The pass only matters once you want to explore more.'}
-            </small>
           </div>
 
-          {quote ? (
-            <div className="quote-table">
-              {quote.costLines.map((line) => (
-                <p key={line.code} className={line.kind === 'credit' ? 'quote-credit' : ''}>
-                  <span>{line.label}</span>
-                  <strong>{formatMoney(line.amountCents, quote.currency)}</strong>
-                </p>
-              ))}
-              <p className="quote-total">
-                <span>Total</span>
-                <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
-              </p>
-              <small>
-                Shipping, tax, and payment fees are estimates until live checkout confirms them.
-              </small>
-            </div>
-          ) : (
-            <div className="quote-empty">
+          <div className="quote-table quote-table--summary">
+            <p className="quote-total quote-total--hero">
+              <span>Estimated total</span>
+              <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
+            </p>
+            <details className="quote-details">
+              <summary>Price breakdown</summary>
               <div>
-                <small>Selected</small>
-                <p>{selectedProduct?.title ?? 'Pick a product'}</p>
+                {quote.costLines.map((line) => (
+                  <p key={line.code} className={line.kind === 'credit' ? 'quote-credit' : ''}>
+                    <span>{line.label}</span>
+                    <strong>{formatMoney(line.amountCents, quote.currency)}</strong>
+                  </p>
+                ))}
               </div>
-              <div className="quote-empty__price">
-                <small>from</small>
-                <strong>{selectedVariant ? formatMoney(selectedVariant.costCents) : '$0.00'}</strong>
-              </div>
-            </div>
-          )}
+            </details>
+            <small>Shipping, tax, and payment fees remain estimates until live checkout.</small>
+          </div>
 
           {canUseCustomerCheckout && (
             <label className="field-block" htmlFor="email">
@@ -1071,6 +1053,7 @@ export default function App() {
             </section>
           )}
         </aside>
+        )}
       </section>
 
       {!publicConfig.isProductionMode && (

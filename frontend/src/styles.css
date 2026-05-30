@@ -188,13 +188,28 @@ a {
 
 /* ---------- Hero ---------- */
 .hero {
-  margin-bottom: 16px;
-  padding: 22px 26px;
+  margin-bottom: 12px;
+  padding: 18px 24px;
   border-radius: var(--radius-xl);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(6px);
+}
+
+.hero-compact .brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 22px;
+}
+
+.hero-compact h1 {
+  font-size: 36px;
+}
+
+.hero-compact .eyebrow {
+  font-size: 11px;
 }
 
 .hero-top {
@@ -243,9 +258,9 @@ h3 {
 
 .hero-tagline {
   max-width: 64ch;
-  margin: 16px 0 0;
-  font-size: 17px;
-  line-height: 1.5;
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
   color: var(--ink-soft);
 }
 
@@ -339,14 +354,18 @@ h3 {
 /* ---------- Customer status ---------- */
 .customer-note {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
-  padding: 14px 18px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
   border: 1px solid rgba(245, 158, 11, 0.35);
   border-radius: var(--radius-lg);
   background: rgba(255, 251, 235, 0.88);
   box-shadow: var(--shadow-sm);
+}
+
+.customer-note--quiet {
+  background: rgba(255, 251, 235, 0.72);
 }
 
 .customer-note strong {
@@ -435,8 +454,8 @@ h3 {
 .workflow-steps {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin: 0 0 16px;
+  gap: 6px;
+  margin: 0 0 12px;
   padding: 0;
   list-style: none;
 }
@@ -444,8 +463,8 @@ h3 {
 .step-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 14px;
+  gap: 8px;
+  padding: 8px 11px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -456,8 +475,8 @@ h3 {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
+  width: 23px;
+  height: 23px;
   border-radius: 999px;
   background: var(--surface-soft);
   border: 1px solid var(--border-strong);
@@ -471,12 +490,12 @@ h3 {
 }
 
 .step-badge strong {
-  font-size: 13.5px;
+  font-size: 12.5px;
 }
 
 .step-badge small {
   color: var(--ink-faint);
-  font-size: 11.5px;
+  font-size: 10.5px;
 }
 
 .step-badge.is-active {
@@ -514,9 +533,13 @@ h3 {
 
 .shop-grid {
   display: grid;
-  grid-template-columns: minmax(290px, 360px) minmax(480px, 1fr) minmax(310px, 388px);
+  grid-template-columns: minmax(280px, 410px) minmax(520px, 1fr);
   gap: 16px;
   align-items: start;
+}
+
+.shop-grid.has-quote {
+  grid-template-columns: minmax(280px, 340px) minmax(500px, 1fr) minmax(300px, 360px);
 }
 
 .catalog-panel,
@@ -578,6 +601,9 @@ h3 {
 .product-list {
   display: grid;
   gap: 10px;
+  max-height: min(58vh, 620px);
+  overflow: auto;
+  padding-right: 3px;
 }
 
 .product-card {
@@ -759,7 +785,7 @@ h3 {
 /* ---------- Studio ---------- */
 .studio-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.92fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(260px, 0.86fr) minmax(320px, 1fr);
   gap: 18px;
 }
 
@@ -767,7 +793,7 @@ h3 {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 440px;
+  min-height: 390px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background:
@@ -809,19 +835,19 @@ h3 {
 }
 
 .product-stage .product-visual {
-  width: min(60vw, 340px);
-  min-height: 300px;
+  width: min(54vw, 300px);
+  min-height: 270px;
   background: transparent;
 }
 .product-stage .product-visual__glow {
   height: 60%;
 }
 .product-stage .product-visual__surface {
-  width: 180px;
-  height: 210px;
+  width: 162px;
+  height: 190px;
 }
 .product-stage .product-visual__icon {
-  font-size: 84px;
+  font-size: 76px;
 }
 .product-stage .product-visual__initials {
   min-width: 34px;
@@ -949,6 +975,36 @@ h3 {
   flex-wrap: wrap;
   gap: 10px;
   margin: 18px 0;
+}
+
+.inline-quote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(15, 157, 118, 0.08));
+}
+
+.inline-quote div {
+  display: grid;
+  gap: 2px;
+}
+
+.inline-quote span {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.inline-quote strong {
+  color: var(--ink);
+  font-size: 24px;
 }
 
 .btn {
@@ -1182,6 +1238,25 @@ button:disabled {
   line-height: 1.4;
 }
 
+.studio-pass-card--compact {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+}
+
+.studio-pass-card--compact p {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.studio-pass-card--compact .btn {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
 /* ---------- Quote ---------- */
 .quote-table p {
   display: flex;
@@ -1224,6 +1299,43 @@ button:disabled {
 .quote-table small {
   color: var(--ink-faint);
   font-size: 12px;
+}
+
+.quote-table--summary {
+  gap: 10px;
+}
+
+.quote-total--hero {
+  margin: 0 !important;
+  border: 0;
+  padding: 0;
+}
+
+.quote-total--hero span {
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.quote-total--hero strong {
+  font-size: 30px;
+}
+
+.quote-details {
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
+}
+
+.quote-details summary {
+  cursor: pointer;
+  color: var(--brand-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.quote-details div {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .quote-empty {
@@ -1476,7 +1588,8 @@ button:disabled {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1380px) {
-  .shop-grid {
+  .shop-grid,
+  .shop-grid.has-quote {
     grid-template-columns: minmax(280px, 320px) 1fr;
   }
   .checkout-panel {
@@ -1521,6 +1634,9 @@ button:disabled {
   .product-stage {
     min-height: 340px;
   }
+  .product-list {
+    max-height: none;
+  }
   .check-row {
     grid-template-columns: 22px 1fr;
   }
@@ -1537,27 +1653,63 @@ button:disabled {
 }
 
 @media (max-width: 560px) {
-  .hero {
-    padding: 18px;
+  .app-shell {
+    padding: 12px 10px 28px;
   }
+  .hero {
+    padding: 14px;
+    border-radius: 24px;
+  }
+  .hero-top {
+    gap: 8px;
+  }
+  .hero-brand {
+    gap: 10px;
+  }
+  .hero-compact .brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    font-size: 18px;
+  }
+  .hero-compact .eyebrow {
+    font-size: 9.5px;
+  }
+  .hero-compact h1,
   h1 {
-    font-size: 34px;
+    font-size: 30px;
+    line-height: 1;
+  }
+  .hero-tagline {
+    font-size: 14px;
+    line-height: 1.42;
   }
   .top-actions {
-    width: 100%;
+    display: none;
   }
-  .top-actions a {
-    flex: 1 1 0;
-    text-align: center;
+  .customer-note {
+    gap: 6px;
+    padding: 10px 12px;
+    font-size: 13.5px;
+  }
+  .panel {
+    padding: 16px;
   }
   .workflow-steps {
-    grid-template-columns: 1fr;
-  }
-  .workflow-steps .step-badge:last-child {
-    grid-column: auto;
+    display: none;
   }
   .action-row .btn {
     width: 100%;
+  }
+  .inline-quote {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .inline-quote .btn {
+    width: 100%;
+  }
+  .studio-pass-card--compact {
+    grid-template-columns: 1fr;
   }
   .product-card {
     grid-template-columns: 56px 1fr;
