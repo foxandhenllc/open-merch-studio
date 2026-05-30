@@ -217,9 +217,9 @@ a {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(30px, 4vw, 46px);
+  font-size: 46px;
   line-height: 1.02;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   background: var(--brand-grad);
   -webkit-background-clip: text;
   background-clip: text;
@@ -229,7 +229,7 @@ h1 {
 h2 {
   margin-bottom: 4px;
   font-size: 19px;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 h3 {
@@ -1419,6 +1419,9 @@ button:disabled {
 @media (max-width: 560px) {
   .hero {
     padding: 18px;
+  }
+  h1 {
+    font-size: 34px;
   }
   .top-actions {
     width: 100%;

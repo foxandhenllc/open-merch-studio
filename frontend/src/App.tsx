@@ -378,8 +378,10 @@ export default function App() {
             </div>
           </div>
           <nav className="top-actions" aria-label="Project links">
-            <a href="https://github.com/FoxAndHenLLC/open-merch-studio">GitHub</a>
-            <a href="/docs/tickets/launch/README.md">Roadmap</a>
+            <a href="https://github.com/foxandhenllc/open-merch-studio">GitHub</a>
+            <a href="https://github.com/foxandhenllc/open-merch-studio/blob/main/docs/tickets/launch/README.md">
+              Roadmap
+            </a>
           </nav>
         </div>
         <p className="hero-tagline">
@@ -451,7 +453,7 @@ export default function App() {
               </p>
             </div>
           </div>
-          <div className="category-row" role="tablist" aria-label="Product categories">
+          <div className="category-row" role="group" aria-label="Product categories">
             <button
               className={`category-chip ${!selectedCategory ? 'is-active' : ''}`}
               onClick={() => setSelectedCategory('')}

@@ -78,11 +78,12 @@ export const sampleCatalog: {
   products: [
     {
       id: 'fixture-product-heavyweight-shirt',
-      title: 'Heavyweight cotton shirt',
+      title: 'Heavyweight Cotton Tee',
       slug: 'heavyweight-cotton-shirt',
       type: 'apparel',
       brand: 'Fixture',
-      description: 'A durable everyday garment for artwork, logos, and campaign drops.',
+      description:
+        'Premium 100% cotton with a relaxed, true-to-size fit — the everyday canvas for logos, art, and campaign drops.',
       thumbnailUrl: null,
       categorySlug: 'apparel',
       isSellable: true,
@@ -129,11 +130,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-embroidered-cap',
-      title: 'Structured embroidered cap',
+      title: 'Structured Embroidered Cap',
       slug: 'structured-embroidered-cap',
       type: 'hat',
       brand: 'Fixture',
-      description: 'A front-panel cap for compact marks, badges, and short text.',
+      description:
+        'A six-panel cap with a flat front panel — built for crisp embroidered logos, badges, and short text.',
       thumbnailUrl: null,
       categorySlug: 'hats',
       isSellable: true,
@@ -161,11 +163,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-ceramic-mug',
-      title: 'Ceramic mug',
+      title: 'Classic Ceramic Mug',
       slug: 'ceramic-mug',
       type: 'drinkware',
       brand: 'Fixture',
-      description: 'A wrap-ready mug for gifts, desk drops, and small batch launches.',
+      description:
+        'A dishwasher-safe 11oz mug with a full wraparound print — a go-to gift and desk companion.',
       thumbnailUrl: null,
       categorySlug: 'drinkware',
       isSellable: true,
@@ -185,11 +188,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-matte-poster',
-      title: 'Matte poster',
+      title: 'Museum Matte Poster',
       slug: 'matte-poster',
       type: 'wall-art',
       brand: 'Fixture',
-      description: 'A lightweight wall art option for posters, prints, and event graphics.',
+      description:
+        'Gallery-grade matte paper with rich, fade-resistant color for art prints and event graphics.',
       thumbnailUrl: null,
       categorySlug: 'wall-art',
       isSellable: true,
@@ -207,11 +211,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-tote',
-      title: 'Canvas tote bag',
+      title: 'Everyday Canvas Tote',
       slug: 'canvas-tote-bag',
       type: 'bag',
       brand: 'Fixture',
-      description: 'A useful merch staple with a large single-sided print area.',
+      description:
+        'A sturdy cotton tote with a roomy print area — practical merch people actually carry every day.',
       thumbnailUrl: null,
       categorySlug: 'bags',
       isSellable: true,
@@ -230,11 +235,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-vinyl-sticker',
-      title: 'Kiss-cut sticker',
+      title: 'Kiss-Cut Vinyl Sticker',
       slug: 'kiss-cut-sticker',
       type: 'sticker',
       brand: 'Fixture',
-      description: 'A compact add-on product for logos, mascots, and campaign art.',
+      description:
+        'Durable, weatherproof vinyl with a glossy finish — the easiest way to spread a logo or mascot.',
       thumbnailUrl: null,
       categorySlug: 'stickers',
       isSellable: true,
@@ -252,11 +258,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-phone-case',
-      title: 'Slim phone case',
+      title: 'Slim Snap Phone Case',
       slug: 'slim-phone-case',
       type: 'phone-case',
       brand: 'Fixture',
-      description: 'A protective case format for device-specific artwork.',
+      description:
+        'A lightweight snap-on case with edge-to-edge artwork and a smooth matte finish.',
       thumbnailUrl: null,
       categorySlug: 'phone-cases',
       isSellable: true,
@@ -273,11 +280,12 @@ export const sampleCatalog: {
     },
     {
       id: 'fixture-product-notebook',
-      title: 'Spiral notebook',
+      title: 'Spiral-Bound Notebook',
       slug: 'spiral-notebook',
       type: 'stationery',
       brand: 'Fixture',
-      description: 'A notebook surface for cover art, office gifts, and creator bundles.',
+      description:
+        'A wire-bound notebook with a fully custom cover — a handy giveaway or creator-bundle add-on.',
       thumbnailUrl: null,
       categorySlug: 'stationery',
       isSellable: true,
