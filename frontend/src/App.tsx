@@ -27,16 +27,47 @@ const defaultPlacement = (product: CatalogProduct): PlacementOption | null =>
   product.placements.find((placement) => placement.isDefault) ?? product.placements[0] ?? null;
 
 const statusLabel = (status: string) =>
-  status
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+  status.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 
-function StepBadge({ index, label, active }: { index: number; label: string; active: boolean }) {
+// Public-safe, product-neutral category signals.
+const categoryIcon: Record<string, string> = {
+  apparel: '👕',
+  hats: '🧢',
+  drinkware: '☕',
+  'wall-art': '🖼️',
+  bags: '👜',
+  stickers: '✦',
+  'phone-cases': '📱',
+  stationery: '📓',
+};
+
+const WORKFLOW = [
+  { label: 'Pick a product', hint: 'Choose what to make' },
+  { label: 'Describe it', hint: 'Tell us your idea' },
+  { label: 'Generate', hint: 'AI drafts your art' },
+  { label: 'Preview', hint: 'See it on a mockup' },
+  { label: 'Checkout', hint: 'Transparent price' },
+] as const;
+
+function StepBadge({
+  index,
+  label,
+  hint,
+  state,
+}: {
+  index: number;
+  label: string;
+  hint: string;
+  state: 'done' | 'active' | 'todo';
+}) {
   return (
-    <span className={`step-badge ${active ? 'is-active' : ''}`}>
-      <b>{index}</b>
-      {label}
-    </span>
+    <li className={`step-badge is-${state}`}>
+      <b aria-hidden="true">{state === 'done' ? '✓' : index}</b>
+      <span>
+        <strong>{label}</strong>
+        <small>{hint}</small>
+      </span>
+    </li>
   );
 }
 
@@ -49,7 +80,7 @@ export default function App() {
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
-  const [prompt, setPrompt] = useState('A precise geometric mark for a small business launch');
+  const [prompt, setPrompt] = useState('A bold retro sunburst badge for a neighborhood coffee shop');
   const [revision, setRevision] = useState('Make it bolder and easier to read at small sizes');
   const [email, setEmail] = useState('');
   const [idea, setIdea] = useState<DesignIdea | null>(null);
@@ -309,30 +340,85 @@ export default function App() {
   if (loading) {
     return (
       <main className="loading-shell">
-        <div>Loading Open Merch Studio...</div>
+        <div className="loading-card">
+          <span className="brand-mark brand-mark--lg" aria-hidden="true">
+            ◓
+          </span>
+          <p className="loading-title">Open Merch Studio</p>
+          <p className="loading-sub">Warming up your design studio…</p>
+          <div className="loading-bars" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
       </main>
     );
   }
 
+  const passActive = Boolean(studioPass);
+  const passBenefits = [
+    'Counts as a $5 credit toward your order',
+    'Up to 8 AI rough drafts to explore',
+    '2 guided edits to refine your favorite',
+    '1 final, print-ready artwork file',
+  ];
+
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">AI-first custom merch studio</p>
-          <h1>Open Merch Studio</h1>
+      <header className="hero">
+        <div className="hero-top">
+          <div className="hero-brand">
+            <span className="brand-mark" aria-hidden="true">
+              ◓
+            </span>
+            <div>
+              <p className="eyebrow">AI design studio · print-on-demand</p>
+              <h1>Open Merch Studio</h1>
+            </div>
+          </div>
+          <nav className="top-actions" aria-label="Project links">
+            <a href="https://github.com/FoxAndHenLLC/open-merch-studio">GitHub</a>
+            <a href="/docs/tickets/launch/README.md">Roadmap</a>
+          </nav>
         </div>
-        <nav className="top-actions" aria-label="Project links">
-          <a href="https://github.com/FoxAndHenLLC/open-merch-studio">GitHub</a>
-          <a href="/docs/tickets/launch/README.md">Roadmap</a>
-        </nav>
+        <p className="hero-tagline">
+          Dream it, generate it, wear it. Pick a product, describe your idea, and watch AI turn it
+          into print-ready art on a real mockup. <strong>Free to start — no account needed.</strong>
+        </p>
+        <ul className="value-pills" aria-label="What to expect">
+          <li>
+            <span aria-hidden="true">✨</span> Start free
+          </li>
+          <li>
+            <span aria-hidden="true">🎟️</span> $5 Studio Pass when you're ready
+          </li>
+          <li>
+            <span aria-hidden="true">📦</span> 8 product types &amp; growing
+          </li>
+          <li>
+            <span aria-hidden="true">💸</span> See the full price before you pay
+          </li>
+        </ul>
       </header>
 
-      {error && <div className="notice notice-error">{error}</div>}
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <strong>Something needs another try</strong>
+          <span>{error}</span>
+        </div>
+      )}
 
       <section className="launch-strip" aria-label="Launch status">
-        <div>
-          <strong>Paid beta fixture mode</strong>
-          <span>No live charges, generation, or fulfillment happen until private provider gates are enabled.</span>
+        <div className="launch-strip__lead">
+          <span className="launch-dot" aria-hidden="true" />
+          <div>
+            <strong>Public beta · fixture mode</strong>
+            <span>
+              Explore the whole journey safely. No live charges, AI generation, or fulfillment run
+              until private provider gates are switched on.
+            </span>
+          </div>
         </div>
         <div className="launch-gates">
           {adminReport?.launchReadiness.gates.slice(0, 4).map((gate) => (
@@ -343,65 +429,83 @@ export default function App() {
         </div>
       </section>
 
-      <section className="workflow-steps" aria-label="Design workflow">
-        <StepBadge index={1} label="Choose" active={step >= 1} />
-        <StepBadge index={2} label="Refine" active={step >= 2} />
-        <StepBadge index={3} label="Draft" active={step >= 3} />
-        <StepBadge index={4} label="Mockup" active={step >= 4} />
-        <StepBadge index={5} label="Checkout" active={step >= 5} />
-      </section>
+      <ol className="workflow-steps" aria-label="How it works">
+        {WORKFLOW.map((item, index) => (
+          <StepBadge
+            key={item.label}
+            index={index + 1}
+            label={item.label}
+            hint={item.hint}
+            state={step > index ? 'done' : step === index ? 'active' : index === 0 ? 'active' : 'todo'}
+          />
+        ))}
+      </ol>
 
       <section className="shop-grid">
         <aside className="panel catalog-panel" aria-label="Catalog">
           <div className="panel-heading">
             <div>
               <h2>{selectedCategoryTitle}</h2>
-              <p>{products.length} curated launch products</p>
+              <p>
+                {products.length} {products.length === 1 ? 'product' : 'products'} ready to customize
+              </p>
             </div>
           </div>
-          <div className="category-row">
+          <div className="category-row" role="tablist" aria-label="Product categories">
             <button
-              className={!selectedCategory ? 'is-active' : ''}
+              className={`category-chip ${!selectedCategory ? 'is-active' : ''}`}
               onClick={() => setSelectedCategory('')}
               type="button"
             >
-              All
+              <span aria-hidden="true">✺</span> All
             </button>
             {categories.map((category) => (
               <button
                 key={category.id}
-                className={selectedCategory === category.slug ? 'is-active' : ''}
+                className={`category-chip ${selectedCategory === category.slug ? 'is-active' : ''}`}
                 onClick={() => setSelectedCategory(category.slug)}
                 type="button"
               >
-                {category.title}
+                <span aria-hidden="true">{categoryIcon[category.slug] ?? '✺'}</span> {category.title}
               </button>
             ))}
           </div>
           <div className="product-list">
+            {products.length === 0 && (
+              <div className="empty-state empty-state--inline">
+                <strong>No products in this category yet</strong>
+                <p>Pick a different category to keep browsing.</p>
+              </div>
+            )}
             {products.map((product) => {
               const variant = firstAvailableVariant(product);
+              const selected = selectedProductId === product.id;
               return (
                 <button
                   key={product.id}
-                  className={`product-card ${selectedProductId === product.id ? 'is-selected' : ''}`}
+                  className={`product-card ${selected ? 'is-selected' : ''}`}
                   onClick={() => selectProduct(product)}
                   type="button"
+                  aria-pressed={selected}
                 >
                   <ProductVisual
                     category={product.categorySlug}
                     title={product.title}
                     color={variant?.colorCode}
                   />
-                  <span>
+                  <span className="product-card__body">
                     <strong>{product.title}</strong>
                     <small>
-                      {product.categoryTitle || product.type || 'Catalog item'} |{' '}
+                      {product.categoryTitle || product.type || 'Catalog item'} ·{' '}
                       {product.placements.length} placement
                       {product.placements.length === 1 ? '' : 's'}
                     </small>
                   </span>
-                  <b>{variant ? formatMoney(variant.costCents) : 'Sync'}</b>
+                  <span className="product-card__meta">
+                    <em>from</em>
+                    <b>{variant ? formatMoney(variant.costCents) : 'Sync'}</b>
+                    {selected && <span className="product-card__tick" aria-hidden="true">✓</span>}
+                  </span>
                 </button>
               );
             })}
@@ -413,6 +517,9 @@ export default function App() {
             <>
               <div className="studio-layout">
                 <div className="product-stage">
+                  <span className="stage-tag">
+                    {mockup ? 'Mockup preview' : design ? 'Artwork draft' : 'Live preview'}
+                  </span>
                   <ProductVisual
                     category={selectedProduct.categorySlug}
                     title={selectedProduct.title}
@@ -422,8 +529,13 @@ export default function App() {
                     <img
                       className="draft-preview"
                       src={mockup?.imageUrl ?? design?.imageUrl}
-                      alt="Generated artwork preview"
+                      alt={`Generated artwork preview for ${selectedProduct.title}`}
                     />
+                  )}
+                  {!design && !mockup && (
+                    <span className="stage-hint">
+                      Generate a draft to see your artwork land here.
+                    </span>
                   )}
                 </div>
 
@@ -435,7 +547,7 @@ export default function App() {
                   </div>
 
                   <label className="field-block" htmlFor="variant">
-                    <span>Variant</span>
+                    <span>Color &amp; size</span>
                     <select
                       id="variant"
                       value={selectedVariantId}
@@ -447,14 +559,14 @@ export default function App() {
                     >
                       {selectedProduct.variants.map((variant) => (
                         <option key={variant.id} value={variant.id} disabled={!variant.isAvailable}>
-                          {variant.name} - {formatMoney(variant.costCents)}
+                          {variant.name} — {formatMoney(variant.costCents)}
                         </option>
                       ))}
                     </select>
                   </label>
 
                   <div className="field-block">
-                    <span>Placement</span>
+                    <span>Where it prints</span>
                     <div className="placement-grid">
                       {selectedProduct.placements.map((placement) => (
                         <button
@@ -466,6 +578,7 @@ export default function App() {
                             setMockup(null);
                           }}
                           type="button"
+                          aria-pressed={selectedPlacements.includes(placement.code)}
                         >
                           {placement.displayName}
                         </button>
@@ -474,41 +587,63 @@ export default function App() {
                   </div>
 
                   <label className="field-block prompt-block" htmlFor="prompt">
-                    <span>Design idea</span>
+                    <span>Describe your design</span>
                     <textarea
                       id="prompt"
                       value={prompt}
                       onChange={(event) => setPrompt(event.target.value)}
                       rows={5}
+                      placeholder="e.g. A minimalist mountain range at sunrise, two-color, vintage feel"
                     />
+                    <small className="field-hint">
+                      The more specific the vibe, colors, and style — the better the draft.
+                    </small>
                   </label>
                 </div>
               </div>
 
-              <div className="action-row">
-                <button onClick={refineIdea} disabled={busy !== null} type="button">
-                  Refine idea
+              <div className="action-row" aria-label="Studio actions">
+                <button
+                  className="btn btn-primary"
+                  onClick={createDraft}
+                  disabled={busy !== null}
+                  type="button"
+                >
+                  {busy === 'draft' ? 'Generating…' : '✨ Generate rough draft'}
                 </button>
-                <button onClick={createDraft} disabled={busy !== null} type="button">
-                  Generate rough draft
+                <button className="btn" onClick={refineIdea} disabled={busy !== null} type="button">
+                  {busy === 'idea' ? 'Refining…' : 'Refine my idea'}
                 </button>
-                <button onClick={buyStudioPass} disabled={busy !== null || Boolean(studioPass)} type="button">
-                  {studioPass ? 'Studio Pass active' : '$5 Studio Pass'}
+                <button
+                  className="btn"
+                  onClick={createMockup}
+                  disabled={busy !== null || !design}
+                  type="button"
+                >
+                  {busy === 'mockup' ? 'Building…' : 'Preview on product'}
                 </button>
-                <button onClick={createMockup} disabled={busy !== null || !design} type="button">
-                  Create mockup
-                </button>
-                <button onClick={createQuote} disabled={busy !== null} type="button">
-                  Price selection
+                <button className="btn" onClick={createQuote} disabled={busy !== null} type="button">
+                  {busy === 'quote' ? 'Pricing…' : 'See the price'}
                 </button>
               </div>
 
               {idea && (
-                <section className="insight-box">
+                <section className="insight-box insight-box--idea">
                   <span>Refined prompt</span>
                   <p>{idea.refinedPrompt}</p>
+                  {idea.styleTags.length > 0 && (
+                    <div className="tag-row">
+                      {idea.styleTags.map((tag) => (
+                        <span key={tag} className="tag">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {idea.warnings.map((warning) => (
-                    <small key={warning}>{warning}</small>
+                    <small key={warning} className="insight-warning">
+                      {warning}
+                    </small>
                   ))}
                 </section>
               )}
@@ -516,28 +651,41 @@ export default function App() {
               {design && (
                 <section className="readiness-grid">
                   <div className="insight-box">
-                    <span>Allowance</span>
+                    <span>Your allowance</span>
                     <p>{design.allowance.message}</p>
                     <small>
-                      Free drafts: {design.allowance.freeDraftsRemaining} | Pass drafts:{' '}
+                      Free drafts left: {design.allowance.freeDraftsRemaining} · Studio Pass drafts:{' '}
                       {design.allowance.roughDraftsRemaining}
                     </small>
                   </div>
                   <div className="insight-box">
-                    <span>Revision</span>
+                    <span>Refine this draft</span>
                     <textarea
                       value={revision}
                       onChange={(event) => setRevision(event.target.value)}
                       rows={3}
+                      aria-label="Revision instructions"
                     />
-                    <button onClick={reviseDraft} disabled={busy !== null || !design.id} type="button">
-                      Apply edit
+                    <button
+                      className="btn btn-soft"
+                      onClick={reviseDraft}
+                      disabled={busy !== null || !design.id}
+                      type="button"
+                    >
+                      {busy === 'revision' ? 'Applying…' : 'Apply edit'}
                     </button>
                   </div>
                   <div className="readiness">
                     <h2>Print readiness</h2>
                     {design.readiness.checks.map((check) => (
-                      <p key={check.label} className={`check-${check.severity ?? 'pass'}`}>
+                      <p key={check.label} className={`check-row check-${check.severity ?? 'pass'}`}>
+                        <span className="check-icon" aria-hidden="true">
+                          {check.severity === 'block'
+                            ? '✕'
+                            : check.severity === 'warning'
+                              ? '!'
+                              : '✓'}
+                        </span>
                         <strong>{check.label}</strong>
                         <span>{check.result}</span>
                       </p>
@@ -547,23 +695,55 @@ export default function App() {
               )}
             </>
           ) : (
-            <div className="empty-state">No sellable products available.</div>
+            <div className="empty-state">
+              <span className="empty-state__art" aria-hidden="true">
+                🎨
+              </span>
+              <strong>Pick a product to start designing</strong>
+              <p>Choose anything from the catalog and your creative workspace opens up here.</p>
+            </div>
           )}
         </section>
 
         <aside className="panel checkout-panel" aria-label="Quote and checkout">
           <div className="panel-heading">
             <div>
-              <h2>Quote</h2>
-              <p>{quote?.id ? `Saved ${quote.id.slice(0, 12)}` : 'Create a price before checkout'}</p>
+              <h2>Your order</h2>
+              <p>
+                {quote?.id
+                  ? `Quote ${quote.id.slice(0, 12)} · locked in`
+                  : 'Transparent pricing — nothing hidden'}
+              </p>
             </div>
           </div>
 
-          <div className="studio-pass-card">
-            <strong>$5 Studio Pass</strong>
-            <span>Applied to eligible purchase</span>
-            <small>
-              Includes 8 rough drafts, or 4 rough drafts plus 2 edits, or 1 final-ready asset.
+          <div className={`studio-pass-card ${passActive ? 'is-active' : ''}`}>
+            <div className="studio-pass-card__head">
+              <div>
+                <span className="studio-pass-card__kicker">
+                  {passActive ? '🎟️ Studio Pass active' : '🎟️ $5 Studio Pass'}
+                </span>
+                <strong>{passActive ? 'Ready on this session' : 'Optional — unlock when ready'}</strong>
+              </div>
+              <span className="studio-pass-card__price">$5</span>
+            </div>
+            <ul className="studio-pass-card__list">
+              {passBenefits.map((benefit) => (
+                <li key={benefit}>
+                  <span aria-hidden="true">✓</span> {benefit}
+                </li>
+              ))}
+            </ul>
+            <button
+              className="btn btn-primary btn-block"
+              onClick={buyStudioPass}
+              disabled={busy !== null || passActive}
+              type="button"
+            >
+              {passActive ? 'Pass active ✓' : busy === 'pass' ? 'Activating…' : 'Get the Studio Pass'}
+            </button>
+            <small className="studio-pass-card__note">
+              Your first draft is always free. The pass only matters once you want to explore more.
             </small>
           </div>
 
@@ -579,12 +759,20 @@ export default function App() {
                 <span>Total</span>
                 <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
               </p>
-              <small>Shipping, tax, and payment fees are estimates until live checkout confirms them.</small>
+              <small>
+                Shipping, tax, and payment fees are estimates until live checkout confirms them.
+              </small>
             </div>
           ) : (
             <div className="quote-empty">
-              <p>{selectedProduct?.title ?? 'Select a product'}</p>
-              <strong>{selectedVariant ? formatMoney(selectedVariant.costCents) : '$0.00'}</strong>
+              <div>
+                <small>Selected</small>
+                <p>{selectedProduct?.title ?? 'Pick a product'}</p>
+              </div>
+              <div className="quote-empty__price">
+                <small>from</small>
+                <strong>{selectedVariant ? formatMoney(selectedVariant.costCents) : '$0.00'}</strong>
+              </div>
             </div>
           )}
 
@@ -592,6 +780,7 @@ export default function App() {
             <span>Email for confirmation</span>
             <input
               id="email"
+              type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
@@ -599,16 +788,22 @@ export default function App() {
           </label>
 
           <button
-            className="checkout-button"
+            className="btn btn-primary btn-block checkout-button"
             onClick={createCheckout}
             disabled={busy !== null || !quote}
             type="button"
           >
-            {checkout?.mode === 'stripe' ? 'Continue checkout' : 'Simulate checkout'}
+            {!quote
+              ? 'Add a price to check out'
+              : checkout?.mode === 'stripe'
+                ? 'Continue to secure checkout'
+                : busy === 'checkout'
+                  ? 'Processing…'
+                  : 'Place order (simulated)'}
           </button>
 
           {checkout && (
-            <div className="notice">
+            <div className="notice notice-info">
               <strong>{statusLabel(checkout.status)}</strong>
               <span>{checkout.message}</span>
             </div>
@@ -616,14 +811,14 @@ export default function App() {
 
           {order && (
             <section className="order-card">
-              <span>Order confirmation</span>
+              <span>🎉 Order confirmation</span>
               <h2>{order.orderNumber}</h2>
               <p>{order.fulfillment.message}</p>
               <strong>{formatMoney(order.totalCents, order.currency)}</strong>
-              <div>
+              <div className="order-timeline">
                 {order.timeline.map((event) => (
                   <small key={`${event.at}-${event.status}`}>
-                    {statusLabel(event.status)}: {event.note}
+                    <b>{statusLabel(event.status)}:</b> {event.note}
                   </small>
                 ))}
               </div>
@@ -633,12 +828,12 @@ export default function App() {
       </section>
 
       <section className="ops-panel" aria-label="Operator readiness">
-        <div>
+        <div className="ops-intro">
           <p className="eyebrow">Operator controls</p>
           <h2>Launch gates stay explicit</h2>
           <p>
-            Fixture mode proves the paid beta journey without creating live charges, live generated
-            images, or live provider orders. Private credentials can be connected after OPS review.
+            Fixture mode proves the full paid-beta journey without creating live charges, generated
+            images, or provider orders. Private credentials connect only after OPS review.
           </p>
         </div>
         <div className="ops-grid">
