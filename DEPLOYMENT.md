@@ -12,6 +12,7 @@ Open Merch Studio can be deployed as a split frontend/backend app or as separate
 
 - Printful bearer value and store ID for live catalog sync, draft-order creation, and fulfillment review
 - OpenAI key for guarded provider-backed design generation
+- Supabase Storage URL, service role key, and artwork bucket for durable generated artwork URLs
 - Stripe key and webhook signing value for Checkout Sessions and webhook reconciliation
 
 Store all provider values in deployment-managed storage. Do not commit provider values or screenshots of provider dashboards.
@@ -31,6 +32,7 @@ Keep live behavior disabled until the private OPS checklist is complete.
 - `ALLOW_LIVE_PAYMENTS=false`
 - `ALLOW_LIVE_FULFILLMENT=false`
 - `PRINTFUL_AUTO_CONFIRM_ORDERS=false`
+- `SUPABASE_STORAGE_BUCKET=open-merch-artwork`
 - `CHECKOUT_ENABLED=true`
 - `FULFILLMENT_ENABLED=false`
 
@@ -39,6 +41,8 @@ Preview deployments should not use production provider settings. Production chec
 The current Vercel deployment shape is a static frontend plus lightweight `/api/*` functions. In production mode, those functions block simulated checkout unless `ENABLE_PUBLIC_CHECKOUT=true`. Do not turn that flag on until the full backend, Stripe webhooks, Printful fulfillment path, support policies, and launch smoke tests are approved.
 
 Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Keep it conservative in serverless environments and prefer long-running backend workers for production mockup generation.
+
+Generated artwork should be uploaded to Supabase Storage before live Printful mockup or fulfillment review. Use a private server-side service role key only in backend/deployment-managed env values, never in browser-exposed `VITE_*` variables.
 
 ## Database Migration
 
@@ -49,7 +53,7 @@ cd backend
 npx prisma migrate deploy
 ```
 
-The first generated migration is `backend/prisma/migrations/20260529180000_paid_beta_foundation/migration.sql`.
+Current paid-beta migrations include `backend/prisma/migrations/20260529180000_paid_beta_foundation/migration.sql`, `backend/prisma/migrations/20260530122000_paid_beta_provider_hardening/migration.sql`, and `backend/prisma/migrations/20260607120000_paid_beta_operator_review/migration.sql`.
 
 ## Release Gate
 

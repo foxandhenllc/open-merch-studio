@@ -13,7 +13,9 @@ import type {
   StudioSession,
 } from '@app-types/catalog';
 
-export const localCategories: CatalogCategory[] = [
+const paidBetaCategorySlugs = ['apparel', 'drinkware', 'wall-art', 'bags', 'stickers'];
+
+const allLocalCategories: CatalogCategory[] = [
   { id: 'fixture-category-apparel', title: 'Apparel', slug: 'apparel', imageUrl: null, isLaunchCategory: true },
   { id: 'fixture-category-hats', title: 'Hats', slug: 'hats', imageUrl: null, isLaunchCategory: true },
   { id: 'fixture-category-drinkware', title: 'Drinkware', slug: 'drinkware', imageUrl: null, isLaunchCategory: true },
@@ -26,7 +28,11 @@ export const localCategories: CatalogCategory[] = [
 
 const defaultPlacement = [{ code: 'default', displayName: 'Default print area', technique: 'dtg', isDefault: true }];
 
-export const localProducts: CatalogProduct[] = [
+export const localCategories: CatalogCategory[] = allLocalCategories.filter((category) =>
+  paidBetaCategorySlugs.includes(category.slug)
+);
+
+const allLocalProducts: CatalogProduct[] = [
   {
     id: 'fixture-product-heavyweight-shirt',
     title: 'Heavyweight Cotton Tee',
@@ -239,6 +245,10 @@ export const localProducts: CatalogProduct[] = [
     placements: defaultPlacement,
   },
 ];
+
+export const localProducts: CatalogProduct[] = allLocalProducts.filter((product) =>
+  product.categorySlug ? paidBetaCategorySlugs.includes(product.categorySlug) : false
+);
 
 const marginFor = (costCents: number, productType?: string | null) => {
   const multiplier = productType === 'sticker' ? 1.45 : productType === 'wall-art' ? 1.2 : 1;

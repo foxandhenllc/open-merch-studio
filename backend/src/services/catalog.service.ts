@@ -108,6 +108,11 @@ async function readProductsFromDatabase(): Promise<CatalogProductDto[]> {
     where: {
       isActive: true,
       isSellable: true,
+      category: {
+        slug: {
+          in: Array.from(launchCategorySlugs),
+        },
+      },
     },
     include: {
       category: true,
@@ -132,7 +137,13 @@ export async function listCategories(): Promise<CatalogCategoryDto[]> {
 
   try {
     const categories = await prisma.catalogCategory.findMany({
-      where: { isActive: true, isLaunchCategory: true },
+      where: {
+        isActive: true,
+        isLaunchCategory: true,
+        slug: {
+          in: Array.from(launchCategorySlugs),
+        },
+      },
       orderBy: { title: 'asc' },
     });
     return categories.length ? categories.map(mapCategory) : fixtureCategories();

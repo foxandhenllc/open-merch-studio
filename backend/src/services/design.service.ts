@@ -9,6 +9,7 @@ import {
 } from './openai-design-provider.js';
 import { getProductsByIds } from './catalog.service.js';
 import { generatePrintfulMockupPreview } from './printful.service.js';
+import { durableArtworkUrl } from './artwork-storage.service.js';
 import {
   authorizeDesignAction,
   getAllowanceState,
@@ -350,6 +351,16 @@ export async function createDesignDraft(
         readinessReport: readiness,
       },
     });
+    const storedArtworkUrl = await durableArtworkUrl(asset.id, generated.imageUrl);
+    if (storedArtworkUrl !== generated.imageUrl) {
+      await prisma.designAsset.update({
+        where: { id: asset.id },
+        data: {
+          imageUrl: storedArtworkUrl,
+          transparentUrl: storedArtworkUrl,
+        },
+      });
+    }
     if (!context.skipAllowanceSpend) {
       await recordDesignSpend({
         sessionId: session.id,
@@ -364,7 +375,10 @@ export async function createDesignDraft(
       sessionId: session.id,
       provider: generated.provider,
       prompt: normalizedPrompt,
-      imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
+      imageUrl:
+        storedArtworkUrl === generated.imageUrl
+          ? `${env.backendUrl}/api/design/assets/${asset.id}.png`
+          : storedArtworkUrl,
       qualityTier,
       allowance,
       policy,
@@ -476,8 +490,15 @@ export async function createDesignMockup(params: {
     try {
       const [product] = await getProductsByIds([params.productId]);
       const variant = product?.variants.find((candidate) => candidate.id === params.variantId);
-      const placement = params.placementCodes[0];
-      if (!product?.printfulId || !variant?.printfulVariantId || !placement || !artwork?.imageUrl) {
+      const placementCode = params.placementCodes[0];
+      const placement = product?.placements.find((candidate) => candidate.code === placementCode);
+      if (
+        !product?.printfulId ||
+        !variant?.printfulVariantId ||
+        !placementCode ||
+        !placement ||
+        !artwork?.imageUrl
+      ) {
         throw new Error(
           'Live Printful mockup requires synced product, variant, placement, and artwork.'
         );
@@ -488,9 +509,9 @@ export async function createDesignMockup(params: {
       const mockup = await generatePrintfulMockupPreview({
         printfulProductId: String(product.printfulId),
         printfulVariantId: variant.printfulVariantId,
-        placement,
+        placement: placementCode,
         designImageUrl: artwork.imageUrl,
-        technique: placement.includes('embroidery') ? 'embroidery' : 'dtg',
+        technique: placement.technique,
       });
       return persistMockup(
         {

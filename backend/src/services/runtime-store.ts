@@ -380,6 +380,13 @@ export function saveMockup(mockup: DesignMockup): DesignMockup {
   return { ...mockup };
 }
 
+export function getMockupForDesignAsset(designAssetId?: string): DesignMockup | undefined {
+  if (!designAssetId) return undefined;
+  return Array.from(state.mockups.values())
+    .filter((mockup) => mockup.designAssetId === designAssetId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+}
+
 export function saveQuote(quote: QuoteBreakdown): QuoteBreakdown {
   const id = quote.id || createId('quote');
   const saved = { ...quote, id };

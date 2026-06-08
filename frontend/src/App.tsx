@@ -11,6 +11,7 @@ import type {
   DesignDraft,
   DesignIdea,
   DesignMockup,
+  ManualReviewOrder,
   OrderSummary,
   PlacementOption,
   QuoteBreakdown,
@@ -30,6 +31,16 @@ const defaultPlacement = (product: CatalogProduct): PlacementOption | null =>
 
 const statusLabel = (status: string) =>
   status.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+
+const shortId = (id?: string | null) => (id ? id.slice(0, 12) : 'Not set');
+
+const storedAdminAccessCode = () => {
+  try {
+    return window.sessionStorage.getItem('oms-admin-access') ?? '';
+  } catch {
+    return '';
+  }
+};
 
 // Public-safe, product-neutral category signals.
 const categoryIcon: Record<string, string> = {
@@ -215,6 +226,194 @@ function PolicyPage({ route }: { route: PolicyRoute }) {
   );
 }
 
+function AdminPage() {
+  const [accessCode, setAccessCode] = useState(storedAdminAccessCode);
+  const [report, setReport] = useState<AdminReport | null>(null);
+  const [reviewQueue, setReviewQueue] = useState<ManualReviewOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadOperatorData = async () => {
+    const code = accessCode.trim();
+    if (!code) {
+      setError('Enter the admin access code.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const [nextReport, nextQueue] = await Promise.all([
+        api.adminReport(code),
+        api.adminReviewQueue(code),
+      ]);
+      setReport(nextReport);
+      setReviewQueue(nextQueue);
+      window.sessionStorage.setItem('oms-admin-access', code);
+    } catch (caught) {
+      setReport(null);
+      setReviewQueue([]);
+      setError(caught instanceof Error ? caught.message : 'Admin data could not be loaded.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="admin-shell">
+      <section className="admin-hero">
+        <a className="back-link" href="/">
+          Back to studio
+        </a>
+        <p className="eyebrow">Operator</p>
+        <h1>Paid Beta Review</h1>
+        <p>Review paid orders before any Printful draft is approved for production.</p>
+      </section>
+
+      <section className="admin-auth" aria-label="Admin access">
+        <label className="field-block" htmlFor="admin-access-code">
+          <span>Admin access code</span>
+          <input
+            id="admin-access-code"
+            type="password"
+            value={accessCode}
+            onChange={(event) => setAccessCode(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void loadOperatorData();
+            }}
+            placeholder="Required"
+          />
+        </label>
+        <button className="btn btn-primary" type="button" onClick={loadOperatorData} disabled={loading}>
+          {loading ? 'Loading...' : 'Load review queue'}
+        </button>
+      </section>
+
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <strong>Admin request failed</strong>
+          <span>{error}</span>
+        </div>
+      )}
+
+      {report && (
+        <section className="admin-metrics" aria-label="Launch metrics">
+          <article>
+            <span>Orders</span>
+            <strong>{report.orders}</strong>
+          </article>
+          <article>
+            <span>Drafts</span>
+            <strong>{report.designDrafts}</strong>
+          </article>
+          <article>
+            <span>AI spend</span>
+            <strong>{formatMoney(report.estimatedAiSpendCents)}</strong>
+          </article>
+          <article>
+            <span>Paid beta</span>
+            <strong>{report.launchReadiness.readyForPaidBeta ? 'Ready' : 'Gated'}</strong>
+          </article>
+        </section>
+      )}
+
+      <section className="admin-review-panel" aria-label="Orders needing review">
+        <div className="panel-heading">
+          <div>
+            <h2>Manual review queue</h2>
+            <p>{reviewQueue.length} order{reviewQueue.length === 1 ? '' : 's'} waiting</p>
+          </div>
+          {report && (
+            <span className={`gate ${report.launchReadiness.readyForPaidBeta ? 'gate-pass' : 'gate-manual'}`}>
+              {report.launchReadiness.readyForPaidBeta ? 'Paid beta ready' : 'Launch gated'}
+            </span>
+          )}
+        </div>
+
+        {!report && (
+          <div className="empty-state empty-state--inline">
+            <strong>Queue locked</strong>
+            <p>Enter the admin access code to load paid orders that need operator review.</p>
+          </div>
+        )}
+
+        {report && reviewQueue.length === 0 && (
+          <div className="empty-state empty-state--inline">
+            <strong>No orders need review</strong>
+            <p>Paid orders will appear here after Stripe completion when fulfillment is gated.</p>
+          </div>
+        )}
+
+        <div className="admin-order-list">
+          {reviewQueue.map((item) => (
+            <article className="admin-order-card" key={item.orderId}>
+              <header>
+                <div>
+                  <span>{statusLabel(item.status)}</span>
+                  <h3>{item.orderNumber}</h3>
+                  <p>{item.customerEmail ?? 'No customer email'}</p>
+                </div>
+                <strong>{formatMoney(item.totalCents, item.currency)}</strong>
+              </header>
+
+              <div className="admin-order-meta" aria-label="Order identifiers">
+                <span>Payment: {statusLabel(item.paymentStatus)}</span>
+                <span>Fulfillment: {statusLabel(item.fulfillmentStatus)}</span>
+                <span>Quote: {shortId(item.quoteId)}</span>
+                <span>Design: {shortId(item.designAssetId)}</span>
+              </div>
+
+              <div className="admin-order-products">
+                {item.items.map((line) => (
+                  <p key={`${line.productId}-${line.variantId}-${line.designAssetId ?? 'design'}`}>
+                    <strong>{line.productTitle}</strong>
+                    <span>
+                      {line.variantName} · {line.placementCodes.join(', ')} ·{' '}
+                      {line.printfulVariantId ? `Printful ${line.printfulVariantId}` : 'No Printful ID'}
+                    </span>
+                  </p>
+                ))}
+              </div>
+
+              {item.recipient && (
+                <address className="admin-recipient">
+                  <strong>{item.recipient.name}</strong>
+                  <span>
+                    {item.recipient.address1}, {item.recipient.city}
+                    {item.recipient.stateCode ? `, ${item.recipient.stateCode}` : ''}{' '}
+                    {item.recipient.zip}
+                  </span>
+                  <span>{item.recipient.countryCode}</span>
+                </address>
+              )}
+
+              <div className="admin-asset-links">
+                <a className={!item.artworkUrl ? 'is-disabled' : ''} href={item.artworkUrl ?? '#'} target="_blank" rel="noreferrer">
+                  Artwork
+                </a>
+                <a className={!item.mockupUrl ? 'is-disabled' : ''} href={item.mockupUrl ?? '#'} target="_blank" rel="noreferrer">
+                  Mockup
+                </a>
+              </div>
+
+              <div className={`admin-readiness ${item.payloadReady ? 'is-ready' : 'needs-review'}`}>
+                {item.checks.map((check) => (
+                  <p key={check.code} className={`check-${check.status}`}>
+                    <span aria-hidden="true">{check.status === 'pass' ? '✓' : '!'}</span>
+                    <strong>{check.label}</strong>
+                    <small>{check.detail}</small>
+                  </p>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <SiteFooter />
+    </main>
+  );
+}
+
 function StepBadge({
   index,
   label,
@@ -238,7 +437,9 @@ function StepBadge({
 }
 
 export default function App() {
-  const policyRoute = policyRoutes[normalizedPathname()];
+  const pathname = normalizedPathname();
+  const policyRoute = policyRoutes[pathname];
+  const isAdminRoute = pathname === '/admin';
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [session, setSession] = useState<StudioSession | null>(null);
@@ -262,7 +463,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (policyRoute) return undefined;
+    if (policyRoute || isAdminRoute) return undefined;
     let mounted = true;
     Promise.all([
       api.categories(),
@@ -293,10 +494,10 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [policyRoute]);
+  }, [isAdminRoute, policyRoute]);
 
   useEffect(() => {
-    if (policyRoute) return undefined;
+    if (policyRoute || isAdminRoute) return undefined;
     api
       .products(selectedCategory || undefined)
       .then((productData) => {
@@ -314,7 +515,7 @@ export default function App() {
       })
       .catch((caught: Error) => setError(caught.message));
     return undefined;
-  }, [policyRoute, selectedCategory, selectedProductId]);
+  }, [isAdminRoute, policyRoute, selectedCategory, selectedProductId]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -543,6 +744,10 @@ export default function App() {
     return <PolicyPage route={policyRoute} />;
   }
 
+  if (isAdminRoute) {
+    return <AdminPage />;
+  }
+
   if (loading) {
     return (
       <main className="loading-shell">
@@ -605,7 +810,7 @@ export default function App() {
               {checkoutUnavailable ? '$5 Studio Pass · opening soon' : "$5 Studio Pass when you're ready"}
             </li>
             <li>
-              <span aria-hidden="true">📦</span> 8 product types &amp; growing
+              <span aria-hidden="true">📦</span> 5 launch products &amp; growing
             </li>
             <li>
               <span aria-hidden="true">💸</span> See the full price before you pay
@@ -742,7 +947,13 @@ export default function App() {
               <div className="studio-layout">
                 <div className="product-stage">
                   <span className="stage-tag">
-                    {mockup ? 'Mockup preview' : design ? 'Artwork draft' : 'Live preview'}
+                    {busy === 'mockup'
+                      ? 'Building mockup'
+                      : mockup
+                        ? 'Mockup preview'
+                        : design
+                          ? 'Artwork draft'
+                          : 'Live preview'}
                   </span>
                   <ProductVisual
                     category={selectedProduct.categorySlug}
@@ -844,7 +1055,7 @@ export default function App() {
                   disabled={busy !== null || !design}
                   type="button"
                 >
-                  {busy === 'mockup' ? 'Building…' : 'Preview on product'}
+                  {busy === 'mockup' ? 'Building product preview…' : 'Preview on product'}
                 </button>
                 <button className="btn" onClick={createQuote} disabled={busy !== null} type="button">
                   {busy === 'quote' ? 'Pricing...' : quote ? 'Update price' : 'See the price'}

@@ -100,13 +100,14 @@ export async function generateDesignImage(params: {
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
   const finalPrompt = buildPrintReadyPrompt(params.prompt);
   await assertPromptAllowed(client, finalPrompt);
+  const supportsTransparentBackground = env.openaiDesignModel !== 'gpt-image-2';
   const response = await client.images.generate({
     model: env.openaiDesignModel,
     prompt: finalPrompt,
     n: 1,
     size: '1024x1024',
     quality,
-    background: 'transparent',
+    ...(supportsTransparentBackground ? { background: 'transparent' as const } : {}),
     output_format: 'png',
     moderation: 'auto',
     user: params.sessionId,

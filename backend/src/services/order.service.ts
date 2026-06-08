@@ -9,6 +9,7 @@ import {
 import {
   createStudioPass,
   getDraft,
+  getMockupForDesignAsset,
   getOrder,
   getQuote,
   getRuntimeSettings,
@@ -20,7 +21,13 @@ import {
   runtimeNow,
   saveOrder,
 } from './runtime-store.js';
-import type { CheckoutSession, MoneyLine, OrderSummary, QuoteBreakdown } from '../types/catalog.js';
+import type {
+  CheckoutSession,
+  ManualReviewOrder,
+  MoneyLine,
+  OrderSummary,
+  QuoteBreakdown,
+} from '../types/catalog.js';
 import {
   canCreateStripeCheckout,
   createMerchCheckoutSession,
@@ -44,7 +51,11 @@ const orderNumber = () =>
 const quoteInclude = {
   items: {
     include: {
-      product: true,
+      product: {
+        include: {
+          placements: true,
+        },
+      },
       variant: true,
     },
   },
@@ -62,6 +73,7 @@ const orderInclude = {
 } satisfies Prisma.OrderInclude;
 
 type PersistedOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+type OrderRecipient = NonNullable<OrderSummary['recipient']>;
 
 const prismaOrderStatus = (status: OrderSummary['status']) => {
   if (status === 'checkout_pending') return 'PENDING_PAYMENT';
@@ -148,6 +160,13 @@ function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
       variantName: item.variant.name,
       quantity: item.quantity,
       placementCodes: item.placementCodes,
+      placementTechniques: Object.fromEntries(
+        item.placementCodes.map((placementCode) => [
+          placementCode,
+          item.product.placements.find((placement) => placement.code === placementCode)
+            ?.technique ?? (placementCode.includes('embroidery') ? 'embroidery' : 'dtg'),
+        ])
+      ),
       designAssetId: item.designAssetId ?? undefined,
       unitCostCents: item.unitCostCents,
       unitRetailCents: item.unitRetailCents,
@@ -173,11 +192,12 @@ async function loadQuoteForCheckout(quoteId?: string | null): Promise<QuoteBreak
 
 function mapPersistedOrder(order: PersistedOrder): OrderSummary {
   const quote = order.quote ? mapPersistedQuote(order.quote) : undefined;
-  return {
+  const summary: OrderSummary = {
     id: order.id,
     orderNumber: order.orderNumber,
     status: runtimeOrderStatus(order.status),
     customerEmail: order.email ?? undefined,
+    recipient: recipientFromJson(order.recipient),
     totalCents: order.totalCents,
     currency: order.currency,
     quote,
@@ -196,6 +216,7 @@ function mapPersistedOrder(order: PersistedOrder): OrderSummary {
     })),
     createdAt: order.createdAt.toISOString(),
   };
+  return addOperatorReview(summary);
 }
 
 async function loadOrder(orderId: string): Promise<OrderSummary | undefined> {
@@ -286,6 +307,7 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
       where: { id: order.id },
       update: {
         email: order.customerEmail,
+        recipient: order.recipient ?? undefined,
         status: prismaOrderStatus(order.status),
         stripeSessionId,
         fulfillmentStatus: order.fulfillment.status,
@@ -297,6 +319,7 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
         orderNumber: order.orderNumber,
         quoteId: order.quote.id,
         email: order.customerEmail,
+        recipient: order.recipient ?? undefined,
         status: prismaOrderStatus(order.status),
         stripeSessionId,
         fulfillmentStatus: order.fulfillment.status,
@@ -359,13 +382,15 @@ async function recordPaymentCompletion(
   orderId: string,
   session: Stripe.Checkout.Session,
   fulfillmentStatus: string,
-  providerEventId = session.id
+  providerEventId = session.id,
+  recipient?: OrderRecipient | null
 ): Promise<void> {
   if (!env.databaseUrl) return;
   await prisma.order.update({
     where: { id: orderId },
     data: {
       email: session.customer_details?.email ?? undefined,
+      recipient: recipient ?? undefined,
       status: 'PAID',
       stripeSessionId: session.id,
       fulfillmentStatus,
@@ -627,6 +652,29 @@ function stripeRecipient(session: Stripe.Checkout.Session): {
   };
 }
 
+function recipientFromJson(value: Prisma.JsonValue | null | undefined): OrderRecipient | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const recipient = value as Partial<OrderRecipient>;
+  if (
+    !recipient.name ||
+    !recipient.address1 ||
+    !recipient.city ||
+    !recipient.countryCode ||
+    !recipient.zip
+  ) {
+    return undefined;
+  }
+  return {
+    name: recipient.name,
+    address1: recipient.address1,
+    city: recipient.city,
+    stateCode: recipient.stateCode,
+    countryCode: recipient.countryCode,
+    zip: recipient.zip,
+    email: recipient.email,
+  };
+}
+
 function getArtworkUrl(order: OrderSummary): string | null {
   const draft = getDraft(order.designAssetId);
   if (!draft?.id || !draft.imageUrl) return null;
@@ -635,6 +683,136 @@ function getArtworkUrl(order: OrderSummary): string | null {
     return `${env.backendUrl}/api/design/assets/${encodeURIComponent(draft.id)}.png`;
   }
   return null;
+}
+
+function addOperatorReview(order: OrderSummary): OrderSummary {
+  if (order.status !== 'needs_review' && order.fulfillment.status !== 'needs_review') {
+    return order;
+  }
+  const artworkUrl = getArtworkUrl(order);
+  const mockup = getMockupForDesignAsset(order.designAssetId);
+  const mockupReady = Boolean(
+    mockup?.status === 'complete' && /^https?:\/\//.test(mockup.imageUrl)
+  );
+  const quoteReady = Boolean(
+    order.quote?.items.length &&
+    order.quote.items.every((item) => {
+      return item.printfulVariantId && item.designAssetId && item.placementCodes.length;
+    })
+  );
+  const recipientReady = Boolean(order.recipient);
+  const artworkReady = Boolean(artworkUrl && /^https?:\/\//.test(artworkUrl));
+  const checks: NonNullable<OrderSummary['operatorReview']>['checks'] = [
+    {
+      code: 'recipient',
+      label: 'Shipping/contact data',
+      status: recipientReady ? 'pass' : 'needs_review',
+      detail: recipientReady
+        ? 'Stripe supplied recipient details for operator review.'
+        : 'Recipient details are missing or incomplete.',
+    },
+    {
+      code: 'artwork',
+      label: 'Durable artwork URL',
+      status: artworkReady ? 'pass' : 'needs_review',
+      detail: artworkReady
+        ? 'Artwork URL is available for Printful payload review.'
+        : 'Artwork must be stored at a public HTTP URL before fulfillment.',
+    },
+    {
+      code: 'mockup',
+      label: 'Provider mockup',
+      status: mockupReady ? 'pass' : 'needs_review',
+      detail: mockupReady
+        ? 'A completed provider mockup is available.'
+        : 'Create or verify a current product mockup before fulfillment approval.',
+    },
+    {
+      code: 'payload',
+      label: 'Printful payload inputs',
+      status: quoteReady ? 'pass' : 'needs_review',
+      detail: quoteReady
+        ? 'Quote items include Printful variant, placement, and artwork references.'
+        : 'Quote items need Printful variant IDs, placements, and artwork references.',
+    },
+  ];
+  return {
+    ...order,
+    operatorReview: {
+      required: true,
+      recipientReady,
+      artworkReady,
+      mockupReady,
+      payloadReady: recipientReady && artworkReady && mockupReady && quoteReady,
+      checks,
+      artworkUrl: artworkUrl ?? undefined,
+      mockupUrl: mockup?.imageUrl,
+    },
+  };
+}
+
+function paymentStatus(order: OrderSummary): ManualReviewOrder['paymentStatus'] {
+  const paidTimeline = order.timeline.some((event) => event.status === 'paid');
+  switch (order.status) {
+    case 'checkout_pending':
+      return 'pending';
+    case 'paid':
+    case 'needs_review':
+    case 'fulfillment_validating':
+    case 'submitted':
+    case 'in_production':
+    case 'shipped':
+    case 'delivered':
+      return 'paid';
+    case 'failed':
+      return paidTimeline ? 'paid' : 'failed';
+    case 'cancelled':
+      return 'cancelled';
+    case 'refunded':
+      return 'refunded';
+    default:
+      return 'unknown';
+  }
+}
+
+function manualReviewOrder(order: OrderSummary): ManualReviewOrder | null {
+  const review = order.operatorReview;
+  if (!review?.required) return null;
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    paymentStatus: paymentStatus(order),
+    fulfillmentStatus: order.fulfillment.status,
+    fulfillmentProvider: order.fulfillment.provider,
+    customerEmail: order.customerEmail,
+    recipient: order.recipient,
+    totalCents: order.totalCents,
+    currency: order.currency,
+    quoteId: order.quote?.id ?? undefined,
+    designAssetId: order.designAssetId,
+    artworkUrl: review.artworkUrl,
+    mockupUrl: review.mockupUrl,
+    payloadReady: review.payloadReady,
+    recipientReady: review.recipientReady,
+    artworkReady: review.artworkReady,
+    mockupReady: review.mockupReady,
+    checks: review.checks,
+    items:
+      order.quote?.items.map((item) => ({
+        productId: item.productId,
+        productTitle: item.title,
+        variantId: item.variantId,
+        variantName: item.variantName,
+        printfulVariantId: item.printfulVariantId ?? undefined,
+        quantity: item.quantity,
+        placementCodes: item.placementCodes,
+        designAssetId: item.designAssetId,
+        unitRetailCents: item.unitRetailCents,
+      })) ?? [],
+    createdAt: order.createdAt,
+  };
 }
 
 export async function handleStripeCheckoutCompleted(
@@ -671,13 +849,24 @@ export async function handleStripeCheckoutCompleted(
   if (!env.fulfillmentEnabled || !env.enableLivePrintful || !env.allowLiveFulfillment) {
     next = {
       ...next,
+      status: 'needs_review',
       fulfillment: {
         ...next.fulfillment,
         status: 'needs_review',
-        message: 'Payment is complete. Real Printful fulfillment is waiting for operator approval.',
+        message:
+          'Payment is complete. Real Printful fulfillment is waiting for operator approval and review.',
       },
     };
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
+    next = transition(next, 'needs_review', next.fulfillment.message);
+    const recipient = stripeRecipient(session);
+    next = addOperatorReview({ ...next, recipient: recipient ?? undefined });
+    await recordPaymentCompletion(
+      next.id,
+      session,
+      next.fulfillment.status,
+      providerEventId,
+      recipient
+    );
     return saveOrder(next);
   }
 
@@ -695,11 +884,19 @@ export async function handleStripeCheckoutCompleted(
           'Payment is complete, but fulfillment needs review because recipient or artwork data is incomplete.',
       },
     };
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
+    next = addOperatorReview({ ...next, recipient: recipient ?? undefined });
+    await recordPaymentCompletion(
+      next.id,
+      session,
+      next.fulfillment.status,
+      providerEventId,
+      recipient
+    );
     return saveOrder(next);
   }
 
   try {
+    next = { ...next, recipient };
     next = transition(next, 'fulfillment_validating', 'Preparing Printful draft order.');
     const printfulOrder = await submitPrintfulDraftOrder({
       quote,
@@ -721,7 +918,13 @@ export async function handleStripeCheckoutCompleted(
       },
     };
     next = transition(next, mappedStatus.orderStatus, next.fulfillment.message);
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
+    await recordPaymentCompletion(
+      next.id,
+      session,
+      next.fulfillment.status,
+      providerEventId,
+      recipient
+    );
     if (env.databaseUrl) {
       await prisma.order.update({
         where: { id: next.id },
@@ -740,7 +943,7 @@ export async function handleStripeCheckoutCompleted(
         },
       });
     }
-    return saveOrder(next);
+    return saveOrder(addOperatorReview(next));
   } catch (error) {
     next = {
       ...next,
@@ -751,7 +954,14 @@ export async function handleStripeCheckoutCompleted(
         message: error instanceof Error ? error.message : 'Printful fulfillment submission failed.',
       },
     };
-    await recordPaymentCompletion(next.id, session, next.fulfillment.status, providerEventId);
+    next = addOperatorReview({ ...next, recipient: recipient ?? undefined });
+    await recordPaymentCompletion(
+      next.id,
+      session,
+      next.fulfillment.status,
+      providerEventId,
+      recipient
+    );
     return saveOrder(next);
   }
 }
@@ -779,7 +989,7 @@ export async function submitFixtureFulfillment(orderId: string): Promise<OrderSu
     },
   };
   next = transition(next, 'submitted', 'Fixture fulfillment submitted.');
-  return saveOrder(next);
+  return saveOrder(addOperatorReview(next));
 }
 
 export async function getOrderSummary(orderId: string): Promise<OrderSummary | undefined> {
@@ -800,6 +1010,13 @@ export async function listOrderSummaries(limit = 50): Promise<OrderSummary[]> {
   } catch {
     return inMemoryOrders;
   }
+}
+
+export async function listManualReviewOrders(limit = 50): Promise<ManualReviewOrder[]> {
+  const orders = await listOrderSummaries(limit);
+  return orders
+    .map((order) => manualReviewOrder(order))
+    .filter((order): order is ManualReviewOrder => Boolean(order));
 }
 
 export function buildFixturePayloadForQuote(quote: QuoteBreakdown, artworkUrl: string) {

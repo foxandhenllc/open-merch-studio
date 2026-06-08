@@ -1586,6 +1586,243 @@ button:disabled {
   line-height: 1.58;
 }
 
+/* ---------- Admin review ---------- */
+.admin-shell {
+  min-height: 100vh;
+  padding: 26px 22px 40px;
+}
+
+.admin-hero,
+.admin-auth,
+.admin-metrics,
+.admin-review-panel {
+  width: min(1320px, 100%);
+  margin-inline: auto;
+}
+
+.admin-hero {
+  margin-bottom: 14px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-hero h1 {
+  margin-bottom: 8px;
+  font-size: 38px;
+}
+
+.admin-hero p:last-child {
+  max-width: 70ch;
+  margin-bottom: 0;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.admin-auth {
+  display: grid;
+  grid-template-columns: minmax(240px, 420px) auto;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-auth .btn {
+  min-width: 170px;
+}
+
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.admin-metrics article {
+  display: grid;
+  gap: 5px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-metrics span,
+.admin-order-card header span {
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-metrics strong {
+  font-size: 26px;
+}
+
+.admin-review-panel {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.admin-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-order-card {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.admin-order-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-order-card h3 {
+  margin: 3px 0;
+  font-size: 18px;
+}
+
+.admin-order-card header p {
+  margin-bottom: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.admin-order-card header > strong {
+  color: var(--ink);
+  font-size: 22px;
+  white-space: nowrap;
+}
+
+.admin-order-meta,
+.admin-asset-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.admin-order-meta span,
+.admin-asset-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.admin-asset-links a:not(.is-disabled) {
+  color: var(--brand-ink);
+}
+
+.admin-asset-links a.is-disabled {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.admin-order-products,
+.admin-recipient {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-order-products p,
+.admin-recipient span {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-order-products strong,
+.admin-recipient strong {
+  display: block;
+  color: var(--ink);
+}
+
+.admin-recipient {
+  font-style: normal;
+}
+
+.admin-readiness {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-readiness p {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-readiness p > span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-readiness strong {
+  align-self: center;
+  font-size: 13px;
+}
+
+.admin-readiness small {
+  grid-column: 2;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.admin-readiness .check-pass > span {
+  background: var(--success-soft);
+  color: var(--success-ink);
+}
+
+.admin-readiness .check-needs_review > span {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1380px) {
   .shop-grid,
@@ -1626,10 +1863,19 @@ button:disabled {
     grid-template-columns: 1fr;
   }
   .shop-grid,
+  .shop-grid.has-quote,
   .studio-layout,
   .readiness-grid,
-  .ops-grid {
+  .ops-grid,
+  .admin-metrics,
+  .admin-readiness {
     grid-template-columns: 1fr;
+  }
+  .admin-auth {
+    grid-template-columns: 1fr;
+  }
+  .admin-auth .btn {
+    width: 100%;
   }
   .product-stage {
     min-height: 340px;
@@ -1655,6 +1901,18 @@ button:disabled {
 @media (max-width: 560px) {
   .app-shell {
     padding: 12px 10px 28px;
+  }
+  .admin-shell {
+    padding: 12px 10px 28px;
+  }
+  .admin-hero h1 {
+    font-size: 30px;
+  }
+  .admin-order-card header {
+    display: grid;
+  }
+  .admin-order-card header > strong {
+    white-space: normal;
   }
   .hero {
     padding: 14px;

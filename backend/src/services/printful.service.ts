@@ -691,7 +691,9 @@ export function buildPrintfulOrderPayload(params: {
       retail_price: (item.unitRetailCents / 100).toFixed(2),
       placements: item.placementCodes.map((placementCode) => ({
         placement: placementCode,
-        technique: placementCode.includes('embroidery') ? 'embroidery' : 'dtg',
+        technique:
+          item.placementTechniques?.[placementCode] ??
+          (placementCode.includes('embroidery') ? 'embroidery' : 'dtg'),
         layers: [
           {
             type: 'file',

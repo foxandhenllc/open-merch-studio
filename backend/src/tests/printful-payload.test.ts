@@ -12,7 +12,7 @@ import {
 } from '../services/printful.service.js';
 
 test('buildPrintfulOrderPayload keeps placement and retail quote details', () => {
-  const baseProduct = sampleCatalog.products[1];
+  const baseProduct = sampleCatalog.products[0];
   const product = {
     ...baseProduct,
     variants: baseProduct.variants.map((variant) => ({
@@ -28,7 +28,7 @@ test('buildPrintfulOrderPayload keeps placement and retail quote details', () =>
         productId: product.id,
         variantId: variant.id,
         quantity: 1,
-        placementCodes: ['embroidery_front'],
+        placementCodes: ['front'],
       },
     ]
   );
@@ -51,13 +51,58 @@ test('buildPrintfulOrderPayload keeps placement and retail quote details', () =>
     retail_costs: { total: string };
   };
 
-  assert.equal(payload.order_items[0].placements[0].placement, 'embroidery_front');
-  assert.equal(payload.order_items[0].placements[0].technique, 'embroidery');
+  assert.equal(payload.order_items[0].placements[0].placement, 'front');
+  assert.equal(payload.order_items[0].placements[0].technique, 'dtg');
   assert.equal(payload.retail_costs.total, (quote.totalCents / 100).toFixed(2));
 });
 
+test('buildPrintfulOrderPayload uses catalog placement technique for non-apparel products', () => {
+  const product = sampleCatalog.products.find((candidate) => candidate.slug === 'ceramic-mug');
+  assert.ok(product);
+  const variant = product.variants[0];
+  const placement = product.placements[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: [placement.code],
+      },
+    ]
+  );
+
+  const payload = buildPrintfulOrderPayload({
+    quote,
+    artworkUrl: 'https://example.com/artwork.png',
+    recipient: {
+      name: 'Example Customer',
+      address1: '1 Main St',
+      city: 'Boston',
+      stateCode: 'MA',
+      countryCode: 'US',
+      zip: '02108',
+    },
+  }) as {
+    order_items: Array<{
+      placements: Array<{ placement: string; technique: string }>;
+    }>;
+  };
+
+  assert.equal(payload.order_items[0].placements[0].placement, 'default');
+  assert.equal(payload.order_items[0].placements[0].technique, 'sublimation');
+});
+
 test('buildPrintfulOrderPayload rejects missing fulfillment data', () => {
-  const product = sampleCatalog.products[1];
+  const baseProduct = sampleCatalog.products[0];
+  const product = {
+    ...baseProduct,
+    variants: baseProduct.variants.map((variant) => ({
+      ...variant,
+      printfulVariantId: undefined,
+    })),
+  };
   const variant = product.variants[0];
   const quote = buildQuoteBreakdown(
     [product],
@@ -66,7 +111,7 @@ test('buildPrintfulOrderPayload rejects missing fulfillment data', () => {
         productId: product.id,
         variantId: variant.id,
         quantity: 1,
-        placementCodes: ['embroidery_front'],
+        placementCodes: ['front'],
       },
     ]
   );
@@ -112,7 +157,7 @@ test('submitPrintfulDraftOrder refuses auto-confirm during paid beta', async () 
     allowLiveFulfillment: env.allowLiveFulfillment,
     printfulAutoConfirmOrders: env.printfulAutoConfirmOrders,
   };
-  const baseProduct = sampleCatalog.products[1];
+  const baseProduct = sampleCatalog.products[0];
   const product = {
     ...baseProduct,
     variants: baseProduct.variants.map((variant) => ({
@@ -128,7 +173,7 @@ test('submitPrintfulDraftOrder refuses auto-confirm during paid beta', async () 
         productId: product.id,
         variantId: variant.id,
         quantity: 1,
-        placementCodes: ['embroidery_front'],
+        placementCodes: ['front'],
       },
     ]
   );

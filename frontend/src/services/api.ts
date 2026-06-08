@@ -3,6 +3,7 @@ import type {
   CatalogCategory,
   CatalogProduct,
   CheckoutSession,
+  ManualReviewOrder,
   DesignDraft,
   DesignIdea,
   DesignMockup,
@@ -173,6 +174,14 @@ export const api = {
       if (!order) throw new Error('Order not found.');
       return order;
     }),
-  adminReport: (): Promise<AdminReport> =>
-    withFallback(request<AdminReport>('/api/admin/report'), () => localAdminReport),
+  adminReport: (adminAccessCode?: string): Promise<AdminReport> => {
+    if (!adminAccessCode) return Promise.resolve(localAdminReport);
+    return request<AdminReport>('/api/admin/report', {
+      headers: { 'x-admin-access': adminAccessCode },
+    });
+  },
+  adminReviewQueue: (adminAccessCode: string): Promise<ManualReviewOrder[]> =>
+    request<ManualReviewOrder[]>('/api/admin/review-queue', {
+      headers: { 'x-admin-access': adminAccessCode },
+    }),
 };

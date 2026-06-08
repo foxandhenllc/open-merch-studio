@@ -13,17 +13,18 @@ The current working title is temporary. The code, docs, and environment template
 - Simulates a `$5` Studio Pass that unlocks deeper design work and applies to an eligible purchase.
 - Simulates checkout, order confirmation, and fixture fulfillment without creating live charges or provider orders. The backend also includes guarded Stripe Checkout/webhook, idempotent checkout creation, durable checkout state, Printful mockup polling, duplicate draft-order recovery, and draft-only Printful order adapters for private test activation.
 - Stores a normalized catalog and launch data model for categories, products, variants, placements, mockups, sessions, Studio Passes, AI spend events, quotes, orders, payment events, fulfillment attempts, settings, and audit logs.
+- Stores generated artwork in Supabase Storage when configured so Printful receives durable public artwork URLs instead of temporary provider or data URLs.
 - Supports fixture-backed local development when Printful, Stripe, and OpenAI credentials are not configured.
 
 ## Launch Catalog
 
-The v1 curated catalog targets broad basics across apparel, hats, drinkware, wall art, bags, stickers, phone cases, and stationery. Live product availability, placement support, and pricing should come from Printful catalog sync before production use.
+The v1 paid-beta catalog targets five broad basics: apparel, drinkware, wall art, bags, and stickers. Live product availability, placement support, and pricing should come from Printful catalog sync before production use. Hats, phone cases, stationery, embroidery, bulk orders, and full catalog exposure are intentionally outside the first paid beta.
 
 ## Stack
 
 - Backend: Node.js, Express, TypeScript, Prisma, PostgreSQL, full-stack Vercel `/api/*` routing
 - Frontend: React, Vite, TypeScript
-- Integrations: Printful catalog/order payloads and draft-order adapter, OpenAI image-generation adapter, Stripe Checkout/webhook adapter, and fixture providers for public-safe development. Live provider activation requires private credentials, database setup, explicit safety gates, and OPS review.
+- Integrations: Printful catalog/order payloads and draft-order adapter, OpenAI image-generation adapter, Supabase Storage artwork persistence, Stripe Checkout/webhook adapter, and fixture providers for public-safe development. Live provider activation requires private credentials, database setup, explicit safety gates, and OPS review.
 
 ## Local Setup
 
@@ -68,6 +69,7 @@ npm run dev:frontend
 - `POST /api/admin/catalog/sync`
 - `GET /api/admin/settings`
 - `GET /api/admin/orders`
+- `GET /api/admin/review-queue`
 - `GET /api/admin/report`
 - `GET /api/admin/launch-readiness`
 
