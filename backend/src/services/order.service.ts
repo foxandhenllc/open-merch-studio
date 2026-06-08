@@ -386,52 +386,56 @@ async function recordPaymentCompletion(
   recipient?: OrderRecipient | null
 ): Promise<void> {
   if (!env.databaseUrl) return;
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      email: session.customer_details?.email ?? undefined,
-      recipient: recipient ?? undefined,
-      status: 'PAID',
-      stripeSessionId: session.id,
-      fulfillmentStatus,
-      transitions: {
-        create: {
-          status: 'paid',
-          note: 'Stripe checkout completed.',
+  try {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        email: session.customer_details?.email ?? undefined,
+        recipient: recipient ?? undefined,
+        status: 'PAID',
+        stripeSessionId: session.id,
+        fulfillmentStatus,
+        transitions: {
+          create: {
+            status: 'paid',
+            note: 'Stripe checkout completed.',
+          },
         },
       },
-    },
-  });
-  await prisma.paymentEvent.upsert({
-    where: {
-      provider_providerEventId: {
+    });
+    await prisma.paymentEvent.upsert({
+      where: {
+        provider_providerEventId: {
+          provider: 'stripe',
+          providerEventId,
+        },
+      },
+      update: {
+        status: session.payment_status ?? 'paid',
+        payload: {
+          id: session.id,
+          eventId: providerEventId,
+          payment_status: session.payment_status,
+          metadata: session.metadata,
+        },
+      },
+      create: {
+        orderId,
         provider: 'stripe',
         providerEventId,
+        eventType: 'checkout.session.completed',
+        status: session.payment_status ?? 'paid',
+        payload: {
+          id: session.id,
+          eventId: providerEventId,
+          payment_status: session.payment_status,
+          metadata: session.metadata,
+        },
       },
-    },
-    update: {
-      status: session.payment_status ?? 'paid',
-      payload: {
-        id: session.id,
-        eventId: providerEventId,
-        payment_status: session.payment_status,
-        metadata: session.metadata,
-      },
-    },
-    create: {
-      orderId,
-      provider: 'stripe',
-      providerEventId,
-      eventType: 'checkout.session.completed',
-      status: session.payment_status ?? 'paid',
-      payload: {
-        id: session.id,
-        eventId: providerEventId,
-        payment_status: session.payment_status,
-        metadata: session.metadata,
-      },
-    },
-  });
+    });
+  } catch {
+    // Runtime order and review state remains the fallback source if persistence is unavailable.
+  }
 }
 
 export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<string[]> {
