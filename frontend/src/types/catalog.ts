@@ -163,6 +163,7 @@ export type DesignMockup = {
   placementCodes: string[];
   designAssetId?: string;
   imageUrl: string;
+  errorMessage?: string;
   createdAt: string;
 };
 

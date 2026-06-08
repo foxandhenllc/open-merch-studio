@@ -5,6 +5,7 @@ import {
   createDesignDraft,
   createDesignIdea,
   createDesignMockup,
+  getLatestDesignMockup,
 } from '../services/design.service.js';
 import {
   createCheckoutSession,
@@ -48,6 +49,13 @@ test('fixture paid-beta path reaches checkout and fulfillment without credential
     designAssetId: draft.id ?? undefined,
   });
   assert.equal(mockup.status, 'complete');
+  const storedMockup = await getLatestDesignMockup({
+    productId: product.id,
+    variantId: variant.id,
+    placementCodes: [placement.code],
+    designAssetId: draft.id ?? undefined,
+  });
+  assert.equal(storedMockup?.id, mockup.id);
 
   const quote = await createQuote(
     [

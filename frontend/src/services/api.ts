@@ -145,6 +145,24 @@ export const api = {
       }),
       () => createLocalMockup(body)
     ),
+  latestMockup: (query: {
+    productId: string;
+    variantId: string;
+    placementCodes: string[];
+    designAssetId?: string;
+  }) => {
+    if (!query.designAssetId) return Promise.resolve(null);
+    const search = new URLSearchParams({
+      productId: query.productId,
+      variantId: query.variantId,
+      designAssetId: query.designAssetId,
+      placementCodes: query.placementCodes.join(','),
+    });
+    return withFallback(
+      request<DesignMockup | null>(`/api/design/mockups/latest?${search.toString()}`),
+      () => null
+    );
+  },
   studioPassCheckout: (sessionId: string) =>
     withFallback(
       request<CheckoutSession>('/api/studio-passes/checkout', {

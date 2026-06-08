@@ -5,6 +5,7 @@ import {
   createDesignDraft,
   createDesignIdea,
   createDesignMockup,
+  getLatestDesignMockup,
   reviseDesignDraft,
   getDesignAssetImage,
 } from '../services/design.service.js';
@@ -90,6 +91,32 @@ export const postDesignMockup = asyncHandler(async (req: Request, res: Response)
     designAssetId: String(req.body?.designAssetId ?? '') || undefined,
   });
   res.status(201).json({ success: true, data: mockup });
+});
+
+export const getDesignMockup = asyncHandler(async (req: Request, res: Response) => {
+  const productId = String(req.query.productId ?? '').trim();
+  const variantId = String(req.query.variantId ?? '').trim();
+  const designAssetId = String(req.query.designAssetId ?? '').trim();
+  const placementParam = req.query.placementCodes;
+  const placementCodes = Array.isArray(placementParam)
+    ? placementParam.map(String)
+    : String(placementParam ?? '')
+        .split(',')
+        .map((placement) => placement.trim())
+        .filter(Boolean);
+  if (!productId || !variantId || !designAssetId || !placementCodes.length) {
+    throw new HttpError(
+      'Design asset, product, variant, and placement are required for mockup lookup.',
+      400
+    );
+  }
+  const mockup = await getLatestDesignMockup({
+    productId,
+    variantId,
+    designAssetId,
+    placementCodes,
+  });
+  res.json({ success: true, data: mockup });
 });
 
 export const getDesignAsset = asyncHandler(async (req: Request, res: Response) => {

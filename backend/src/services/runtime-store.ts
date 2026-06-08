@@ -380,6 +380,37 @@ export function saveMockup(mockup: DesignMockup): DesignMockup {
   return { ...mockup };
 }
 
+function normalizedPlacementCodes(codes: string[]): string[] {
+  return [...codes].filter(Boolean).sort();
+}
+
+function samePlacementCodes(left: string[], right: string[]): boolean {
+  const normalizedLeft = normalizedPlacementCodes(left);
+  const normalizedRight = normalizedPlacementCodes(right);
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((code, index) => code === normalizedRight[index])
+  );
+}
+
+export function getMockupForSelection(params: {
+  designAssetId?: string;
+  productId: string;
+  variantId: string;
+  placementCodes: string[];
+}): DesignMockup | undefined {
+  if (!params.designAssetId) return undefined;
+  return Array.from(state.mockups.values())
+    .filter(
+      (mockup) =>
+        mockup.designAssetId === params.designAssetId &&
+        mockup.productId === params.productId &&
+        mockup.variantId === params.variantId &&
+        samePlacementCodes(mockup.placementCodes, params.placementCodes)
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+}
+
 export function getMockupForDesignAsset(designAssetId?: string): DesignMockup | undefined {
   if (!designAssetId) return undefined;
   return Array.from(state.mockups.values())

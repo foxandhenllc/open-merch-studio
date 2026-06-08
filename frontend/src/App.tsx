@@ -18,7 +18,7 @@ import type {
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
-import type { PolicyRoute } from './App.types';
+import type { ImageViewerState, PolicyRoute } from './App.types';
 
 const formatMoney = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
@@ -41,6 +41,23 @@ const storedAdminAccessCode = () => {
     return '';
   }
 };
+
+function buildMockupCacheKey(params: {
+  designAssetId?: string | null;
+  productId?: string | null;
+  variantId?: string | null;
+  placementCodes: string[];
+}): string {
+  if (!params.designAssetId || !params.productId || !params.variantId || !params.placementCodes.length) {
+    return '';
+  }
+  return [
+    params.designAssetId,
+    params.productId,
+    params.variantId,
+    [...params.placementCodes].sort().join(','),
+  ].join('|');
+}
 
 // Public-safe, product-neutral category signals.
 const categoryIcon: Record<string, string> = {
@@ -454,6 +471,8 @@ export default function App() {
   const [idea, setIdea] = useState<DesignIdea | null>(null);
   const [design, setDesign] = useState<DesignDraft | null>(null);
   const [mockup, setMockup] = useState<DesignMockup | null>(null);
+  const [mockupsByKey, setMockupsByKey] = useState<Record<string, DesignMockup>>({});
+  const [imageViewer, setImageViewer] = useState<ImageViewerState>(null);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [order, setOrder] = useState<OrderSummary | null>(null);
@@ -527,6 +546,29 @@ export default function App() {
     [selectedProduct, selectedVariantId]
   );
 
+  const selectedPlacementsKey = useMemo(
+    () => [...selectedPlacements].sort().join(','),
+    [selectedPlacements]
+  );
+
+  const selectedPlacementCodes = useMemo(
+    () => (selectedPlacementsKey ? selectedPlacementsKey.split(',') : []),
+    [selectedPlacementsKey]
+  );
+
+  const selectedMockupKey = useMemo(
+    () =>
+      buildMockupCacheKey({
+        designAssetId: design?.id,
+        productId: selectedProduct?.id,
+        variantId: selectedVariant?.id,
+        placementCodes: selectedPlacementCodes,
+      }),
+    [design?.id, selectedProduct?.id, selectedVariant?.id, selectedPlacementCodes]
+  );
+
+  const cachedMockup = selectedMockupKey ? mockupsByKey[selectedMockupKey] : undefined;
+
   const step = quote ? 5 : mockup ? 4 : design ? 3 : idea ? 2 : selectedProduct ? 1 : 0;
   const selectedCategoryTitle =
     categories.find((category) => category.slug === selectedCategory)?.title ?? 'All products';
@@ -535,6 +577,63 @@ export default function App() {
     publicConfig.isProductionMode && !publicConfig.enablePublicCheckout
       ? 'Paid checkout opens after final provider and support review.'
       : null;
+
+  useEffect(() => {
+    if (policyRoute || isAdminRoute) return undefined;
+    if (!selectedMockupKey || !selectedProduct || !selectedVariant || !design?.id) {
+      setMockup(null);
+      return undefined;
+    }
+    if (cachedMockup) {
+      setMockup(cachedMockup);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setMockup(null);
+    api
+      .latestMockup({
+        productId: selectedProduct.id,
+        variantId: selectedVariant.id,
+        placementCodes: selectedPlacementCodes,
+        designAssetId: design.id,
+      })
+      .then((storedMockup) => {
+        if (cancelled || !storedMockup) return;
+        setMockupsByKey((current) => ({ ...current, [selectedMockupKey]: storedMockup }));
+        setMockup(storedMockup);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cachedMockup,
+    design?.id,
+    isAdminRoute,
+    policyRoute,
+    selectedMockupKey,
+    selectedPlacementCodes,
+    selectedProduct,
+    selectedVariant,
+  ]);
+
+  useEffect(() => {
+    if (!imageViewer) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setImageViewer(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [imageViewer]);
 
   const runAction = async <T,>(
     key: string,
@@ -600,7 +699,12 @@ export default function App() {
           variantId: selectedVariant?.id,
           placementCodes: selectedPlacements,
         }),
-      setDesign
+      (result) => {
+        setDesign(result);
+        setQuote(null);
+        setCheckout(null);
+        setOrder(null);
+      }
     );
   };
 
@@ -614,7 +718,12 @@ export default function App() {
           instructions: revision,
           sessionId: session?.id,
         }),
-      setDesign
+      (result) => {
+        setDesign(result);
+        setQuote(null);
+        setCheckout(null);
+        setOrder(null);
+      }
     );
   };
 
@@ -672,7 +781,18 @@ export default function App() {
           designAssetId: design?.id ?? undefined,
           imageUrl: design?.imageUrl,
         }),
-      setMockup
+      (result) => {
+        setMockup(result);
+        const cacheKey = buildMockupCacheKey({
+          designAssetId: result.designAssetId ?? design?.id,
+          productId: result.productId,
+          variantId: result.variantId,
+          placementCodes: result.placementCodes,
+        });
+        if (cacheKey) {
+          setMockupsByKey((current) => ({ ...current, [cacheKey]: result }));
+        }
+      }
     );
   };
 
@@ -768,6 +888,13 @@ export default function App() {
   }
 
   const passActive = Boolean(studioPass);
+  const previewImageUrl = mockup?.imageUrl ?? design?.imageUrl ?? '';
+  const previewTitle = mockup ? `${selectedProduct?.title ?? 'Product'} mockup` : 'Generated artwork';
+  const previewDetail = mockup
+    ? `${statusLabel(mockup.status)} ${mockup.provider === 'printful' ? 'Printful' : 'provider'} preview`
+    : design
+      ? `${statusLabel(design.qualityTier)} draft artwork`
+      : '';
   return (
     <main className="app-shell">
       <header className="hero hero-compact">
@@ -949,7 +1076,9 @@ export default function App() {
                   <span className="stage-tag">
                     {busy === 'mockup'
                       ? 'Building mockup'
-                      : mockup
+                      : mockup?.status === 'failed'
+                        ? 'Mockup needs retry'
+                        : mockup
                         ? 'Mockup preview'
                         : design
                           ? 'Artwork draft'
@@ -960,12 +1089,28 @@ export default function App() {
                     title={selectedProduct.title}
                     color={selectedVariant.colorCode}
                   />
-                  {(mockup || design) && (
-                    <img
-                      className="draft-preview"
-                      src={mockup?.imageUrl ?? design?.imageUrl}
-                      alt={`Generated artwork preview for ${selectedProduct.title}`}
-                    />
+                  {previewImageUrl && (
+                    <button
+                      className="preview-frame"
+                      type="button"
+                      onClick={() =>
+                        setImageViewer({
+                          title: previewTitle,
+                          imageUrl: previewImageUrl,
+                          detail: previewDetail,
+                        })
+                      }
+                      aria-label={`Open ${previewTitle} full size`}
+                    >
+                      <img
+                        className="draft-preview"
+                        src={previewImageUrl}
+                        alt={`Generated artwork preview for ${selectedProduct.title}`}
+                      />
+                      <span className="preview-frame__icon" aria-hidden="true">
+                        ⛶
+                      </span>
+                    </button>
                   )}
                   {!design && !mockup && (
                     <span className="stage-hint">
@@ -1076,6 +1221,13 @@ export default function App() {
                     View details
                   </button>
                 </section>
+              )}
+
+              {mockup?.status === 'failed' && (
+                <div className="notice notice-error" role="status">
+                  <strong>Mockup preview failed</strong>
+                  <span>{mockup.errorMessage ?? 'The provider preview could not be generated.'}</span>
+                </div>
               )}
 
               {idea && (
@@ -1287,6 +1439,41 @@ export default function App() {
           ))}
         </div>
         </section>
+      )}
+
+      {imageViewer && (
+        <div
+          className="image-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={imageViewer.title}
+          onClick={() => setImageViewer(null)}
+        >
+          <div className="image-viewer__panel" onClick={(event) => event.stopPropagation()}>
+            <header className="image-viewer__header">
+              <div>
+                <span>{imageViewer.detail}</span>
+                <h2>{imageViewer.title}</h2>
+              </div>
+              <button
+                className="image-viewer__close"
+                type="button"
+                onClick={() => setImageViewer(null)}
+                aria-label="Close full size image"
+              >
+                ×
+              </button>
+            </header>
+            <div className="image-viewer__canvas">
+              <img src={imageViewer.imageUrl} alt={imageViewer.title} />
+            </div>
+            <footer className="image-viewer__footer">
+              <a href={imageViewer.imageUrl} target="_blank" rel="noreferrer">
+                Open original image
+              </a>
+            </footer>
+          </div>
+        </div>
       )}
 
       <SiteFooter />
