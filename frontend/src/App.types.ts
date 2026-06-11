@@ -10,3 +10,5 @@ export type ImageViewerState = {
   imageUrl: string;
   detail: string;
 } | null;
+
+export type CanvasView = 'artwork' | 'product';
