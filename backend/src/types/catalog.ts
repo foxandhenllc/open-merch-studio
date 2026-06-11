@@ -88,6 +88,7 @@ export type QuoteBreakdown = {
     variantName: string;
     quantity: number;
     placementCodes: string[];
+    placementTechniques?: Record<string, string>;
     designAssetId?: string;
     unitCostCents: number;
     unitRetailCents: number;
@@ -207,6 +208,15 @@ export type OrderSummary = {
     | 'failed'
     | 'needs_review';
   customerEmail?: string;
+  recipient?: {
+    name: string;
+    address1: string;
+    city: string;
+    stateCode?: string;
+    countryCode: string;
+    zip: string;
+    email?: string;
+  };
   totalCents: number;
   currency: string;
   quote?: QuoteBreakdown;
@@ -216,7 +226,51 @@ export type OrderSummary = {
     status: 'not_submitted' | 'validated' | 'submitted' | 'failed' | 'needs_review';
     message: string;
   };
+  operatorReview?: {
+    required: boolean;
+    payloadReady: boolean;
+    recipientReady: boolean;
+    artworkReady: boolean;
+    mockupReady: boolean;
+    checks: Array<{ code: string; label: string; status: 'pass' | 'needs_review'; detail: string }>;
+    artworkUrl?: string;
+    mockupUrl?: string;
+  };
   timeline: Array<{ at: string; status: string; note: string }>;
+  createdAt: string;
+};
+
+export type ManualReviewOrder = {
+  orderId: string;
+  orderNumber: string;
+  status: OrderSummary['status'];
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'unknown';
+  fulfillmentStatus: OrderSummary['fulfillment']['status'];
+  fulfillmentProvider: OrderSummary['fulfillment']['provider'];
+  customerEmail?: string;
+  recipient?: OrderSummary['recipient'];
+  totalCents: number;
+  currency: string;
+  quoteId?: string;
+  designAssetId?: string;
+  artworkUrl?: string;
+  mockupUrl?: string;
+  payloadReady: boolean;
+  recipientReady: boolean;
+  artworkReady: boolean;
+  mockupReady: boolean;
+  checks: NonNullable<OrderSummary['operatorReview']>['checks'];
+  items: Array<{
+    productId: string;
+    productTitle: string;
+    variantId: string;
+    variantName: string;
+    printfulVariantId?: number;
+    quantity: number;
+    placementCodes: string[];
+    designAssetId?: string;
+    unitRetailCents: number;
+  }>;
   createdAt: string;
 };
 

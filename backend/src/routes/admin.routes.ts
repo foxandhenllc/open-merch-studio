@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getAdminOrders,
   getAdminReport,
+  getAdminReviewQueue,
   getAdminSettings,
   getLaunchReadiness,
   patchAdminSettings,
@@ -16,6 +17,7 @@ router.post('/catalog/sync', postCatalogSync);
 router.get('/settings', getAdminSettings);
 router.patch('/settings', patchAdminSettings);
 router.get('/orders', getAdminOrders);
+router.get('/review-queue', getAdminReviewQueue);
 router.get('/report', getAdminReport);
 router.get('/launch-readiness', getLaunchReadiness);
 

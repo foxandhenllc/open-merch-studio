@@ -31,6 +31,7 @@ async function main() {
     const createdProduct = await prisma.catalogProduct.upsert({
       where: { slug: product.slug },
       update: {
+        printfulId: product.printfulId,
         title: product.title,
         type: product.type,
         brand: product.brand,
@@ -41,6 +42,7 @@ async function main() {
         isActive: true,
       },
       create: {
+        printfulId: product.printfulId,
         title: product.title,
         slug: product.slug,
         type: product.type,
@@ -57,6 +59,7 @@ async function main() {
       const createdVariant = await prisma.catalogVariant.upsert({
         where: { id: variant.id },
         update: {
+          printfulVariantId: variant.printfulVariantId,
           name: variant.name,
           size: variant.size,
           color: variant.color,
@@ -66,6 +69,7 @@ async function main() {
         },
         create: {
           id: variant.id,
+          printfulVariantId: variant.printfulVariantId,
           productId: createdProduct.id,
           name: variant.name,
           size: variant.size,
@@ -99,6 +103,9 @@ async function main() {
         },
         update: {
           displayName: placement.displayName,
+          technique: placement.technique,
+          width: placement.width,
+          height: placement.height,
           isDefault: placement.isDefault,
         },
         create: {
@@ -106,6 +113,8 @@ async function main() {
           code: placement.code,
           displayName: placement.displayName,
           technique: placement.technique,
+          width: placement.width,
+          height: placement.height,
           isDefault: placement.isDefault,
         },
       });

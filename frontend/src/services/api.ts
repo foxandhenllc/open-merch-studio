@@ -3,6 +3,7 @@ import type {
   CatalogCategory,
   CatalogProduct,
   CheckoutSession,
+  ManualReviewOrder,
   DesignDraft,
   DesignIdea,
   DesignMockup,
@@ -144,6 +145,24 @@ export const api = {
       }),
       () => createLocalMockup(body)
     ),
+  latestMockup: (query: {
+    productId: string;
+    variantId: string;
+    placementCodes: string[];
+    designAssetId?: string;
+  }) => {
+    if (!query.designAssetId) return Promise.resolve(null);
+    const search = new URLSearchParams({
+      productId: query.productId,
+      variantId: query.variantId,
+      designAssetId: query.designAssetId,
+      placementCodes: query.placementCodes.join(','),
+    });
+    return withFallback(
+      request<DesignMockup | null>(`/api/design/mockups/latest?${search.toString()}`),
+      () => null
+    );
+  },
   studioPassCheckout: (sessionId: string) =>
     withFallback(
       request<CheckoutSession>('/api/studio-passes/checkout', {
@@ -173,6 +192,14 @@ export const api = {
       if (!order) throw new Error('Order not found.');
       return order;
     }),
-  adminReport: (): Promise<AdminReport> =>
-    withFallback(request<AdminReport>('/api/admin/report'), () => localAdminReport),
+  adminReport: (adminAccessCode?: string): Promise<AdminReport> => {
+    if (!adminAccessCode) return Promise.resolve(localAdminReport);
+    return request<AdminReport>('/api/admin/report', {
+      headers: { 'x-admin-access': adminAccessCode },
+    });
+  },
+  adminReviewQueue: (adminAccessCode: string): Promise<ManualReviewOrder[]> =>
+    request<ManualReviewOrder[]>('/api/admin/review-queue', {
+      headers: { 'x-admin-access': adminAccessCode },
+    }),
 };

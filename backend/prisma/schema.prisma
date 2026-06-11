@@ -307,6 +307,7 @@ model Order {
   orderNumber     String      @unique
   quoteId         String?
   email           String?
+  recipient       Json?
   status          OrderStatus @default(DRAFT)
   stripeSessionId String?
   printfulOrderId String?

@@ -9,10 +9,12 @@ import {
 } from './openai-design-provider.js';
 import { getProductsByIds } from './catalog.service.js';
 import { generatePrintfulMockupPreview } from './printful.service.js';
+import { durableArtworkUrl } from './artwork-storage.service.js';
 import {
   authorizeDesignAction,
   getAllowanceState,
   getDraft,
+  getMockupForSelection,
   getOrCreateSession,
   recordDesignSpend,
   runtimeId,
@@ -39,6 +41,9 @@ type DesignArtwork = {
 };
 
 const blockedTerms = ['nike', 'disney', 'marvel', 'pokemon', 'supreme'];
+
+const normalizePlacementCodes = (placementCodes: string[]): string[] =>
+  [...placementCodes].filter(Boolean).sort();
 
 const estimatedGenerationCostCents = (qualityTier: 'rough' | 'final') =>
   canUseLiveOpenAi() ? (qualityTier === 'final' ? 36 : 6) : 1;
@@ -350,6 +355,16 @@ export async function createDesignDraft(
         readinessReport: readiness,
       },
     });
+    const storedArtworkUrl = await durableArtworkUrl(asset.id, generated.imageUrl);
+    if (storedArtworkUrl !== generated.imageUrl) {
+      await prisma.designAsset.update({
+        where: { id: asset.id },
+        data: {
+          imageUrl: storedArtworkUrl,
+          transparentUrl: storedArtworkUrl,
+        },
+      });
+    }
     if (!context.skipAllowanceSpend) {
       await recordDesignSpend({
         sessionId: session.id,
@@ -364,7 +379,10 @@ export async function createDesignDraft(
       sessionId: session.id,
       provider: generated.provider,
       prompt: normalizedPrompt,
-      imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
+      imageUrl:
+        storedArtworkUrl === generated.imageUrl
+          ? `${env.backendUrl}/api/design/assets/${asset.id}.png`
+          : storedArtworkUrl,
       qualityTier,
       allowance,
       policy,
@@ -464,6 +482,7 @@ export async function createDesignMockup(params: {
   designAssetId?: string;
 }): Promise<DesignMockup> {
   const session = getOrCreateSession(params.sessionId);
+  const placementCodes = normalizePlacementCodes(params.placementCodes);
   await recordDesignSpend({
     sessionId: session.id,
     designAssetId: params.designAssetId,
@@ -476,8 +495,15 @@ export async function createDesignMockup(params: {
     try {
       const [product] = await getProductsByIds([params.productId]);
       const variant = product?.variants.find((candidate) => candidate.id === params.variantId);
-      const placement = params.placementCodes[0];
-      if (!product?.printfulId || !variant?.printfulVariantId || !placement || !artwork?.imageUrl) {
+      const placementCode = placementCodes[0];
+      const placement = product?.placements.find((candidate) => candidate.code === placementCode);
+      if (
+        !product?.printfulId ||
+        !variant?.printfulVariantId ||
+        !placementCode ||
+        !placement ||
+        !artwork?.imageUrl
+      ) {
         throw new Error(
           'Live Printful mockup requires synced product, variant, placement, and artwork.'
         );
@@ -488,9 +514,9 @@ export async function createDesignMockup(params: {
       const mockup = await generatePrintfulMockupPreview({
         printfulProductId: String(product.printfulId),
         printfulVariantId: variant.printfulVariantId,
-        placement,
+        placement: placementCode,
         designImageUrl: artwork.imageUrl,
-        technique: placement.includes('embroidery') ? 'embroidery' : 'dtg',
+        technique: placement.technique,
       });
       return persistMockup(
         {
@@ -499,7 +525,7 @@ export async function createDesignMockup(params: {
           provider: 'printful',
           productId: params.productId,
           variantId: params.variantId,
-          placementCodes: params.placementCodes,
+          placementCodes,
           designAssetId: params.designAssetId,
           imageUrl: mockup.imageUrl,
           createdAt: runtimeNow(),
@@ -513,7 +539,7 @@ export async function createDesignMockup(params: {
         provider: 'printful-ready',
         productId: params.productId,
         variantId: params.variantId,
-        placementCodes: params.placementCodes,
+        placementCodes,
         designAssetId: params.designAssetId,
         imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
         errorMessage: error instanceof Error ? error.message : 'Printful mockup generation failed.',
@@ -527,11 +553,58 @@ export async function createDesignMockup(params: {
     provider: env.printfulApiKey && env.enableLivePrintful ? 'printful-ready' : 'fixture',
     productId: params.productId,
     variantId: params.variantId,
-    placementCodes: params.placementCodes,
+    placementCodes,
     designAssetId: params.designAssetId,
     imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
     createdAt: runtimeNow(),
   });
+}
+
+export async function getLatestDesignMockup(params: {
+  designAssetId?: string;
+  productId: string;
+  variantId: string;
+  placementCodes: string[];
+}): Promise<DesignMockup | null> {
+  const placementCodes = normalizePlacementCodes(params.placementCodes);
+  const runtimeMockup = getMockupForSelection({
+    ...params,
+    placementCodes,
+  });
+  if (runtimeMockup) return runtimeMockup;
+
+  if (!env.databaseUrl || !params.designAssetId) return null;
+
+  try {
+    const task = await prisma.mockupTask.findFirst({
+      where: {
+        designAssetId: params.designAssetId,
+        productId: params.productId,
+        variantId: params.variantId,
+        placementCodes: {
+          equals: placementCodes,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    if (!task?.imageUrl) return null;
+    return {
+      id: task.id,
+      status: task.status as DesignMockup['status'],
+      provider: task.provider as DesignMockup['provider'],
+      productId: task.productId ?? params.productId,
+      variantId: task.variantId ?? params.variantId,
+      placementCodes: task.placementCodes,
+      designAssetId: task.designAssetId ?? undefined,
+      imageUrl: task.imageUrl,
+      errorMessage: task.errorMessage ?? undefined,
+      createdAt: task.createdAt.toISOString(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getDesignAssetImage(

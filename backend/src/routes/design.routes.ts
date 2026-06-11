@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getDesignAsset,
   getDesignAllowance,
+  getDesignMockup,
   postDesignDraft,
   postDesignIdea,
   postDesignMockup,
@@ -19,6 +20,7 @@ router.post('/ideas', postDesignIdea);
 router.post('/drafts', postDesignDraft);
 router.post('/drafts/:id/revisions', postDesignRevision);
 router.post('/readiness', postReadiness);
+router.get('/mockups/latest', getDesignMockup);
 router.post('/mockups', postDesignMockup);
 
 export default router;

@@ -86,12 +86,20 @@ export function buildQuoteBreakdown(
 
     const quantity = Math.max(1, Math.floor(input.quantity || 1));
     const unitCostCents = variant.costCents;
+    const placements = placementCodes
+      .map((placementCode) =>
+        product.placements.find((placement) => placement.code === placementCode)
+      )
+      .filter(Boolean) as Array<(typeof product.placements)[number]>;
     const unavailablePlacement = placementCodes.find(
-      (placementCode) => !product.placements.some((placement) => placement.code === placementCode)
+      (placementCode) => !placements.some((placement) => placement.code === placementCode)
     );
     if (unavailablePlacement) {
       throw new Error(`Placement ${unavailablePlacement} is unavailable for ${product.title}`);
     }
+    const placementTechniques = Object.fromEntries(
+      placements.map((placement) => [placement.code, placement.technique])
+    );
 
     const unitMarginCents = calculateTargetMarginCents(unitCostCents, product.type, settings);
     const unitRetailCents = unitCostCents + unitMarginCents + settings.aiDesignFeeCents;
@@ -104,6 +112,7 @@ export function buildQuoteBreakdown(
       variantName: variant.name,
       quantity,
       placementCodes,
+      placementTechniques,
       designAssetId: input.designAssetId,
       unitCostCents,
       unitRetailCents,

@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { ProductVisual } from '@components/ProductVisual';
 import { canUseCustomerCheckout, publicConfig } from './config';
 import { api } from '@services/api';
+import {
+  deriveStudioCanvasState,
+  findVariantForOption,
+  groupVariantOptions,
+} from './studio-view-model';
+import type { StudioCanvasState, VariantOptionGroups } from './studio-view-model';
 import type {
   AdminReport,
   CatalogCategory,
@@ -11,13 +17,14 @@ import type {
   DesignDraft,
   DesignIdea,
   DesignMockup,
+  ManualReviewOrder,
   OrderSummary,
   PlacementOption,
   QuoteBreakdown,
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
-import type { PolicyRoute } from './App.types';
+import type { CanvasView, ImageViewerState, PolicyRoute } from './App.types';
 
 const formatMoney = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
@@ -30,6 +37,33 @@ const defaultPlacement = (product: CatalogProduct): PlacementOption | null =>
 
 const statusLabel = (status: string) =>
   status.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+
+const shortId = (id?: string | null) => (id ? id.slice(0, 12) : 'Not set');
+
+const storedAdminAccessCode = () => {
+  try {
+    return window.sessionStorage.getItem('oms-admin-access') ?? '';
+  } catch {
+    return '';
+  }
+};
+
+function buildMockupCacheKey(params: {
+  designAssetId?: string | null;
+  productId?: string | null;
+  variantId?: string | null;
+  placementCodes: string[];
+}): string {
+  if (!params.designAssetId || !params.productId || !params.variantId || !params.placementCodes.length) {
+    return '';
+  }
+  return [
+    params.designAssetId,
+    params.productId,
+    params.variantId,
+    [...params.placementCodes].sort().join(','),
+  ].join('|');
+}
 
 // Public-safe, product-neutral category signals.
 const categoryIcon: Record<string, string> = {
@@ -50,6 +84,15 @@ const WORKFLOW = [
   { label: 'Preview', hint: 'See it on a mockup' },
   { label: 'Checkout', hint: 'Transparent price' },
 ] as const;
+
+const minimumBusyMs: Record<string, number> = {
+  draft: 1400,
+  revision: 1100,
+  mockup: 1200,
+};
+
+const delay = (durationMs: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, durationMs));
 
 const policyRoutes: Record<string, PolicyRoute> = {
   '/privacy': {
@@ -215,6 +258,194 @@ function PolicyPage({ route }: { route: PolicyRoute }) {
   );
 }
 
+function AdminPage() {
+  const [accessCode, setAccessCode] = useState(storedAdminAccessCode);
+  const [report, setReport] = useState<AdminReport | null>(null);
+  const [reviewQueue, setReviewQueue] = useState<ManualReviewOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadOperatorData = async () => {
+    const code = accessCode.trim();
+    if (!code) {
+      setError('Enter the admin access code.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const [nextReport, nextQueue] = await Promise.all([
+        api.adminReport(code),
+        api.adminReviewQueue(code),
+      ]);
+      setReport(nextReport);
+      setReviewQueue(nextQueue);
+      window.sessionStorage.setItem('oms-admin-access', code);
+    } catch (caught) {
+      setReport(null);
+      setReviewQueue([]);
+      setError(caught instanceof Error ? caught.message : 'Admin data could not be loaded.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="admin-shell">
+      <section className="admin-hero">
+        <a className="back-link" href="/">
+          Back to studio
+        </a>
+        <p className="eyebrow">Operator</p>
+        <h1>Paid Beta Review</h1>
+        <p>Review paid orders before any Printful draft is approved for production.</p>
+      </section>
+
+      <section className="admin-auth" aria-label="Admin access">
+        <label className="field-block" htmlFor="admin-access-code">
+          <span>Admin access code</span>
+          <input
+            id="admin-access-code"
+            type="password"
+            value={accessCode}
+            onChange={(event) => setAccessCode(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void loadOperatorData();
+            }}
+            placeholder="Required"
+          />
+        </label>
+        <button className="btn btn-primary" type="button" onClick={loadOperatorData} disabled={loading}>
+          {loading ? 'Loading...' : 'Load review queue'}
+        </button>
+      </section>
+
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <strong>Admin request failed</strong>
+          <span>{error}</span>
+        </div>
+      )}
+
+      {report && (
+        <section className="admin-metrics" aria-label="Launch metrics">
+          <article>
+            <span>Orders</span>
+            <strong>{report.orders}</strong>
+          </article>
+          <article>
+            <span>Drafts</span>
+            <strong>{report.designDrafts}</strong>
+          </article>
+          <article>
+            <span>AI spend</span>
+            <strong>{formatMoney(report.estimatedAiSpendCents)}</strong>
+          </article>
+          <article>
+            <span>Paid beta</span>
+            <strong>{report.launchReadiness.readyForPaidBeta ? 'Ready' : 'Gated'}</strong>
+          </article>
+        </section>
+      )}
+
+      <section className="admin-review-panel" aria-label="Orders needing review">
+        <div className="panel-heading">
+          <div>
+            <h2>Manual review queue</h2>
+            <p>{reviewQueue.length} order{reviewQueue.length === 1 ? '' : 's'} waiting</p>
+          </div>
+          {report && (
+            <span className={`gate ${report.launchReadiness.readyForPaidBeta ? 'gate-pass' : 'gate-manual'}`}>
+              {report.launchReadiness.readyForPaidBeta ? 'Paid beta ready' : 'Launch gated'}
+            </span>
+          )}
+        </div>
+
+        {!report && (
+          <div className="empty-state empty-state--inline">
+            <strong>Queue locked</strong>
+            <p>Enter the admin access code to load paid orders that need operator review.</p>
+          </div>
+        )}
+
+        {report && reviewQueue.length === 0 && (
+          <div className="empty-state empty-state--inline">
+            <strong>No orders need review</strong>
+            <p>Paid orders will appear here after Stripe completion when fulfillment is gated.</p>
+          </div>
+        )}
+
+        <div className="admin-order-list">
+          {reviewQueue.map((item) => (
+            <article className="admin-order-card" key={item.orderId}>
+              <header>
+                <div>
+                  <span>{statusLabel(item.status)}</span>
+                  <h3>{item.orderNumber}</h3>
+                  <p>{item.customerEmail ?? 'No customer email'}</p>
+                </div>
+                <strong>{formatMoney(item.totalCents, item.currency)}</strong>
+              </header>
+
+              <div className="admin-order-meta" aria-label="Order identifiers">
+                <span>Payment: {statusLabel(item.paymentStatus)}</span>
+                <span>Fulfillment: {statusLabel(item.fulfillmentStatus)}</span>
+                <span>Quote: {shortId(item.quoteId)}</span>
+                <span>Design: {shortId(item.designAssetId)}</span>
+              </div>
+
+              <div className="admin-order-products">
+                {item.items.map((line) => (
+                  <p key={`${line.productId}-${line.variantId}-${line.designAssetId ?? 'design'}`}>
+                    <strong>{line.productTitle}</strong>
+                    <span>
+                      {line.variantName} · {line.placementCodes.join(', ')} ·{' '}
+                      {line.printfulVariantId ? `Printful ${line.printfulVariantId}` : 'No Printful ID'}
+                    </span>
+                  </p>
+                ))}
+              </div>
+
+              {item.recipient && (
+                <address className="admin-recipient">
+                  <strong>{item.recipient.name}</strong>
+                  <span>
+                    {item.recipient.address1}, {item.recipient.city}
+                    {item.recipient.stateCode ? `, ${item.recipient.stateCode}` : ''}{' '}
+                    {item.recipient.zip}
+                  </span>
+                  <span>{item.recipient.countryCode}</span>
+                </address>
+              )}
+
+              <div className="admin-asset-links">
+                <a className={!item.artworkUrl ? 'is-disabled' : ''} href={item.artworkUrl ?? '#'} target="_blank" rel="noreferrer">
+                  Artwork
+                </a>
+                <a className={!item.mockupUrl ? 'is-disabled' : ''} href={item.mockupUrl ?? '#'} target="_blank" rel="noreferrer">
+                  Mockup
+                </a>
+              </div>
+
+              <div className={`admin-readiness ${item.payloadReady ? 'is-ready' : 'needs-review'}`}>
+                {item.checks.map((check) => (
+                  <p key={check.code} className={`check-${check.status}`}>
+                    <span aria-hidden="true">{check.status === 'pass' ? '✓' : '!'}</span>
+                    <strong>{check.label}</strong>
+                    <small>{check.detail}</small>
+                  </p>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <SiteFooter />
+    </main>
+  );
+}
+
 function StepBadge({
   index,
   label,
@@ -237,8 +468,166 @@ function StepBadge({
   );
 }
 
+function CanvasTabs({
+  view,
+  hasArtwork,
+  hasMockup,
+  onChange,
+}: {
+  view: CanvasView;
+  hasArtwork: boolean;
+  hasMockup: boolean;
+  onChange: (view: CanvasView) => void;
+}) {
+  return (
+    <div className="canvas-tabs" role="tablist" aria-label="Preview view">
+      <button
+        className={view === 'artwork' ? 'is-active' : ''}
+        type="button"
+        role="tab"
+        aria-selected={view === 'artwork'}
+        onClick={() => onChange('artwork')}
+      >
+        <span>Artwork</span>
+        {hasArtwork && <b aria-hidden="true">✓</b>}
+      </button>
+      <button
+        className={view === 'product' ? 'is-active' : ''}
+        type="button"
+        role="tab"
+        aria-selected={view === 'product'}
+        onClick={() => onChange('product')}
+      >
+        <span>On product</span>
+        {hasMockup && <b aria-hidden="true">✓</b>}
+      </button>
+    </div>
+  );
+}
+
+function CanvasStateCard({ state }: { state: StudioCanvasState }) {
+  return (
+    <aside className={`canvas-state-card tone-${state.tone}`} aria-live="polite">
+      <div>
+        <h3>{state.title}</h3>
+        <p>{state.detail}</p>
+      </div>
+      {state.scene === 'drafting' && (
+        <ol className="canvas-progress" aria-label="Artwork generation progress">
+          {state.progressSteps.map((step) => (
+            <li key={step.label} className={`is-${step.state}`}>
+              <span aria-hidden="true">
+                {step.state === 'done' ? '✓' : step.state === 'active' ? '●' : '○'}
+              </span>
+              <strong>{step.label}</strong>
+            </li>
+          ))}
+        </ol>
+      )}
+    </aside>
+  );
+}
+
+function MakeItYoursPanel({
+  product,
+  selectedVariant,
+  options,
+  selectedPlacements,
+  onSelectColor,
+  onSelectSize,
+  onTogglePlacement,
+}: {
+  product: CatalogProduct;
+  selectedVariant: CatalogVariant;
+  options: VariantOptionGroups;
+  selectedPlacements: string[];
+  onSelectColor: (colorKey: string) => void;
+  onSelectSize: (sizeKey: string) => void;
+  onTogglePlacement: (code: string) => void;
+}) {
+  return (
+    <section className="make-panel" aria-label="Customize product">
+      <div className="section-kicker">
+        <span>02</span>
+        <div>
+          <strong>Make it yours</strong>
+          <small>Choose the variant and print area before previewing.</small>
+        </div>
+      </div>
+
+      {options.colorOptions.length > 0 && (
+        <div className="option-group">
+          <span>Color</span>
+          <div className="swatch-grid" role="group" aria-label="Color options">
+            {options.colorOptions.map((option) => (
+              <button
+                key={option.key}
+                className={option.key === options.selectedColorKey ? 'is-active' : ''}
+                style={{ '--swatch': option.colorCode ?? '#f8fafc' } as CSSProperties}
+                type="button"
+                aria-pressed={option.key === options.selectedColorKey}
+                disabled={!option.available}
+                onClick={() => onSelectColor(option.key)}
+              >
+                <span className="swatch-dot" aria-hidden="true" />
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {options.sizeOptions.length > 0 && (
+        <div className="option-group">
+          <span>Size</span>
+          <div className="size-grid" role="group" aria-label="Size options">
+            {options.sizeOptions.map((option) => (
+              <button
+                key={option.key}
+                className={option.key === options.selectedSizeKey ? 'is-active' : ''}
+                type="button"
+                aria-pressed={option.key === options.selectedSizeKey}
+                disabled={!option.available}
+                onClick={() => onSelectSize(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="variant-summary">
+        <span>Selected</span>
+        <strong>{selectedVariant.name}</strong>
+        <small>{formatMoney(selectedVariant.costCents)} base cost</small>
+      </div>
+
+      <div className="option-group">
+        <span>Where it prints</span>
+        <div className="placement-grid placement-grid--panel">
+          {product.placements.map((placement) => (
+            <button
+              key={placement.code}
+              className={selectedPlacements.includes(placement.code) ? 'is-active' : ''}
+              onClick={() => onTogglePlacement(placement.code)}
+              type="button"
+              aria-pressed={selectedPlacements.includes(placement.code)}
+            >
+              <strong>{placement.displayName}</strong>
+              <small>{placement.technique.toUpperCase()}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
-  const policyRoute = policyRoutes[normalizedPathname()];
+  const pathname = normalizedPathname();
+  const policyRoute = policyRoutes[pathname];
+  const isAdminRoute = pathname === '/admin';
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [session, setSession] = useState<StudioSession | null>(null);
@@ -253,6 +642,9 @@ export default function App() {
   const [idea, setIdea] = useState<DesignIdea | null>(null);
   const [design, setDesign] = useState<DesignDraft | null>(null);
   const [mockup, setMockup] = useState<DesignMockup | null>(null);
+  const [mockupsByKey, setMockupsByKey] = useState<Record<string, DesignMockup>>({});
+  const [canvasView, setCanvasView] = useState<CanvasView>('artwork');
+  const [imageViewer, setImageViewer] = useState<ImageViewerState>(null);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [order, setOrder] = useState<OrderSummary | null>(null);
@@ -262,7 +654,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (policyRoute) return undefined;
+    if (policyRoute || isAdminRoute) return undefined;
     let mounted = true;
     Promise.all([
       api.categories(),
@@ -293,10 +685,10 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [policyRoute]);
+  }, [isAdminRoute, policyRoute]);
 
   useEffect(() => {
-    if (policyRoute) return undefined;
+    if (policyRoute || isAdminRoute) return undefined;
     api
       .products(selectedCategory || undefined)
       .then((productData) => {
@@ -314,7 +706,7 @@ export default function App() {
       })
       .catch((caught: Error) => setError(caught.message));
     return undefined;
-  }, [policyRoute, selectedCategory, selectedProductId]);
+  }, [isAdminRoute, policyRoute, selectedCategory, selectedProductId]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -326,6 +718,34 @@ export default function App() {
     [selectedProduct, selectedVariantId]
   );
 
+  const selectedPlacementsKey = useMemo(
+    () => [...selectedPlacements].sort().join(','),
+    [selectedPlacements]
+  );
+
+  const selectedPlacementCodes = useMemo(
+    () => (selectedPlacementsKey ? selectedPlacementsKey.split(',') : []),
+    [selectedPlacementsKey]
+  );
+
+  const selectedMockupKey = useMemo(
+    () =>
+      buildMockupCacheKey({
+        designAssetId: design?.id,
+        productId: selectedProduct?.id,
+        variantId: selectedVariant?.id,
+        placementCodes: selectedPlacementCodes,
+      }),
+    [design?.id, selectedProduct?.id, selectedVariant?.id, selectedPlacementCodes]
+  );
+
+  const cachedMockup = selectedMockupKey ? mockupsByKey[selectedMockupKey] : undefined;
+
+  const variantOptions = useMemo(
+    () => (selectedProduct ? groupVariantOptions(selectedProduct, selectedVariantId) : null),
+    [selectedProduct, selectedVariantId]
+  );
+
   const step = quote ? 5 : mockup ? 4 : design ? 3 : idea ? 2 : selectedProduct ? 1 : 0;
   const selectedCategoryTitle =
     categories.find((category) => category.slug === selectedCategory)?.title ?? 'All products';
@@ -334,18 +754,91 @@ export default function App() {
     publicConfig.isProductionMode && !publicConfig.enablePublicCheckout
       ? 'Paid checkout opens after final provider and support review.'
       : null;
+  const canvasState = useMemo(
+    () =>
+      deriveStudioCanvasState({
+        busy,
+        design,
+        mockup,
+        quoteReady: hasQuote,
+        checkoutUnavailable,
+      }),
+    [busy, checkoutUnavailable, design, hasQuote, mockup]
+  );
+
+  useEffect(() => {
+    if (policyRoute || isAdminRoute) return undefined;
+    if (!selectedMockupKey || !selectedProduct || !selectedVariant || !design?.id) {
+      setMockup(null);
+      return undefined;
+    }
+    if (cachedMockup) {
+      setMockup(cachedMockup);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setMockup(null);
+    api
+      .latestMockup({
+        productId: selectedProduct.id,
+        variantId: selectedVariant.id,
+        placementCodes: selectedPlacementCodes,
+        designAssetId: design.id,
+      })
+      .then((storedMockup) => {
+        if (cancelled || !storedMockup) return;
+        setMockupsByKey((current) => ({ ...current, [selectedMockupKey]: storedMockup }));
+        setMockup(storedMockup);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cachedMockup,
+    design?.id,
+    isAdminRoute,
+    policyRoute,
+    selectedMockupKey,
+    selectedPlacementCodes,
+    selectedProduct,
+    selectedVariant,
+  ]);
+
+  useEffect(() => {
+    if (!imageViewer) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setImageViewer(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [imageViewer]);
 
   const runAction = async <T,>(
     key: string,
     action: () => Promise<T>,
     done: (result: T) => void | Promise<void>
   ) => {
+    const startedAt = window.performance.now();
     setBusy(key);
     setError(null);
     try {
       const result = await action();
+      const remaining = (minimumBusyMs[key] ?? 0) - (window.performance.now() - startedAt);
+      if (remaining > 0) await delay(remaining);
       await done(result);
     } catch (caught) {
+      const remaining = (minimumBusyMs[key] ?? 0) - (window.performance.now() - startedAt);
+      if (remaining > 0) await delay(remaining);
       setError(caught instanceof Error ? caught.message : 'Action failed.');
     } finally {
       setBusy(null);
@@ -364,6 +857,21 @@ export default function App() {
     setMockup(null);
   };
 
+  const selectVariant = (variantId: string) => {
+    if (variantId === selectedVariantId) return;
+    setSelectedVariantId(variantId);
+    setQuote(null);
+    setCheckout(null);
+    setOrder(null);
+    setMockup(null);
+  };
+
+  const selectVariantOption = (updates: { colorKey?: string; sizeKey?: string }) => {
+    if (!selectedProduct) return;
+    const nextVariant = findVariantForOption(selectedProduct, selectedVariantId, updates);
+    if (nextVariant) selectVariant(nextVariant.id);
+  };
+
   const togglePlacement = (code: string) => {
     setSelectedPlacements((current) => {
       if (current.includes(code)) {
@@ -372,6 +880,10 @@ export default function App() {
       }
       return [...current, code];
     });
+    setQuote(null);
+    setCheckout(null);
+    setOrder(null);
+    setMockup(null);
   };
 
   const refineIdea = () => {
@@ -389,6 +901,7 @@ export default function App() {
   };
 
   const createDraft = () => {
+    setCanvasView('artwork');
     runAction(
       'draft',
       () =>
@@ -399,12 +912,18 @@ export default function App() {
           variantId: selectedVariant?.id,
           placementCodes: selectedPlacements,
         }),
-      setDesign
+      (result) => {
+        setDesign(result);
+        setQuote(null);
+        setCheckout(null);
+        setOrder(null);
+      }
     );
   };
 
   const reviseDraft = () => {
     if (!design?.id) return;
+    setCanvasView('artwork');
     runAction(
       'revision',
       () =>
@@ -413,7 +932,12 @@ export default function App() {
           instructions: revision,
           sessionId: session?.id,
         }),
-      setDesign
+      (result) => {
+        setDesign(result);
+        setQuote(null);
+        setCheckout(null);
+        setOrder(null);
+      }
     );
   };
 
@@ -460,6 +984,7 @@ export default function App() {
 
   const createMockup = () => {
     if (!selectedProduct || !selectedVariant) return;
+    setCanvasView('product');
     runAction(
       'mockup',
       () =>
@@ -471,7 +996,18 @@ export default function App() {
           designAssetId: design?.id ?? undefined,
           imageUrl: design?.imageUrl,
         }),
-      setMockup
+      (result) => {
+        setMockup(result);
+        const cacheKey = buildMockupCacheKey({
+          designAssetId: result.designAssetId ?? design?.id,
+          productId: result.productId,
+          variantId: result.variantId,
+          placementCodes: result.placementCodes,
+        });
+        if (cacheKey) {
+          setMockupsByKey((current) => ({ ...current, [cacheKey]: result }));
+        }
+      }
     );
   };
 
@@ -543,6 +1079,10 @@ export default function App() {
     return <PolicyPage route={policyRoute} />;
   }
 
+  if (isAdminRoute) {
+    return <AdminPage />;
+  }
+
   if (loading) {
     return (
       <main className="loading-shell">
@@ -563,6 +1103,25 @@ export default function App() {
   }
 
   const passActive = Boolean(studioPass);
+  const hasArtwork = Boolean(design?.imageUrl);
+  const hasProductMockup = Boolean(mockup?.imageUrl && mockup.status === 'complete');
+  const isDraftingArtwork = busy === 'draft' || busy === 'revision';
+  const isBuildingMockup =
+    busy === 'mockup' || mockup?.status === 'queued' || mockup?.status === 'processing';
+  const canvasImageUrl =
+    canvasView === 'product' ? (mockup?.imageUrl ?? '') : (design?.imageUrl ?? '');
+  const canvasTitle =
+    canvasView === 'product'
+      ? `${selectedProduct?.title ?? 'Product'} mockup`
+      : 'Generated artwork';
+  const canvasDetail =
+    canvasView === 'product'
+      ? mockup
+        ? `${statusLabel(mockup.status)} ${mockup.provider === 'printful' ? 'Printful' : 'provider'} preview`
+        : 'Product preview'
+      : design
+        ? `${statusLabel(design.qualityTier)} draft artwork`
+        : 'Artwork preview';
   return (
     <main className="app-shell">
       <header className="hero hero-compact">
@@ -605,7 +1164,7 @@ export default function App() {
               {checkoutUnavailable ? '$5 Studio Pass · opening soon' : "$5 Studio Pass when you're ready"}
             </li>
             <li>
-              <span aria-hidden="true">📦</span> 8 product types &amp; growing
+              <span aria-hidden="true">📦</span> 5 launch products &amp; growing
             </li>
             <li>
               <span aria-hidden="true">💸</span> See the full price before you pay
@@ -740,78 +1299,96 @@ export default function App() {
           {selectedProduct && selectedVariant ? (
             <>
               <div className="studio-layout">
-                <div className="product-stage">
-                  <span className="stage-tag">
-                    {mockup ? 'Mockup preview' : design ? 'Artwork draft' : 'Live preview'}
-                  </span>
-                  <ProductVisual
-                    category={selectedProduct.categorySlug}
-                    title={selectedProduct.title}
-                    color={selectedVariant.colorCode}
-                  />
-                  {(mockup || design) && (
-                    <img
-                      className="draft-preview"
-                      src={mockup?.imageUrl ?? design?.imageUrl}
-                      alt={`Generated artwork preview for ${selectedProduct.title}`}
+                <div className={`product-stage proof-stage scene-${canvasState.scene} tone-${canvasState.tone}`}>
+                  <div className="stage-toolbar">
+                    <span className="stage-tag">{canvasState.title}</span>
+                    <CanvasTabs
+                      view={canvasView}
+                      hasArtwork={hasArtwork}
+                      hasMockup={hasProductMockup}
+                      onChange={setCanvasView}
                     />
-                  )}
-                  {!design && !mockup && (
-                    <span className="stage-hint">
-                      Generate a draft to see your artwork land here.
-                    </span>
-                  )}
+                  </div>
+
+                  <div className={`proof-canvas__content is-${canvasView}`}>
+                    {canvasImageUrl ? (
+                      <button
+                        className={`preview-frame preview-frame--${canvasView}`}
+                        type="button"
+                        onClick={() =>
+                          setImageViewer({
+                            title: canvasTitle,
+                            imageUrl: canvasImageUrl,
+                            detail: canvasDetail,
+                          })
+                        }
+                        aria-label={`Open ${canvasTitle} full size`}
+                      >
+                        <img
+                          className="draft-preview"
+                          src={canvasImageUrl}
+                          alt={`${canvasTitle} for ${selectedProduct.title}`}
+                        />
+                        <span className="preview-frame__icon" aria-hidden="true">
+                          ⛶
+                        </span>
+                      </button>
+                    ) : (
+                      <div className={`canvas-placeholder ${isDraftingArtwork || isBuildingMockup ? 'is-loading' : ''}`}>
+                        <ProductVisual
+                          category={selectedProduct.categorySlug}
+                          title={selectedProduct.title}
+                          color={selectedVariant.colorCode}
+                        />
+                        <strong>
+                          {canvasView === 'product'
+                            ? isBuildingMockup
+                              ? 'Placing artwork on product'
+                              : design
+                              ? 'Preview this on product'
+                              : 'Generate artwork first'
+                            : isDraftingArtwork
+                              ? 'Rendering your draft'
+                              : 'Start with a square draft'}
+                        </strong>
+                        <span>
+                          {canvasView === 'product'
+                            ? isBuildingMockup
+                              ? 'The mockup will appear here and be restored when you return to this item.'
+                              : 'Your Printful mockup will persist here once generated.'
+                            : isDraftingArtwork
+                              ? 'Print readiness checks run as soon as the image returns.'
+                              : 'Describe the design and the artwork will appear on this proof grid.'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <CanvasStateCard state={canvasState} />
                 </div>
 
                 <div className="studio-fields">
                   <div className="product-summary">
-                    <span>{selectedProduct.categoryTitle || selectedProduct.type}</span>
+                    <span>01 Product</span>
                     <h2>{selectedProduct.title}</h2>
                     <p>{selectedProduct.description}</p>
+                    <small>{selectedProduct.categoryTitle || selectedProduct.type}</small>
                   </div>
 
-                  <label className="field-block" htmlFor="variant">
-                    <span>Color &amp; size</span>
-                    <select
-                      id="variant"
-                      value={selectedVariantId}
-                      onChange={(event) => {
-                        setSelectedVariantId(event.target.value);
-                        setQuote(null);
-                        setMockup(null);
-                      }}
-                    >
-                      {selectedProduct.variants.map((variant) => (
-                        <option key={variant.id} value={variant.id} disabled={!variant.isAvailable}>
-                          {variant.name} — {formatMoney(variant.costCents)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <div className="field-block">
-                    <span>Where it prints</span>
-                    <div className="placement-grid">
-                      {selectedProduct.placements.map((placement) => (
-                        <button
-                          key={placement.code}
-                          className={selectedPlacements.includes(placement.code) ? 'is-active' : ''}
-                          onClick={() => {
-                            togglePlacement(placement.code);
-                            setQuote(null);
-                            setMockup(null);
-                          }}
-                          type="button"
-                          aria-pressed={selectedPlacements.includes(placement.code)}
-                        >
-                          {placement.displayName}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  {variantOptions && (
+                    <MakeItYoursPanel
+                      product={selectedProduct}
+                      selectedVariant={selectedVariant}
+                      options={variantOptions}
+                      selectedPlacements={selectedPlacements}
+                      onSelectColor={(colorKey) => selectVariantOption({ colorKey })}
+                      onSelectSize={(sizeKey) => selectVariantOption({ sizeKey })}
+                      onTogglePlacement={togglePlacement}
+                    />
+                  )}
 
                   <label className="field-block prompt-block" htmlFor="prompt">
-                    <span>Describe your design</span>
+                    <span>03 Describe your design</span>
                     <textarea
                       id="prompt"
                       value={prompt}
@@ -844,7 +1421,7 @@ export default function App() {
                   disabled={busy !== null || !design}
                   type="button"
                 >
-                  {busy === 'mockup' ? 'Building…' : 'Preview on product'}
+                  {busy === 'mockup' ? 'Building product preview…' : 'Preview on product'}
                 </button>
                 <button className="btn" onClick={createQuote} disabled={busy !== null} type="button">
                   {busy === 'quote' ? 'Pricing...' : quote ? 'Update price' : 'See the price'}
@@ -865,6 +1442,13 @@ export default function App() {
                     View details
                   </button>
                 </section>
+              )}
+
+              {mockup?.status === 'failed' && (
+                <div className="notice notice-error" role="status">
+                  <strong>Mockup preview failed</strong>
+                  <span>{mockup.errorMessage ?? 'The provider preview could not be generated.'}</span>
+                </div>
               )}
 
               {idea && (
@@ -1076,6 +1660,41 @@ export default function App() {
           ))}
         </div>
         </section>
+      )}
+
+      {imageViewer && (
+        <div
+          className="image-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={imageViewer.title}
+          onClick={() => setImageViewer(null)}
+        >
+          <div className="image-viewer__panel" onClick={(event) => event.stopPropagation()}>
+            <header className="image-viewer__header">
+              <div>
+                <span>{imageViewer.detail}</span>
+                <h2>{imageViewer.title}</h2>
+              </div>
+              <button
+                className="image-viewer__close"
+                type="button"
+                onClick={() => setImageViewer(null)}
+                aria-label="Close full size image"
+              >
+                ×
+              </button>
+            </header>
+            <div className="image-viewer__canvas">
+              <img src={imageViewer.imageUrl} alt={imageViewer.title} />
+            </div>
+            <footer className="image-viewer__footer">
+              <a href={imageViewer.imageUrl} target="_blank" rel="noreferrer">
+                Open original image
+              </a>
+            </footer>
+          </div>
+        </div>
       )}
 
       <SiteFooter />

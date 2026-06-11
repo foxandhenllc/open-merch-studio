@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { env } from '../config/env.js';
+import { removeEdgeBackgroundFromImageUrl } from './background-removal.service.js';
 
 type GeneratedDesignImage = {
   provider: 'mock' | 'openai';
@@ -55,17 +56,24 @@ export function normalizePromptForPrint(prompt: string): string {
     .trim();
 }
 
-export function buildPrintReadyPrompt(prompt: string): string {
+export function buildPrintReadyPrompt(
+  prompt: string,
+  options: { transparentBackground?: boolean } = {}
+): string {
   const cleaned = normalizePromptForPrint(prompt) || prompt;
   const expectsText = detectTextIntent(prompt);
+  const transparentBackground = options.transparentBackground ?? true;
   const textGuidance = expectsText
     ? 'If lettering is requested, keep text short, legible, correctly spelled, and high contrast.'
     : 'Do not add words, slogans, signatures, logos, or random typography unless requested.';
+  const backgroundGuidance = transparentBackground
+    ? 'Use a centered composition, transparent background, strong silhouette, and simple readable shapes.'
+    : 'Use a centered composition, strong silhouette, and simple readable shapes on a flat solid white background that can be cleanly removed later. Do not draw checkerboard transparency patterns, canvas texture, product mockups, or photographic scenery.';
 
   return [
     cleaned,
     'Create one original print-ready merchandise graphic, not a product photo or mockup.',
-    'Use a centered composition, transparent background, strong silhouette, and simple readable shapes.',
+    backgroundGuidance,
     'Avoid brand logos, celebrities, protected characters, private data, watermarks, tiny unreadable text, and photographic backgrounds.',
     textGuidance,
   ].join(' ');
@@ -98,7 +106,10 @@ export async function generateDesignImage(params: {
 
   const client = new OpenAI({ apiKey: env.openaiApiKey });
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
-  const finalPrompt = buildPrintReadyPrompt(params.prompt);
+  const supportsTransparentBackground = env.openaiDesignModel !== 'gpt-image-2';
+  const finalPrompt = buildPrintReadyPrompt(params.prompt, {
+    transparentBackground: supportsTransparentBackground,
+  });
   await assertPromptAllowed(client, finalPrompt);
   const response = await client.images.generate({
     model: env.openaiDesignModel,
@@ -106,17 +117,26 @@ export async function generateDesignImage(params: {
     n: 1,
     size: '1024x1024',
     quality,
-    background: 'transparent',
+    ...(supportsTransparentBackground ? { background: 'transparent' as const } : {}),
     output_format: 'png',
     moderation: 'auto',
     user: params.sessionId,
   });
 
   const image = response.data?.[0];
-  const imageUrl = image?.b64_json ? `data:image/png;base64,${image.b64_json}` : (image?.url ?? '');
+  let imageUrl = image?.b64_json ? `data:image/png;base64,${image.b64_json}` : (image?.url ?? '');
 
   if (!imageUrl) {
     throw new Error('OpenAI image generation did not return an image.');
+  }
+
+  if (!supportsTransparentBackground) {
+    try {
+      const cleaned = await removeEdgeBackgroundFromImageUrl(imageUrl);
+      imageUrl = cleaned.imageUrl;
+    } catch {
+      // Keep the original generated image if local cleanup cannot process the provider output.
+    }
   }
 
   return {
