@@ -26,35 +26,70 @@ import {
 import { publicConfig } from '../config';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+const ADMIN_ACCESS_CODE = import.meta.env.VITE_ADMIN_ACCESS_CODE || '';
 
 type ApiResponse<T> = {
   success: boolean;
   data: T;
   error?: string;
+  errorCode?: string;
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export type DataSource = 'live' | 'fixture';
+
+export type Sourced<T> = {
+  data: T;
+  source: DataSource;
+  fallbackReason?: string;
+};
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
     ...init,
+    signal: signal ?? init?.signal,
   });
   const payload = (await response.json()) as ApiResponse<T>;
   if (!response.ok || !payload.success) {
-    throw new Error(payload.error || `Request failed: ${response.status}`);
+    throw new ApiError(
+      payload.error || `Request failed: ${response.status}`,
+      response.status,
+      payload.errorCode
+    );
   }
   return payload.data;
 }
 
-function withFallback<T>(requestPromise: Promise<T>, fallback: () => T | Promise<T>): Promise<T> {
-  return requestPromise.catch((error) => {
-    if (!publicConfig.enableLocalFallbacks) {
-      throw error;
-    }
-    return fallback();
-  });
+async function withFallback<T>(
+  requestPromise: Promise<T>,
+  fallback: () => T | Promise<T>
+): Promise<Sourced<T>> {
+  try {
+    return { data: await requestPromise, source: 'live' };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    if (!publicConfig.enableLocalFallbacks) throw error;
+    return {
+      data: await fallback(),
+      source: 'fixture',
+      fallbackReason: error instanceof Error ? error.message : 'Studio server unreachable.',
+    };
+  }
 }
 
 export const api = {
@@ -62,9 +97,8 @@ export const api = {
     withFallback(request<CatalogCategory[]>('/api/catalog/categories'), () => localCategories),
   products: (category?: string) => {
     const search = category ? `?category=${encodeURIComponent(category)}` : '';
-    return withFallback(
-      request<CatalogProduct[]>(`/api/catalog/products${search}`),
-      () => localProductsForCategory(category)
+    return withFallback(request<CatalogProduct[]>(`/api/catalog/products${search}`), () =>
+      localProductsForCategory(category)
     );
   },
   quote: (body: {
@@ -106,19 +140,23 @@ export const api = {
       }),
       () => createLocalDesignIdea(body.prompt, body.sessionId)
     ),
-  designDraft: (body: {
-    prompt: string;
-    sessionId?: string;
-    productId?: string;
-    variantId?: string;
-    placementCodes?: string[];
-    qualityTier?: 'rough' | 'final';
-  }) =>
+  designDraft: (
+    body: {
+      prompt: string;
+      sessionId?: string;
+      productId?: string;
+      variantId?: string;
+      placementCodes?: string[];
+      qualityTier?: 'rough' | 'final';
+    },
+    signal?: AbortSignal
+  ) =>
     withFallback(
-      request<DesignDraft>('/api/design/drafts', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request<DesignDraft>(
+        '/api/design/drafts',
+        { method: 'POST', body: JSON.stringify(body) },
+        signal
+      ),
       () => createLocalDesignDraft(body.prompt, body.sessionId)
     ),
   reviseDraft: (body: { draftId: string; instructions: string; sessionId?: string }) =>
@@ -127,7 +165,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-      () => createLocalDesignDraft(`${body.instructions}`, body.sessionId)
+      () => createLocalDesignDraft(body.instructions, body.sessionId)
     ),
   mockup: (body: {
     sessionId?: string;
@@ -170,9 +208,18 @@ export const api = {
   order: (orderId: string) =>
     withFallback(request<OrderSummary>(`/api/orders/${encodeURIComponent(orderId)}`), () => {
       const order = getLocalOrder();
-      if (!order) throw new Error('Order not found.');
+      if (!order) throw new Error('Order details are still pending.');
       return order;
     }),
-  adminReport: (): Promise<AdminReport> =>
-    withFallback(request<AdminReport>('/api/admin/report'), () => localAdminReport),
+  adminReport: (): Promise<Sourced<AdminReport>> => {
+    if (!ADMIN_ACCESS_CODE) {
+      return Promise.resolve({ data: localAdminReport, source: 'fixture' });
+    }
+    return withFallback(
+      request<AdminReport>('/api/admin/report', {
+        headers: { 'x-admin-access': ADMIN_ACCESS_CODE },
+      }),
+      () => localAdminReport
+    );
+  },
 };

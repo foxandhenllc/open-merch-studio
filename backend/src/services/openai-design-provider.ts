@@ -128,7 +128,7 @@ export async function generateDesignImage(params: {
 }
 
 export function dataUrlToBuffer(imageUrl: string): { buffer: Buffer; contentType: string } | null {
-  const match = imageUrl.match(/^data:([^;,]+)(;base64)?,(.+)$/);
+  const match = imageUrl.match(/^data:([^;,]+)(?:;charset=[^;,]+)?(;base64)?,(.+)$/i);
   if (!match) return null;
   const isBase64 = Boolean(match[2]);
   const payload = match[3];
