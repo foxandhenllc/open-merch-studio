@@ -14,6 +14,7 @@ import {
   authorizeDesignAction,
   getAllowanceState,
   getDraft,
+  findReusableMockup,
   getOrCreateDurableSession,
   recordDesignSpend,
   runtimeId,
@@ -159,6 +160,47 @@ async function persistMockup(mockup: DesignMockup, providerTaskId?: string): Pro
     // Runtime mockup state remains available if persistence is unavailable.
   }
   return saved;
+}
+
+async function getReusableMockup(params: {
+  productId: string;
+  variantId: string;
+  placementCodes: string[];
+  designAssetId?: string;
+  orientation?: DesignMockup['orientation'];
+}): Promise<DesignMockup | null> {
+  const runtime = findReusableMockup(params);
+  if (runtime) return runtime;
+  if (!env.databaseUrl || params.orientation || !params.designAssetId) return null;
+  try {
+    const cached = await prisma.mockupTask.findFirst({
+      where: {
+        productId: params.productId,
+        variantId: params.variantId,
+        designAssetId: params.designAssetId,
+        placementCodes: { equals: params.placementCodes },
+        status: 'complete',
+        imageUrl: { not: null },
+        createdAt: { gte: new Date(Date.now() - 6 * 60 * 60 * 1000) },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!cached?.imageUrl) return null;
+    return saveMockup({
+      id: cached.id,
+      status: 'complete',
+      provider: cached.provider as DesignMockup['provider'],
+      productId: cached.productId,
+      variantId: cached.variantId,
+      placementCodes: cached.placementCodes,
+      designAssetId: cached.designAssetId ?? undefined,
+      imageUrl: cached.imageUrl,
+      views: [{ label: 'Saved mockup', imageUrl: cached.imageUrl }],
+      createdAt: cached.createdAt.toISOString(),
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function createDesignIdea(params: {
@@ -497,8 +539,11 @@ export async function createDesignMockup(params: {
   variantId: string;
   placementCodes: string[];
   designAssetId?: string;
+  orientation?: DesignMockup['orientation'];
 }): Promise<DesignMockup> {
   const session = await getOrCreateDurableSession(params.sessionId);
+  const reusable = await getReusableMockup(params);
+  if (reusable) return reusable;
   await recordDesignSpend({
     sessionId: session.id,
     designAssetId: params.designAssetId,
@@ -529,6 +574,8 @@ export async function createDesignMockup(params: {
         placement,
         designImageUrl: artwork.imageUrl,
         technique: placementOption?.technique,
+        orientation: params.orientation,
+        preferFrontView: product.categorySlug === 'drinkware',
       });
       return persistMockup(
         {
@@ -539,7 +586,9 @@ export async function createDesignMockup(params: {
           variantId: params.variantId,
           placementCodes: params.placementCodes,
           designAssetId: params.designAssetId,
+          orientation: params.orientation,
           imageUrl: mockup.imageUrl,
+          views: mockup.views,
           createdAt: runtimeNow(),
         },
         mockup.taskKey
@@ -553,6 +602,7 @@ export async function createDesignMockup(params: {
         variantId: params.variantId,
         placementCodes: params.placementCodes,
         designAssetId: params.designAssetId,
+        orientation: params.orientation,
         imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
         errorMessage: describePrintfulError(error),
         createdAt: runtimeNow(),
@@ -567,6 +617,7 @@ export async function createDesignMockup(params: {
     variantId: params.variantId,
     placementCodes: params.placementCodes,
     designAssetId: params.designAssetId,
+    orientation: params.orientation,
     imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
     createdAt: runtimeNow(),
   });

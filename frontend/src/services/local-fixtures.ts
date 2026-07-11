@@ -263,6 +263,7 @@ export function createLocalQuote(
     variantId: string;
     quantity: number;
     placementCodes: string[];
+    orientation?: 'portrait' | 'landscape' | 'square';
     designAssetId?: string;
   }>,
   studioPassId?: string
@@ -284,6 +285,7 @@ export function createLocalQuote(
       variantName: variant.name,
       quantity,
       placementCodes,
+      orientation: item.orientation,
       designAssetId: item.designAssetId,
       unitCostCents: variant.costCents,
       unitRetailCents: variant.costCents + marginFor(variant.costCents, product.type) + 300,
@@ -461,6 +463,7 @@ export function createLocalMockup(params: {
   placementCodes: string[];
   designAssetId?: string;
   imageUrl?: string;
+  orientation?: 'portrait' | 'landscape' | 'square';
 }): DesignMockup {
   return {
     id: localId('mockup'),
@@ -470,6 +473,7 @@ export function createLocalMockup(params: {
     variantId: params.variantId,
     placementCodes: params.placementCodes,
     designAssetId: params.designAssetId,
+    orientation: params.orientation,
     imageUrl: params.imageUrl ?? createLocalDesignDraft('Mockup preview').imageUrl,
     createdAt: new Date().toISOString(),
   };

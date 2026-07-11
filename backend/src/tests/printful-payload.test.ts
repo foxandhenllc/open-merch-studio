@@ -6,6 +6,7 @@ import { env } from '../config/env.js';
 import {
   buildPrintfulMockupPayload,
   buildPrintfulOrderPayload,
+  extractMockupViews,
   mapPrintfulOrderStatus,
   normalizeCountryCode,
   normalizeStateCode,
@@ -33,6 +34,45 @@ test('mockup payloads preserve placement while omitting invalid zero width', () 
     top: 0,
     left: 159,
   });
+  const portraitPayload = buildPrintfulMockupPayload({
+    printfulVariantId: 3876,
+    placement: 'default',
+    designImageUrl: 'https://example.com/artwork.png',
+    printfile: { printfile_id: 55, width: 1800, height: 1200 },
+    orientation: 'portrait',
+  });
+  assert.deepEqual(portraitPayload.files[0].position, {
+    area_width: 1200,
+    area_height: 1800,
+    width: 1200,
+    height: 1200,
+    top: 300,
+    left: 0,
+  });
+});
+
+test('mockup views keep provider alternatives and prefer a front-facing mug', () => {
+  const views = extractMockupViews(
+    {
+      status: 'completed',
+      mockups: [
+        {
+          placement: 'default',
+          display_name: 'Wraparound print',
+          mockup_url: 'https://example.com/mug-handle-on-right.png',
+          extra: [
+            { title: 'Side', url: 'https://example.com/mug-side.png' },
+            { title: 'Front', url: 'https://example.com/mug-front.png' },
+          ],
+        },
+      ],
+    },
+    'default',
+    true
+  );
+  assert.equal(views[0].label, 'Front');
+  assert.equal(views[0].imageUrl, 'https://example.com/mug-front.png');
+  assert.equal(views.length, 3);
 });
 
 test('buildPrintfulOrderPayload keeps placement and retail quote details', () => {

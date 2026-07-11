@@ -49,11 +49,34 @@ export type SurfaceError = {
   recovery: string;
   retryable: boolean;
 };
+export type PreviewOrientation = 'portrait' | 'landscape' | 'square';
 
 const firstVariant = (product: CatalogProduct): CatalogVariant | null =>
   product.variants.find((variant) => variant.isAvailable) ?? product.variants[0] ?? null;
 const firstPlacement = (product: CatalogProduct): PlacementOption | null =>
   product.placements.find((placement) => placement.isDefault) ?? product.placements[0] ?? null;
+const previewOrientation = (
+  product: CatalogProduct,
+  variant: CatalogVariant | null
+): PreviewOrientation | undefined => {
+  if (product.categorySlug !== 'wall-art') return undefined;
+  const dimensions = variant?.size?.match(/([\d.]+)\s*[x×]\s*([\d.]+)/i);
+  return dimensions && dimensions[1] === dimensions[2] ? 'square' : 'landscape';
+};
+const mockupKey = (params: {
+  productId: string;
+  variantId: string;
+  placements: string[];
+  draftId: string;
+  orientation?: PreviewOrientation;
+}) =>
+  [
+    params.draftId,
+    params.productId,
+    params.variantId,
+    [...params.placements].sort().join(','),
+    params.orientation ?? 'default',
+  ].join('|');
 const emptyBusy: Record<ActionKey, boolean> = {
   catalog: false,
   refining: false,
@@ -152,6 +175,9 @@ export function useStudioViewModel() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedVariantId, setSelectedVariantIdState] = useState('');
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
+  const [selectedOrientation, setSelectedOrientationState] = useState<
+    PreviewOrientation | undefined
+  >();
   const [prompt, setPrompt] = useState('');
   const [revision, setRevision] = useState('Make it bolder and easier to read at small sizes');
   const [email, setEmail] = useState('');
@@ -173,6 +199,13 @@ export function useStudioViewModel() {
   const [online, setOnline] = useState(navigator.onLine);
   const generationController = useRef<AbortController | null>(null);
   const mockupRequestId = useRef(0);
+  const mockupCache = useRef(new Map<string, DesignMockup>());
+  const productSelections = useRef(
+    new Map<
+      string,
+      { variantId: string; placements: string[]; orientation?: PreviewOrientation }
+    >()
+  );
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -257,9 +290,29 @@ export function useStudioViewModel() {
     variant: CatalogVariant;
     placements: string[];
     draft: DesignDraft;
+    orientation?: PreviewOrientation;
   }) => {
     if (!params.draft.id || params.draft.readiness.status === 'blocked') return;
     const requestId = ++mockupRequestId.current;
+    const key = mockupKey({
+      productId: params.product.id,
+      variantId: params.variant.id,
+      placements: params.placements,
+      draftId: params.draft.id,
+      orientation: params.orientation,
+    });
+    const cached = mockupCache.current.get(key);
+    if (cached) {
+      setAction('mockup', false);
+      setOperationStartedAt(null);
+      setMockup(cached);
+      setMockupStale(false);
+      clearError('mockup');
+      setFlow(quote ? 'quote_stale' : 'drafted');
+      setAnnouncement('Saved product mockup restored.');
+      return;
+    }
+    setMockup(null);
     setAction('mockup', true);
     setFlow('previewing');
     setOperationStartedAt(Date.now());
@@ -273,6 +326,7 @@ export function useStudioViewModel() {
           placementCodes: params.placements,
           designAssetId: params.draft.id,
           imageUrl: params.draft.imageUrl,
+          orientation: params.orientation,
         })
       );
       if (requestId !== mockupRequestId.current) return;
@@ -285,6 +339,7 @@ export function useStudioViewModel() {
         );
         setFlow(quote ? 'quote_stale' : 'drafted');
       } else {
+        mockupCache.current.set(key, result);
         setFlow(quote ? 'quote_stale' : 'drafted');
         setAnnouncement('Product mockup ready. You can refine the design or calculate the price.');
       }
@@ -308,15 +363,42 @@ export function useStudioViewModel() {
     setOrder(null);
   };
   const selectProduct = (product: CatalogProduct) => {
-    const variant = firstVariant(product);
+    if (selectedProductId && selectedVariantId) {
+      productSelections.current.set(selectedProductId, {
+        variantId: selectedVariantId,
+        placements: selectedPlacements,
+        orientation: selectedOrientation,
+      });
+    }
+    const remembered = productSelections.current.get(product.id);
+    const variant =
+      product.variants.find(
+        (candidate) => candidate.id === remembered?.variantId && candidate.isAvailable
+      ) ?? firstVariant(product);
     const placement = firstPlacement(product);
+    const placements = remembered?.placements.length
+      ? remembered.placements.filter((code) =>
+          product.placements.some((candidate) => candidate.code === code)
+        )
+      : placement
+        ? [placement.code]
+        : [];
+    const orientation = remembered?.orientation ?? previewOrientation(product, variant);
     setSelectedProductId(product.id);
     setSelectedVariantIdState(variant?.id ?? '');
-    setSelectedPlacements(placement ? [placement.code] : []);
+    setSelectedPlacements(placements);
+    setSelectedOrientationState(orientation);
+    if (variant) {
+      productSelections.current.set(product.id, {
+        variantId: variant.id,
+        placements,
+        orientation,
+      });
+    }
     markStale();
-    if (design && variant && placement) {
+    if (design && variant && placements.length) {
       setAnnouncement(`${product.title} selected. Updating the product mockup.`);
-      void requestMockup({ product, variant, placements: [placement.code], draft: design });
+      void requestMockup({ product, variant, placements, draft: design, orientation });
     } else {
       setAnnouncement(`${product.title} selected. Next: describe your design.`);
     }
@@ -325,12 +407,32 @@ export function useStudioViewModel() {
     setSelectedVariantIdState(id);
     markStale();
     const variant = selectedProduct?.variants.find((candidate) => candidate.id === id);
+    const derivedOrientation = selectedProduct
+      ? previewOrientation(selectedProduct, variant ?? null)
+      : undefined;
+    const orientation =
+      derivedOrientation === 'square'
+        ? 'square'
+        : derivedOrientation
+          ? selectedOrientation === 'portrait'
+            ? 'portrait'
+            : 'landscape'
+          : undefined;
+    setSelectedOrientationState(orientation);
+    if (selectedProduct) {
+      productSelections.current.set(selectedProduct.id, {
+        variantId: id,
+        placements: selectedPlacements,
+        orientation,
+      });
+    }
     if (design && selectedProduct && variant) {
       void requestMockup({
         product: selectedProduct,
         variant,
         placements: selectedPlacements,
         draft: design,
+        orientation,
       });
     }
   };
@@ -342,6 +444,13 @@ export function useStudioViewModel() {
       : [...selectedPlacements, code];
     if (next === selectedPlacements) return;
     setSelectedPlacements(next);
+    if (selectedProduct && selectedVariant) {
+      productSelections.current.set(selectedProduct.id, {
+        variantId: selectedVariant.id,
+        placements: next,
+        orientation: selectedOrientation,
+      });
+    }
     markStale();
     if (design && selectedProduct && selectedVariant) {
       void requestMockup({
@@ -349,6 +458,26 @@ export function useStudioViewModel() {
         variant: selectedVariant,
         placements: next,
         draft: design,
+        orientation: selectedOrientation,
+      });
+    }
+  };
+  const setSelectedOrientation = (orientation: PreviewOrientation) => {
+    if (!selectedProduct || !selectedVariant || orientation === selectedOrientation) return;
+    setSelectedOrientationState(orientation);
+    productSelections.current.set(selectedProduct.id, {
+      variantId: selectedVariant.id,
+      placements: selectedPlacements,
+      orientation,
+    });
+    markStale();
+    if (design) {
+      void requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: selectedPlacements,
+        draft: design,
+        orientation,
       });
     }
   };
@@ -424,6 +553,7 @@ export function useStudioViewModel() {
         variant: selectedVariant,
         placements: selectedPlacements,
         draft,
+        orientation: selectedOrientation,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -468,6 +598,7 @@ export function useStudioViewModel() {
           variant: selectedVariant,
           placements: selectedPlacements,
           draft: revised,
+          orientation: selectedOrientation,
         });
       }
     } catch (error) {
@@ -483,6 +614,7 @@ export function useStudioViewModel() {
       variant: selectedVariant,
       placements: selectedPlacements,
       draft: design,
+      orientation: selectedOrientation,
     });
   };
   const createQuote = async () => {
@@ -500,6 +632,7 @@ export function useStudioViewModel() {
               variantId: selectedVariant.id,
               quantity: 1,
               placementCodes: selectedPlacements,
+              orientation: selectedOrientation,
               designAssetId: design?.id ?? undefined,
             },
           ],
@@ -676,6 +809,7 @@ export function useStudioViewModel() {
     selectedProductId,
     selectedVariantId,
     selectedPlacements,
+    selectedOrientation,
     prompt,
     revision,
     email,
@@ -703,6 +837,7 @@ export function useStudioViewModel() {
     setSelectedCategory,
     selectProduct,
     setSelectedVariantId,
+    setSelectedOrientation,
     togglePlacement,
     refineIdea,
     generate,

@@ -448,6 +448,26 @@ export function saveMockup(mockup: DesignMockup): DesignMockup {
   return { ...mockup };
 }
 
+export function findReusableMockup(params: {
+  productId: string;
+  variantId: string;
+  designAssetId?: string;
+  placementCodes: string[];
+  orientation?: DesignMockup['orientation'];
+}): DesignMockup | undefined {
+  return Array.from(state.mockups.values())
+    .reverse()
+    .find(
+      (mockup) =>
+        mockup.status === 'complete' &&
+        mockup.productId === params.productId &&
+        mockup.variantId === params.variantId &&
+        mockup.designAssetId === params.designAssetId &&
+        mockup.orientation === params.orientation &&
+        mockup.placementCodes.join('|') === params.placementCodes.join('|')
+    );
+}
+
 export function saveQuote(quote: QuoteBreakdown): QuoteBreakdown {
   const id = quote.id || createId('quote');
   const saved = { ...quote, id };

@@ -387,6 +387,7 @@ function StudioApp() {
             onRetryMockup={vm.createMockup}
             onContinueWithoutMockup={vm.createQuote}
             error={vm.errors.mockup}
+            orientation={vm.selectedOrientation}
           />
 
           {!vm.selectedProduct && (
@@ -450,6 +451,35 @@ function StudioApp() {
                     ))}
                   </div>
                 </fieldset>
+                {vm.selectedProduct.categorySlug === 'wall-art' && (
+                  <fieldset>
+                    <legend>Poster orientation</legend>
+                    <div className="placement-options">
+                      {vm.selectedOrientation === 'square' ? (
+                        <button type="button" aria-pressed="true">
+                          Square
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            aria-pressed={vm.selectedOrientation === 'landscape'}
+                            onClick={() => vm.setSelectedOrientation('landscape')}
+                          >
+                            Landscape
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={vm.selectedOrientation === 'portrait'}
+                            onClick={() => vm.setSelectedOrientation('portrait')}
+                          >
+                            Portrait
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </fieldset>
+                )}
               </div>
               <label className="prompt-field">
                 <span>Design prompt</span>

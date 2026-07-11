@@ -14,6 +14,41 @@ import { buildQuoteBreakdown } from './pricing.service.js';
 import { getStudioPassById, getStudioPassForSession, saveQuote } from './runtime-store.js';
 
 const launchCategorySlugs = new Set(sampleCatalog.categories.map((category) => category.slug));
+const curatedPosterVariants: CatalogVariantDto[] = [
+  {
+    id: 'printful-variant-4464',
+    printfulVariantId: 4464,
+    name: '12 × 12 in',
+    size: '12 × 12 in',
+    color: null,
+    colorCode: null,
+    imageUrl: 'https://files.cdn.printful.com/products/1/4464_1527678770.jpg',
+    isAvailable: true,
+    costCents: 889,
+  },
+  {
+    id: 'printful-variant-6242',
+    printfulVariantId: 6242,
+    name: '18 × 18 in',
+    size: '18 × 18 in',
+    color: null,
+    colorCode: null,
+    imageUrl: 'https://files.cdn.printful.com/products/1/6242_1527678943.jpg',
+    isAvailable: true,
+    costCents: 1239,
+  },
+  {
+    id: 'printful-variant-48499',
+    printfulVariantId: 48499,
+    name: '24 × 24 in',
+    size: '24 × 24 in',
+    color: null,
+    colorCode: null,
+    imageUrl: 'https://files.cdn.printful.com/products/1/48499_1777277701.jpg',
+    isAvailable: true,
+    costCents: 1289,
+  },
+];
 
 export const slugify = (value: string): string =>
   value
@@ -62,7 +97,7 @@ type ProductWithCatalog = Prisma.CatalogProductGetPayload<{
 }>;
 
 const mapProduct = (product: ProductWithCatalog): CatalogProductDto => {
-  const variants: CatalogVariantDto[] = product.variants.map((variant) => ({
+  let variants: CatalogVariantDto[] = product.variants.map((variant) => ({
     id: variant.id,
     printfulVariantId: variant.printfulVariantId,
     name: variant.name,
@@ -73,6 +108,13 @@ const mapProduct = (product: ProductWithCatalog): CatalogProductDto => {
     isAvailable: variant.isAvailable,
     costCents: decimalToCents(variant.priceSnapshots[0]?.amount),
   }));
+  if (product.printfulId === 1) {
+    const existing = new Set(variants.map((variant) => variant.printfulVariantId));
+    variants = [
+      ...variants,
+      ...curatedPosterVariants.filter((variant) => !existing.has(variant.printfulVariantId)),
+    ];
+  }
 
   const placements: PlacementOption[] = product.placements.map((placement) => ({
     code: placement.code,
@@ -100,6 +142,54 @@ const mapProduct = (product: ProductWithCatalog): CatalogProductDto => {
     placements,
   };
 };
+
+async function ensureCuratedQuoteVariants(
+  products: CatalogProductDto[],
+  inputItems: QuoteLineInput[]
+): Promise<void> {
+  if (!env.databaseUrl) return;
+  for (const item of inputItems) {
+    const product = products.find((candidate) => candidate.id === item.productId);
+    const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
+    if (product?.printfulId !== 1 || !variant?.printfulVariantId) continue;
+    if (!curatedPosterVariants.some((candidate) => candidate.id === variant.id)) continue;
+    const stored = await prisma.catalogVariant.upsert({
+      where: { printfulVariantId: variant.printfulVariantId },
+      update: {
+        productId: product.id,
+        name: variant.name,
+        size: variant.size,
+        imageUrl: variant.imageUrl,
+        isAvailable: true,
+      },
+      create: {
+        id: variant.id,
+        printfulVariantId: variant.printfulVariantId,
+        productId: product.id,
+        name: variant.name,
+        size: variant.size,
+        imageUrl: variant.imageUrl,
+        availability: { sellingRegion: env.printfulSellingRegion },
+        isAvailable: true,
+      },
+    });
+    const price = await prisma.priceSnapshot.findFirst({
+      where: { productId: product.id, variantId: stored.id, priceType: 'base' },
+    });
+    if (!price) {
+      await prisma.priceSnapshot.create({
+        data: {
+          productId: product.id,
+          variantId: stored.id,
+          amount: variant.costCents / 100,
+          currency: env.defaultCurrency,
+          source: 'printful-curated',
+          priceType: 'base',
+        },
+      });
+    }
+  }
+}
 
 async function readProductsFromDatabase(): Promise<CatalogProductDto[]> {
   if (!env.databaseUrl) return [];
@@ -180,6 +270,11 @@ export async function createQuote(
   options: { sessionId?: string; studioPassId?: string } = {}
 ): Promise<QuoteBreakdown & { id: string | null }> {
   const products = await getProductsByIds(inputItems.map((item) => item.productId));
+  try {
+    await ensureCuratedQuoteVariants(products, inputItems);
+  } catch {
+    // Runtime quotes remain available if catalog persistence is temporarily unavailable.
+  }
   const pass =
     options.sessionId || options.studioPassId
       ? (getStudioPassForSession(options.sessionId ?? '') ??

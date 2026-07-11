@@ -104,6 +104,7 @@ export function buildQuoteBreakdown(
       variantName: variant.name,
       quantity,
       placementCodes,
+      orientation: input.orientation,
       designAssetId: input.designAssetId,
       unitCostCents,
       unitRetailCents,

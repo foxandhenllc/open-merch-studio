@@ -76,6 +76,7 @@ export type QuoteBreakdown = {
     variantName: string;
     quantity: number;
     placementCodes: string[];
+    orientation?: 'portrait' | 'landscape' | 'square';
     designAssetId?: string;
     unitCostCents: number;
     unitRetailCents: number;
@@ -166,7 +167,9 @@ export type DesignMockup = {
   variantId: string;
   placementCodes: string[];
   designAssetId?: string;
+  orientation?: 'portrait' | 'landscape' | 'square';
   imageUrl: string;
+  views?: Array<{ label: string; imageUrl: string }>;
   errorMessage?: string;
   createdAt: string;
 };

@@ -824,9 +824,15 @@ export function mapPrintfulOrderStatus(status?: string): {
   }
 }
 
-function computeCenteredSquarePosition(printfile: PrintfulPrintfile) {
-  const areaWidth = printfile.width;
-  const areaHeight = printfile.height;
+function computeCenteredSquarePosition(
+  printfile: PrintfulPrintfile,
+  orientation?: 'portrait' | 'landscape' | 'square'
+) {
+  const shouldSwap =
+    (orientation === 'portrait' && printfile.width > printfile.height) ||
+    (orientation === 'landscape' && printfile.height > printfile.width);
+  const areaWidth = shouldSwap ? printfile.height : printfile.width;
+  const areaHeight = shouldSwap ? printfile.width : printfile.height;
   const size = Math.min(areaWidth, areaHeight);
 
   return {
@@ -860,6 +866,7 @@ export function buildPrintfulMockupPayload(params: {
   placement: string;
   designImageUrl: string;
   printfile: PrintfulPrintfile;
+  orientation?: 'portrait' | 'landscape' | 'square';
 }) {
   return {
     variant_ids: [params.printfulVariantId],
@@ -868,7 +875,7 @@ export function buildPrintfulMockupPayload(params: {
       {
         placement: params.placement,
         image_url: params.designImageUrl,
-        position: computeCenteredSquarePosition(params.printfile),
+        position: computeCenteredSquarePosition(params.printfile, params.orientation),
       },
     ],
   };
@@ -928,6 +935,7 @@ async function createPrintfulMockupTask(params: {
   placement: string;
   designImageUrl: string;
   technique?: string;
+  orientation?: 'portrait' | 'landscape' | 'square';
 }): Promise<string> {
   const printfile = await fetchPrintfileForVariant(params);
   const response = await params.client.post(
@@ -937,6 +945,7 @@ async function createPrintfulMockupTask(params: {
       placement: params.placement,
       designImageUrl: params.designImageUrl,
       printfile,
+      orientation: params.orientation,
     })
   );
   const result = unwrapPrintfulResponse<PrintfulMockupTaskCreateResult>(response.data);
@@ -967,18 +976,42 @@ async function pollPrintfulMockupTask(
   throw new Error('Timed out waiting for Printful mockup generation.');
 }
 
-function extractMockupUrl(taskResult: PrintfulMockupTaskResult, placement: string): string {
+export function extractMockupViews(
+  taskResult: PrintfulMockupTaskResult,
+  placement: string,
+  preferFrontView = false
+): Array<{ label: string; imageUrl: string }> {
   const mockups = Array.isArray(taskResult.mockups) ? taskResult.mockups : [];
   const candidates = mockups as Array<Record<string, unknown>>;
   const match =
     candidates.find((candidate) => String(candidate.placement ?? '') === placement) ??
     candidates[0];
+  const views: Array<{ label: string; imageUrl: string }> = [];
   const directUrl = match?.mockup_url ?? match?.mockupUrl ?? match?.url;
-  if (typeof directUrl === 'string' && directUrl) return directUrl;
+  if (typeof directUrl === 'string' && directUrl) {
+    views.push({ label: String(match?.display_name ?? 'Product view'), imageUrl: directUrl });
+  }
   const extra = Array.isArray(match?.extra) ? (match.extra as Array<Record<string, unknown>>) : [];
-  const extraUrl = extra.find((entry) => typeof entry.url === 'string')?.url;
-  if (typeof extraUrl === 'string' && extraUrl) return extraUrl;
-  throw new Error('Unable to extract Printful mockup URL.');
+  for (const entry of extra) {
+    if (typeof entry.url !== 'string' || !entry.url) continue;
+    const title = String(entry.title ?? entry.option ?? 'Product view');
+    const group = typeof entry.option_group === 'string' ? entry.option_group : '';
+    views.push({ label: group ? `${title} · ${group}` : title, imageUrl: entry.url });
+  }
+  const unique = Array.from(new Map(views.map((view) => [view.imageUrl, view])).values());
+  if (!unique.length) throw new Error('Unable to extract Printful mockup URL.');
+  if (!preferFrontView) return unique.slice(0, 5);
+  const score = (view: { label: string; imageUrl: string }) => {
+    const value = `${view.label} ${view.imageUrl}`.toLowerCase();
+    return (
+      (value.includes('front') ? 100 : 0) +
+      (value.includes('center') ? 80 : 0) +
+      (value.includes('straight') ? 40 : 0) -
+      (value.includes('side') ? 60 : 0) -
+      (value.includes('handle-on-right') || value.includes('handle-on-left') ? 30 : 0)
+    );
+  };
+  return unique.sort((left, right) => score(right) - score(left)).slice(0, 5);
 }
 
 export async function generatePrintfulMockupPreview(params: {
@@ -987,7 +1020,13 @@ export async function generatePrintfulMockupPreview(params: {
   placement: string;
   designImageUrl: string;
   technique?: string;
-}): Promise<{ taskKey: string; imageUrl: string }> {
+  orientation?: 'portrait' | 'landscape' | 'square';
+  preferFrontView?: boolean;
+}): Promise<{
+  taskKey: string;
+  imageUrl: string;
+  views: Array<{ label: string; imageUrl: string }>;
+}> {
   if (!env.printfulApiKey || !env.enableLivePrintful) {
     throw new Error('Printful live mockups require PRINTFUL_API_KEY and ENABLE_LIVE_PRINTFUL.');
   }
@@ -998,8 +1037,10 @@ export async function generatePrintfulMockupPreview(params: {
   const client = createPrintfulClient();
   const taskKey = await createPrintfulMockupTask({ client, ...params });
   const taskResult = await pollPrintfulMockupTask(client, taskKey);
+  const views = extractMockupViews(taskResult, params.placement, params.preferFrontView);
   return {
     taskKey,
-    imageUrl: extractMockupUrl(taskResult, params.placement),
+    imageUrl: views[0].imageUrl,
+    views,
   };
 }

@@ -3,5 +3,6 @@ export type ProductVisualProps = {
   title: string;
   color?: string | null;
   imageUrl?: string | null;
+  orientation?: 'portrait' | 'landscape' | 'square';
   size?: 'compact' | 'stage';
 };

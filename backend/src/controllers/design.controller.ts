@@ -80,6 +80,9 @@ export const postDesignMockup = asyncHandler(async (req: Request, res: Response)
   const productId = String(req.body?.productId ?? '').trim();
   const variantId = String(req.body?.variantId ?? '').trim();
   const placementCodes = Array.isArray(req.body?.placementCodes) ? req.body.placementCodes : [];
+  const orientation = ['portrait', 'landscape', 'square'].includes(req.body?.orientation)
+    ? req.body.orientation
+    : undefined;
   if (!productId || !variantId || !placementCodes.length) {
     throw new HttpError('Product, variant, and placement are required for mockup.', 400);
   }
@@ -89,6 +92,7 @@ export const postDesignMockup = asyncHandler(async (req: Request, res: Response)
     variantId,
     placementCodes,
     designAssetId: String(req.body?.designAssetId ?? '') || undefined,
+    orientation,
   });
   res.status(201).json({ success: true, data: mockup });
 });

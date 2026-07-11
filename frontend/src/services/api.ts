@@ -109,6 +109,7 @@ export const api = {
       variantId: string;
       quantity: number;
       placementCodes: string[];
+      orientation?: 'portrait' | 'landscape' | 'square';
       designAssetId?: string;
     }>;
   }) =>
@@ -174,6 +175,7 @@ export const api = {
     placementCodes: string[];
     designAssetId?: string;
     imageUrl?: string;
+    orientation?: 'portrait' | 'landscape' | 'square';
   }) =>
     withFallback(
       request<DesignMockup>('/api/design/mockups', {

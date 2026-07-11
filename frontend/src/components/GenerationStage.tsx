@@ -23,6 +23,7 @@ export function GenerationStage({
   onRetryMockup,
   onContinueWithoutMockup,
   error,
+  orientation,
 }: {
   product: CatalogProduct | null;
   variant: CatalogVariant | null;
@@ -37,15 +38,18 @@ export function GenerationStage({
   onRetryMockup: () => void;
   onContinueWithoutMockup: () => void;
   error?: { title: string; message: string; recovery: string };
+  orientation?: 'portrait' | 'landscape' | 'square';
 }) {
   const [, tick] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
+  const [activeViewIndex, setActiveViewIndex] = useState(0);
   useEffect(() => {
     if (!generating && !mockupBusy) return undefined;
     const timer = window.setInterval(() => tick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [generating, mockupBusy]);
   useEffect(() => setImageFailed(false), [draft?.imageUrl, mockup?.imageUrl]);
+  useEffect(() => setActiveViewIndex(0), [mockup?.id]);
 
   if (!product || !variant) {
     return (
@@ -64,6 +68,13 @@ export function GenerationStage({
 
   const hasProviderMockup = mockup?.status === 'complete' && mockup.provider === 'printful';
   const artworkUrl = draft?.imageUrl;
+  const mockupViews =
+    mockup?.views?.length && hasProviderMockup
+      ? mockup.views
+      : hasProviderMockup
+        ? [{ label: 'Product view', imageUrl: mockup.imageUrl }]
+        : [];
+  const activeView = mockupViews[activeViewIndex] ?? mockupViews[0];
   return (
     <section
       className={`stage ${stale ? 'is-stale' : ''}`}
@@ -72,34 +83,60 @@ export function GenerationStage({
     >
       <div className="stage__meta">
         <span>{product.title}</span>
-        <b>{variant.name}</b>
+        <b>
+          {variant.name}
+          {orientation ? ` · ${orientation}` : ''}
+        </b>
         {stale && <span className="status-pill status-pill--warn">Preview stale</span>}
       </div>
-      {hasProviderMockup && !imageFailed ? (
-        <img
-          className="mockup-preview"
-          src={mockup.imageUrl}
-          alt={`Printful product mockup for ${product.title}`}
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <>
-          <ProductVisual
-            category={product.categorySlug}
-            title={product.title}
-            color={variant.colorCode}
-            imageUrl={product.thumbnailUrl || variant.imageUrl}
-            size="stage"
+      {activeView && !imageFailed ? (
+        <div className="mockup-viewer">
+          <img
+            className="mockup-preview"
+            src={activeView.imageUrl}
+            alt={`${activeView.label} mockup for ${product.title}`}
+            onError={() => setImageFailed(true)}
           />
-          {artworkUrl && !imageFailed && (
-            <img
-              className="artwork-preview"
-              src={artworkUrl}
-              alt={`Generated artwork for ${product.title}`}
-              onError={() => setImageFailed(true)}
-            />
+          {mockupViews.length > 1 && (
+            <div className="mockup-viewer__rail" aria-label="Product mockup views">
+              {mockupViews.map((view, index) => (
+                <button
+                  key={view.imageUrl}
+                  type="button"
+                  className={index === activeViewIndex ? 'is-active' : ''}
+                  aria-label={`Show ${view.label}`}
+                  aria-pressed={index === activeViewIndex}
+                  onClick={() => {
+                    setImageFailed(false);
+                    setActiveViewIndex(index);
+                  }}
+                >
+                  <img src={view.imageUrl} alt="" />
+                  <span>{view.label}</span>
+                </button>
+              ))}
+            </div>
           )}
-        </>
+        </div>
+      ) : artworkUrl && !imageFailed ? (
+        <div className="artwork-preparation">
+          <span className="kicker">Artwork ready</span>
+          <img src={artworkUrl} alt={`Generated artwork for ${product.title}`} />
+          <p>{mockupBusy ? 'Preparing the product mockup…' : 'Artwork is ready for a product.'}</p>
+        </div>
+      ) : (
+        <ProductVisual
+          category={product.categorySlug}
+          title={product.title}
+          color={variant.colorCode}
+          imageUrl={
+            product.categorySlug === 'wall-art'
+              ? undefined
+              : variant.imageUrl || product.thumbnailUrl
+          }
+          orientation={orientation}
+          size="stage"
+        />
       )}
       {imageFailed && (
         <div className="image-fallback">
