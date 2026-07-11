@@ -8,10 +8,10 @@ import {
   reviseDesignDraft,
   getDesignAssetImage,
 } from '../services/design.service.js';
-import { getAllowanceState, getOrCreateSession } from '../services/runtime-store.js';
+import { getAllowanceState, getOrCreateDurableSession } from '../services/runtime-store.js';
 
 export const postStudioSession = asyncHandler(async (req: Request, res: Response) => {
-  const session = getOrCreateSession(String(req.body?.sessionId ?? '') || undefined);
+  const session = await getOrCreateDurableSession(String(req.body?.sessionId ?? '') || undefined);
   res.status(201).json({ success: true, data: session });
 });
 
@@ -20,7 +20,8 @@ export const getDesignAllowance = asyncHandler(async (req: Request, res: Respons
   if (!sessionId) {
     throw new HttpError('Session ID is required.', 400);
   }
-  res.json({ success: true, data: getAllowanceState(sessionId) });
+  const session = await getOrCreateDurableSession(sessionId);
+  res.json({ success: true, data: getAllowanceState(session.id) });
 });
 
 export const postDesignIdea = asyncHandler(async (req: Request, res: Response) => {

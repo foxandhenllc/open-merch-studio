@@ -13,11 +13,17 @@ const booleanFromEnv = (name: string, fallback = false): boolean => {
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 };
 
+export const backendUrlFromEnv = (source: NodeJS.ProcessEnv): string => {
+  if (source.BACKEND_URL) return source.BACKEND_URL;
+  const vercelHost = source.VERCEL_PROJECT_PRODUCTION_URL || source.VERCEL_URL;
+  return vercelHost ? `https://${vercelHost}` : 'http://localhost:5000';
+};
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: numberFromEnv('PORT', 5000),
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-  backendUrl: process.env.BACKEND_URL || 'http://localhost:5000',
+  backendUrl: backendUrlFromEnv(process.env),
   databaseUrl: process.env.DATABASE_URL,
   printfulApiKey: process.env.PRINTFUL_API_KEY,
   printfulStoreId: process.env.PRINTFUL_STORE_ID,
@@ -29,7 +35,7 @@ export const env = {
   printfulMaxLaunchProducts: numberFromEnv('PRINTFUL_MAX_LAUNCH_PRODUCTS', 6),
   printfulMockupTimeoutMs: numberFromEnv('PRINTFUL_MOCKUP_TIMEOUT_MS', 180000),
   openaiApiKey: process.env.OPENAI_API_KEY,
-  openaiDesignModel: process.env.OPENAI_DESIGN_MODEL || 'gpt-image-1',
+  openaiDesignModel: process.env.OPENAI_DESIGN_MODEL || 'gpt-image-1.5',
   openaiTextModel: process.env.OPENAI_TEXT_MODEL || 'gpt-5-nano',
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,

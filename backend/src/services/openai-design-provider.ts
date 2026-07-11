@@ -33,6 +33,10 @@ export function canUseLiveOpenAi(): boolean {
   return Boolean(env.openaiApiKey && env.enableLiveOpenAi);
 }
 
+export function supportsTransparentBackground(model: string): boolean {
+  return !/^gpt-image-2(?:-|$)/i.test(model);
+}
+
 function detectTextIntent(prompt: string): boolean {
   return (
     prompt.includes('"') ||
@@ -106,7 +110,7 @@ export async function generateDesignImage(params: {
     n: 1,
     size: '1024x1024',
     quality,
-    background: 'transparent',
+    background: supportsTransparentBackground(env.openaiDesignModel) ? 'transparent' : 'auto',
     output_format: 'png',
     moderation: 'auto',
     user: params.sessionId,

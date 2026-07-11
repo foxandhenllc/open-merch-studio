@@ -106,10 +106,10 @@ export function updateRuntimeSettings(patch: Partial<AdminSettings>): {
   return { before, after: getRuntimeSettings() };
 }
 
-export function createStudioSession(): StudioSession {
+export function createStudioSession(sessionId?: string): StudioSession {
   const now = nowIso();
   const session: StudioSession = {
-    id: createId('sess'),
+    id: sessionId || createId('sess'),
     status: 'guest',
     freeDraftsUsed: 0,
     freeDraftLimit: state.settings.freeDraftLimit,
@@ -125,7 +125,75 @@ export function getOrCreateSession(sessionId?: string): StudioSession {
     const existing = state.sessions.get(sessionId);
     if (existing) return { ...existing, studioPass: getStudioPassForSession(existing.id) };
   }
-  return createStudioSession();
+  return createStudioSession(sessionId);
+}
+
+export async function getOrCreateDurableSession(sessionId?: string): Promise<StudioSession> {
+  const runtimeSession = sessionId ? state.sessions.get(sessionId) : undefined;
+  if (runtimeSession) {
+    return { ...runtimeSession, studioPass: getStudioPassForSession(runtimeSession.id) };
+  }
+
+  if (env.databaseUrl && sessionId) {
+    try {
+      const persisted = await prisma.studioSession.findUnique({
+        where: { id: sessionId },
+        include: { passes: { orderBy: { createdAt: 'desc' } } },
+      });
+      if (persisted) {
+        const restored: StudioSession = {
+          id: persisted.id,
+          status: persisted.status as StudioSession['status'],
+          freeDraftsUsed: persisted.freeDraftsUsed,
+          freeDraftLimit: persisted.freeDraftLimit,
+          createdAt: persisted.createdAt.toISOString(),
+          updatedAt: persisted.updatedAt.toISOString(),
+        };
+        state.sessions.set(restored.id, restored);
+        for (const pass of persisted.passes) {
+          state.passes.set(pass.id, {
+            id: pass.id,
+            sessionId: pass.sessionId,
+            status: pass.status as StudioPass['status'],
+            priceCents: pass.priceCents,
+            creditCents: pass.creditCents,
+            includedRoughDrafts: pass.includedRoughDrafts,
+            includedEdits: pass.includedEdits,
+            includedFinals: pass.includedFinals,
+            roughDraftsUsed: pass.roughDraftsUsed,
+            editsUsed: pass.editsUsed,
+            finalsUsed: pass.finalsUsed,
+            appliedOrderId: pass.appliedOrderId ?? undefined,
+            createdAt: pass.createdAt.toISOString(),
+            expiresAt: pass.expiresAt?.toISOString(),
+          });
+        }
+        return { ...restored, studioPass: getStudioPassForSession(restored.id) };
+      }
+    } catch {
+      // Fall through to a runtime session when persistence is unavailable.
+    }
+  }
+
+  const session = createStudioSession(sessionId);
+  if (env.databaseUrl) {
+    try {
+      await prisma.studioSession.upsert({
+        where: { id: session.id },
+        update: {},
+        create: {
+          id: session.id,
+          status: session.status,
+          freeDraftsUsed: session.freeDraftsUsed,
+          freeDraftLimit: session.freeDraftLimit,
+          createdAt: new Date(session.createdAt),
+        },
+      });
+    } catch {
+      // Runtime session remains available if persistence is unavailable.
+    }
+  }
+  return session;
 }
 
 export function touchSession(sessionId: string, patch: Partial<StudioSession>): StudioSession {
@@ -262,7 +330,7 @@ export async function authorizeDesignAction(
   action: LedgerEvent['action'],
   pendingCostCents = 0
 ): Promise<{ allowed: boolean; allowance: AllowanceState; message?: string }> {
-  const session = getOrCreateSession(sessionId);
+  const session = await getOrCreateDurableSession(sessionId);
   const allowance = getAllowanceState(session.id);
   const { sessionSpend, dailySpend } = await durableSpendTotals(session.id);
 
@@ -313,7 +381,7 @@ export async function recordDesignSpend(params: {
   };
   state.ledger.push(event);
 
-  const session = getOrCreateSession(params.sessionId);
+  const session = await getOrCreateDurableSession(params.sessionId);
   const pass = getStudioPassForSession(session.id);
   if (params.action === 'rough_draft') {
     if (pass && session.freeDraftsUsed >= session.freeDraftLimit) {

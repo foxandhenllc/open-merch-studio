@@ -13,7 +13,7 @@ import {
   authorizeDesignAction,
   getAllowanceState,
   getDraft,
-  getOrCreateSession,
+  getOrCreateDurableSession,
   recordDesignSpend,
   runtimeId,
   runtimeNow,
@@ -166,7 +166,7 @@ export async function createDesignIdea(params: {
   productId?: string;
   placementCodes?: string[];
 }): Promise<DesignIdea> {
-  const session = getOrCreateSession(params.sessionId);
+  const session = await getOrCreateDurableSession(params.sessionId);
   const originalPrompt = params.prompt.trim() || 'A clean, print-ready merch graphic';
   const placementText = params.placementCodes?.length
     ? ` for ${params.placementCodes.join(', ')} placement`
@@ -199,7 +199,7 @@ export async function createDesignDraft(
   prompt: string,
   context: DesignContext = {}
 ): Promise<DesignDraft> {
-  const session = getOrCreateSession(context.sessionId);
+  const session = await getOrCreateDurableSession(context.sessionId);
   const normalizedPrompt = prompt.trim() || 'A clean, print-ready merch graphic';
   const qualityTier = context.qualityTier ?? 'rough';
   const authorization = context.skipAllowanceSpend
@@ -401,7 +401,7 @@ export async function reviseDesignDraft(params: {
   sessionId?: string;
 }): Promise<DesignDraft> {
   const base = getDraft(params.draftId);
-  const session = getOrCreateSession(params.sessionId ?? base?.sessionId);
+  const session = await getOrCreateDurableSession(params.sessionId ?? base?.sessionId);
   const authorization = await authorizeDesignAction(
     session.id,
     'edit',
@@ -463,7 +463,7 @@ export async function createDesignMockup(params: {
   placementCodes: string[];
   designAssetId?: string;
 }): Promise<DesignMockup> {
-  const session = getOrCreateSession(params.sessionId);
+  const session = await getOrCreateDurableSession(params.sessionId);
   await recordDesignSpend({
     sessionId: session.id,
     designAssetId: params.designAssetId,

@@ -5,6 +5,7 @@ import {
   createMockDesignImage,
   dataUrlToBuffer,
   normalizePromptForPrint,
+  supportsTransparentBackground,
 } from '../services/openai-design-provider.js';
 
 test('print prompt builder removes product mockup language and keeps requested text explicit', () => {
@@ -20,4 +21,11 @@ test('fixture SVG data URLs decode with their charset parameter intact', () => {
   const decoded = dataUrlToBuffer(image.imageUrl);
   assert.equal(decoded?.contentType, 'image/svg+xml');
   assert.match(decoded?.buffer.toString('utf8') ?? '', /Fixture preview/);
+});
+
+test('transparent output is requested only from compatible GPT Image models', () => {
+  assert.equal(supportsTransparentBackground('gpt-image-1.5'), true);
+  assert.equal(supportsTransparentBackground('gpt-image-1'), true);
+  assert.equal(supportsTransparentBackground('gpt-image-2'), false);
+  assert.equal(supportsTransparentBackground('gpt-image-2-2026-04-21'), false);
 });
