@@ -696,8 +696,11 @@ h3 {
   animation: artworkIn 200ms ease-out;
 }
 .mockup-preview {
-  width: 100%;
-  height: 100%;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   animation: artworkIn 200ms ease-out;
 }
@@ -705,8 +708,11 @@ h3 {
   position: absolute;
   z-index: 2;
   inset: 48px 44px 84px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
 }
 .mockup-viewer__rail {
   position: absolute;
@@ -1745,8 +1751,10 @@ input:focus {
     width: min(32%, 130px);
   }
   .mockup-preview {
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
   }
   .mockup-viewer {
     inset: 46px 14px 78px;
