@@ -97,7 +97,9 @@ export function QuoteLedger({
                 <div key={line.code} className={`ledger-line is-${line.kind}`}>
                   <span>
                     {line.label}
-                    {estimated && <small>estimate</small>}
+                    {estimated && !line.label.toLowerCase().includes('estimate') && (
+                      <small>estimate</small>
+                    )}
                   </span>
                   <b>{money(line.amountCents, quote.currency)}</b>
                 </div>

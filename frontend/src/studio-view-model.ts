@@ -165,12 +165,14 @@ export function useStudioViewModel() {
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
   const [fallback, setFallback] = useState<{ visible: boolean; reason: string } | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>('live');
-  const [artifactsStale, setArtifactsStale] = useState(false);
+  const [mockupStale, setMockupStale] = useState(false);
+  const [quoteStale, setQuoteStale] = useState(false);
   const [generationPhase, setGenerationPhase] = useState('Queued');
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [online, setOnline] = useState(navigator.onLine);
   const generationController = useRef<AbortController | null>(null);
+  const mockupRequestId = useRef(0);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -250,8 +252,56 @@ export function useStudioViewModel() {
       setAction('catalog', false);
     }
   };
+  const requestMockup = async (params: {
+    product: CatalogProduct;
+    variant: CatalogVariant;
+    placements: string[];
+    draft: DesignDraft;
+  }) => {
+    if (!params.draft.id || params.draft.readiness.status === 'blocked') return;
+    const requestId = ++mockupRequestId.current;
+    setAction('mockup', true);
+    setFlow('previewing');
+    setOperationStartedAt(Date.now());
+    clearError('mockup');
+    try {
+      const result = consumeSource(
+        await api.mockup({
+          sessionId: session?.id,
+          productId: params.product.id,
+          variantId: params.variant.id,
+          placementCodes: params.placements,
+          designAssetId: params.draft.id,
+          imageUrl: params.draft.imageUrl,
+        })
+      );
+      if (requestId !== mockupRequestId.current) return;
+      setMockup(result);
+      setMockupStale(false);
+      if (result.status === 'failed') {
+        fail(
+          'mockup',
+          new Error(result.errorMessage || 'The fulfillment provider could not build this mockup.')
+        );
+        setFlow(quote ? 'quote_stale' : 'drafted');
+      } else {
+        setFlow(quote ? 'quote_stale' : 'drafted');
+        setAnnouncement('Product mockup ready. You can refine the design or calculate the price.');
+      }
+    } catch (error) {
+      if (requestId !== mockupRequestId.current) return;
+      fail('mockup', error);
+      setFlow(quote ? 'quote_stale' : 'drafted');
+    } finally {
+      if (requestId === mockupRequestId.current) {
+        setAction('mockup', false);
+        setOperationStartedAt(null);
+      }
+    }
+  };
   const markStale = () => {
-    if (mockup || quote) setArtifactsStale(true);
+    if (mockup) setMockupStale(true);
+    if (quote) setQuoteStale(true);
     if (quote) setFlow('quote_stale');
     else setFlow(design ? 'drafted' : 'configuring');
     setCheckout(null);
@@ -264,21 +314,43 @@ export function useStudioViewModel() {
     setSelectedVariantIdState(variant?.id ?? '');
     setSelectedPlacements(placement ? [placement.code] : []);
     markStale();
-    setAnnouncement(`${product.title} selected. Next: describe your design.`);
+    if (design && variant && placement) {
+      setAnnouncement(`${product.title} selected. Updating the product mockup.`);
+      void requestMockup({ product, variant, placements: [placement.code], draft: design });
+    } else {
+      setAnnouncement(`${product.title} selected. Next: describe your design.`);
+    }
   };
   const setSelectedVariantId = (id: string) => {
     setSelectedVariantIdState(id);
     markStale();
+    const variant = selectedProduct?.variants.find((candidate) => candidate.id === id);
+    if (design && selectedProduct && variant) {
+      void requestMockup({
+        product: selectedProduct,
+        variant,
+        placements: selectedPlacements,
+        draft: design,
+      });
+    }
   };
   const togglePlacement = (code: string) => {
-    setSelectedPlacements((current) =>
-      current.includes(code)
-        ? current.length === 1
-          ? current
-          : current.filter((item) => item !== code)
-        : [...current, code]
-    );
+    const next = selectedPlacements.includes(code)
+      ? selectedPlacements.length === 1
+        ? selectedPlacements
+        : selectedPlacements.filter((item) => item !== code)
+      : [...selectedPlacements, code];
+    if (next === selectedPlacements) return;
+    setSelectedPlacements(next);
     markStale();
+    if (design && selectedProduct && selectedVariant) {
+      void requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: next,
+        draft: design,
+      });
+    }
   };
 
   const refineIdea = async () => {
@@ -315,8 +387,8 @@ export function useStudioViewModel() {
     setGenerationPhase('Queued');
     setOperationStartedAt(Date.now());
     clearError('generation');
-    const phaseOne = window.setTimeout(() => setGenerationPhase('Composing artwork'), 500);
-    const phaseTwo = window.setTimeout(() => setGenerationPhase('Running readiness checks'), 1200);
+    const phaseOne = window.setTimeout(() => setGenerationPhase('Generating artwork'), 1000);
+    const phaseTwo = window.setTimeout(() => setGenerationPhase('Preparing the print file'), 10000);
     try {
       const [result] = await Promise.all([
         api.designDraft(
@@ -341,9 +413,18 @@ export function useStudioViewModel() {
       setDesign(draft);
       setMockup(null);
       setQuote(null);
-      setArtifactsStale(false);
+      setMockupStale(false);
+      setQuoteStale(false);
       setFlow('drafted');
-      setAnnouncement('Draft ready. Next: preview it on your selected product.');
+      setAnnouncement('Artwork ready. Building your product mockup now.');
+      setAction('generating', false);
+      setOperationStartedAt(null);
+      await requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: selectedPlacements,
+        draft,
+      });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         setFlow('configuring');
@@ -368,18 +449,27 @@ export function useStudioViewModel() {
     setAction('revising', true);
     clearError('generation');
     try {
-      setDesign(
-        consumeSource(
-          await api.reviseDraft({
-            draftId: design.id,
-            instructions: revision,
-            sessionId: session?.id,
-          })
-        )
+      const revised = consumeSource(
+        await api.reviseDraft({
+          draftId: design.id,
+          instructions: revision,
+          sessionId: session?.id,
+        })
       );
-      setArtifactsStale(true);
+      setDesign(revised);
+      setMockup(null);
+      setMockupStale(false);
+      setQuoteStale(Boolean(quote));
       setFlow('drafted');
-      setAnnouncement('Edit applied. Next: update the product preview.');
+      setAnnouncement('Edit applied. Rebuilding your product mockup.');
+      if (selectedProduct && selectedVariant) {
+        await requestMockup({
+          product: selectedProduct,
+          variant: selectedVariant,
+          placements: selectedPlacements,
+          draft: revised,
+        });
+      }
     } catch (error) {
       fail('generation', error);
     } finally {
@@ -388,36 +478,12 @@ export function useStudioViewModel() {
   };
   const createMockup = async () => {
     if (!selectedProduct || !selectedVariant || !design) return;
-    setAction('mockup', true);
-    setFlow('previewing');
-    setOperationStartedAt(Date.now());
-    clearError('mockup');
-    try {
-      const result = consumeSource(
-        await api.mockup({
-          sessionId: session?.id,
-          productId: selectedProduct.id,
-          variantId: selectedVariant.id,
-          placementCodes: selectedPlacements,
-          designAssetId: design.id ?? undefined,
-          imageUrl: design.imageUrl,
-        })
-      );
-      setMockup(result);
-      setArtifactsStale(false);
-      if (result.status === 'failed')
-        fail('mockup', new Error('The fulfillment provider could not build this mockup.'));
-      else {
-        setFlow('drafted');
-        setAnnouncement('Product preview ready. Next: calculate the full price.');
-      }
-    } catch (error) {
-      fail('mockup', error);
-      setFlow('drafted');
-    } finally {
-      setAction('mockup', false);
-      setOperationStartedAt(null);
-    }
+    await requestMockup({
+      product: selectedProduct,
+      variant: selectedVariant,
+      placements: selectedPlacements,
+      draft: design,
+    });
   };
   const createQuote = async () => {
     if (!selectedProduct || !selectedVariant) return;
@@ -440,7 +506,7 @@ export function useStudioViewModel() {
         })
       );
       setQuote(result);
-      setArtifactsStale(false);
+      setQuoteStale(false);
       setFlow('quoted');
       setAnnouncement(
         `Price updated: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: result.currency }).format(result.totalCents / 100)}.`
@@ -568,15 +634,20 @@ export function useStudioViewModel() {
   const stepStates = useMemo<Record<StudioStep, StepState>>(
     () => ({
       product: selectedProduct ? 'done' : 'active',
-      design:
-        flow === 'generating' || flow === 'refining' || (!design && selectedProduct)
+      make:
+        flow === 'generating' ||
+        flow === 'refining' ||
+        flow === 'previewing' ||
+        mockup?.status === 'failed' ||
+        (!design && selectedProduct)
           ? 'active'
-          : design
+          : design && mockup?.status === 'complete' && !mockupStale
             ? 'done'
-            : 'todo',
-      preview: artifactsStale && mockup ? 'stale' : mockup ? 'done' : design ? 'active' : 'todo',
+            : design
+              ? 'active'
+              : 'todo',
       price:
-        flow === 'quote_stale' || flow === 'quote_expired'
+        quoteStale || flow === 'quote_stale' || flow === 'quote_expired'
           ? 'stale'
           : quote
             ? flow === 'quoted'
@@ -587,7 +658,7 @@ export function useStudioViewModel() {
               : 'todo',
       order: order || flow === 'confirmed' ? 'active' : quote ? 'todo' : 'todo',
     }),
-    [selectedProduct, design, mockup, quote, order, flow, artifactsStale]
+    [selectedProduct, design, mockup, quote, order, flow, mockupStale, quoteStale]
   );
   const navigate = (step: StudioStep) =>
     document.getElementById(`step-${step}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -618,7 +689,8 @@ export function useStudioViewModel() {
     errors,
     fallback,
     dataSource,
-    artifactsStale,
+    mockupStale,
+    quoteStale,
     generationPhase,
     operationStartedAt,
     announcement,

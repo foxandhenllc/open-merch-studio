@@ -59,7 +59,7 @@ export function normalizePromptForPrint(prompt: string): string {
     .trim();
 }
 
-export function buildPrintReadyPrompt(prompt: string): string {
+export function buildPrintReadyPrompt(prompt: string, model = env.openaiDesignModel): string {
   const cleaned = normalizePromptForPrint(prompt) || prompt;
   const expectsText = detectTextIntent(prompt);
   const textGuidance = expectsText
@@ -69,7 +69,9 @@ export function buildPrintReadyPrompt(prompt: string): string {
   return [
     cleaned,
     'Create one original print-ready merchandise graphic, not a product photo or mockup.',
-    'Use a centered composition, transparent background, strong silhouette, and simple readable shapes.',
+    supportsTransparentBackground(model)
+      ? 'Use a centered composition, transparent background, strong silhouette, and simple readable shapes.'
+      : 'Use a centered composition, isolated subject, strong silhouette, simple readable shapes, and a plain background that can be removed cleanly.',
     'Avoid brand logos, celebrities, protected characters, private data, watermarks, tiny unreadable text, and photographic backgrounds.',
     textGuidance,
   ].join(' ');
@@ -102,7 +104,7 @@ export async function generateDesignImage(params: {
 
   const client = new OpenAI({ apiKey: env.openaiApiKey });
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
-  const finalPrompt = buildPrintReadyPrompt(params.prompt);
+  const finalPrompt = buildPrintReadyPrompt(params.prompt, env.openaiDesignModel);
   await assertPromptAllowed(client, finalPrompt);
   const response = await client.images.generate({
     model: env.openaiDesignModel,

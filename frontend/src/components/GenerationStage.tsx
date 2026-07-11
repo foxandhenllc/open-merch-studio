@@ -22,6 +22,7 @@ export function GenerationStage({
   onCancel,
   onRetryMockup,
   onContinueWithoutMockup,
+  error,
 }: {
   product: CatalogProduct | null;
   variant: CatalogVariant | null;
@@ -35,6 +36,7 @@ export function GenerationStage({
   onCancel: () => void;
   onRetryMockup: () => void;
   onContinueWithoutMockup: () => void;
+  error?: { title: string; message: string; recovery: string };
 }) {
   const [, tick] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
@@ -60,7 +62,8 @@ export function GenerationStage({
     );
   }
 
-  const imageUrl = mockup?.imageUrl || draft?.imageUrl;
+  const hasProviderMockup = mockup?.status === 'complete' && mockup.provider === 'printful';
+  const artworkUrl = draft?.imageUrl;
   return (
     <section
       className={`stage ${stale ? 'is-stale' : ''}`}
@@ -72,20 +75,31 @@ export function GenerationStage({
         <b>{variant.name}</b>
         {stale && <span className="status-pill status-pill--warn">Preview stale</span>}
       </div>
-      <ProductVisual
-        category={product.categorySlug}
-        title={product.title}
-        color={variant.colorCode}
-        imageUrl={product.thumbnailUrl || variant.imageUrl}
-        size="stage"
-      />
-      {imageUrl && !imageFailed && (
+      {hasProviderMockup && !imageFailed ? (
         <img
-          className="artwork-preview"
-          src={imageUrl}
-          alt={`Generated artwork for ${product.title}`}
+          className="mockup-preview"
+          src={mockup.imageUrl}
+          alt={`Printful product mockup for ${product.title}`}
           onError={() => setImageFailed(true)}
         />
+      ) : (
+        <>
+          <ProductVisual
+            category={product.categorySlug}
+            title={product.title}
+            color={variant.colorCode}
+            imageUrl={product.thumbnailUrl || variant.imageUrl}
+            size="stage"
+          />
+          {artworkUrl && !imageFailed && (
+            <img
+              className="artwork-preview"
+              src={artworkUrl}
+              alt={`Generated artwork for ${product.title}`}
+              onError={() => setImageFailed(true)}
+            />
+          )}
+        </>
       )}
       {imageFailed && (
         <div className="image-fallback">
@@ -124,17 +138,18 @@ export function GenerationStage({
           )}
         </div>
       )}
-      {mockup?.status === 'failed' && (
+      {(mockup?.status === 'failed' || error) && (
         <div className="stage__status">
-          <StatusNote tone="error" title="The product preview failed">
+          <StatusNote tone="error" title={error?.title ?? 'The product preview failed'}>
+            <p>{error?.message ?? mockup?.errorMessage ?? 'Printful could not build this mockup.'}</p>
             <p>
-              Your artwork is unchanged. Retry the provider preview, or continue to price without
-              it.
+              {error?.recovery ??
+                'Your artwork is unchanged. Retry the mockup, or continue to price without it.'}
             </p>
           </StatusNote>
           <div className="stage__status-actions">
             <button className="button button--secondary" type="button" onClick={onRetryMockup}>
-              Retry preview
+              Retry mockup
             </button>
             <button className="text-action" type="button" onClick={onContinueWithoutMockup}>
               Continue without mockup

@@ -4,12 +4,36 @@ import { buildQuoteBreakdown } from '../services/pricing.service.js';
 import { sampleCatalog } from '../services/catalog-fixtures.js';
 import { env } from '../config/env.js';
 import {
+  buildPrintfulMockupPayload,
   buildPrintfulOrderPayload,
   mapPrintfulOrderStatus,
   normalizeCountryCode,
   normalizeStateCode,
+  normalizePrintfulTechnique,
   submitPrintfulDraftOrder,
 } from '../services/printful.service.js';
+
+test('mockup payloads preserve placement while omitting invalid zero width', () => {
+  assert.equal(normalizePrintfulTechnique('sublimation'), 'SUBLIMATION');
+  assert.equal(normalizePrintfulTechnique('dtg'), 'DTG');
+  assert.equal(normalizePrintfulTechnique('cut_sew'), 'CUT-SEW');
+  const payload = buildPrintfulMockupPayload({
+    printfulVariantId: 1320,
+    placement: 'default',
+    designImageUrl: 'https://example.com/artwork.png',
+    printfile: { printfile_id: 43, width: 520, height: 202 },
+  });
+  assert.equal('width' in payload, false);
+  assert.equal(payload.files[0].placement, 'default');
+  assert.deepEqual(payload.files[0].position, {
+    area_width: 520,
+    area_height: 202,
+    width: 202,
+    height: 202,
+    top: 0,
+    left: 159,
+  });
+});
 
 test('buildPrintfulOrderPayload keeps placement and retail quote details', () => {
   const baseProduct = sampleCatalog.products[1];

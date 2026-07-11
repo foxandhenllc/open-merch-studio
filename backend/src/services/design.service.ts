@@ -8,7 +8,8 @@ import {
   canUseLiveOpenAi,
 } from './openai-design-provider.js';
 import { getProductsByIds } from './catalog.service.js';
-import { generatePrintfulMockupPreview } from './printful.service.js';
+import { describePrintfulError, generatePrintfulMockupPreview } from './printful.service.js';
+import { prepareArtworkForPrint } from './background-removal.service.js';
 import {
   authorizeDesignAction,
   getAllowanceState,
@@ -308,8 +309,39 @@ export async function createDesignDraft(
       createdAt: runtimeNow(),
     };
   }
-  const readiness = buildReadiness(normalizedPrompt, context.placementCodes ?? []);
+  const printPreparation =
+    generated.provider === 'mock'
+      ? {
+          imageUrl: generated.imageUrl,
+          transparentUrl: generated.imageUrl,
+          status: 'transparent' as const,
+          provider: 'none' as const,
+          message: 'The fixture artwork includes a transparent print file.',
+        }
+      : await prepareArtworkForPrint({
+          imageUrl: generated.imageUrl,
+          model: env.openaiDesignModel,
+        });
+  const baseReadiness = buildReadiness(normalizedPrompt, context.placementCodes ?? []);
+  const preparationReady = ['transparent', 'removed'].includes(printPreparation.status);
+  const readiness: DesignDraft['readiness'] = {
+    status:
+      baseReadiness.status === 'blocked'
+        ? 'blocked'
+        : preparationReady
+          ? baseReadiness.status
+          : 'warning',
+    checks: [
+      ...baseReadiness.checks,
+      {
+        label: 'Transparent print file',
+        result: printPreparation.message,
+        severity: preparationReady ? 'pass' : 'warning',
+      },
+    ],
+  };
   const allowance = getAllowanceState(session.id);
+  const preparedImageUrl = printPreparation.transparentUrl ?? printPreparation.imageUrl;
 
   if (!env.databaseUrl) {
     const draft = saveDraft({
@@ -317,8 +349,9 @@ export async function createDesignDraft(
       sessionId: session.id,
       provider: generated.provider,
       prompt: normalizedPrompt,
-      imageUrl: generated.imageUrl,
+      imageUrl: preparedImageUrl,
       qualityTier,
+      printPreparation,
       allowance,
       policy,
       readiness,
@@ -342,7 +375,7 @@ export async function createDesignDraft(
         prompt: normalizedPrompt,
         provider: generated.provider,
         imageUrl: generated.imageUrl,
-        transparentUrl: generated.imageUrl,
+        transparentUrl: printPreparation.transparentUrl ?? null,
         generationStatus: 'complete',
         policyStatus: policy.status,
         policyReport: policy,
@@ -366,6 +399,7 @@ export async function createDesignDraft(
       prompt: normalizedPrompt,
       imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
       qualityTier,
+      printPreparation,
       allowance,
       policy,
       readiness,
@@ -385,8 +419,9 @@ export async function createDesignDraft(
       sessionId: session.id,
       provider: generated.provider,
       prompt: normalizedPrompt,
-      imageUrl: generated.imageUrl,
+      imageUrl: preparedImageUrl,
       qualityTier,
+      printPreparation,
       allowance,
       policy,
       readiness,
@@ -477,20 +512,23 @@ export async function createDesignMockup(params: {
       const [product] = await getProductsByIds([params.productId]);
       const variant = product?.variants.find((candidate) => candidate.id === params.variantId);
       const placement = params.placementCodes[0];
+      const placementOption = product?.placements.find((candidate) => candidate.code === placement);
       if (!product?.printfulId || !variant?.printfulVariantId || !placement || !artwork?.imageUrl) {
         throw new Error(
           'Live Printful mockup requires synced product, variant, placement, and artwork.'
         );
       }
-      if (artwork.policyStatus !== 'pass' || artwork.readinessStatus !== 'pass') {
-        throw new Error('Live Printful mockup requires policy-passing, print-ready artwork.');
+      if (artwork.policyStatus !== 'pass' || artwork.readinessStatus === 'blocked') {
+        throw new Error(
+          'Live Printful mockup requires policy-passing artwork without blocked checks.'
+        );
       }
       const mockup = await generatePrintfulMockupPreview({
         printfulProductId: String(product.printfulId),
         printfulVariantId: variant.printfulVariantId,
         placement,
         designImageUrl: artwork.imageUrl,
-        technique: placement.includes('embroidery') ? 'embroidery' : 'dtg',
+        technique: placementOption?.technique,
       });
       return persistMockup(
         {
@@ -516,7 +554,7 @@ export async function createDesignMockup(params: {
         placementCodes: params.placementCodes,
         designAssetId: params.designAssetId,
         imageUrl: artwork?.imageUrl ?? createMockDesignImage('Mockup preview').imageUrl,
-        errorMessage: error instanceof Error ? error.message : 'Printful mockup generation failed.',
+        errorMessage: describePrintfulError(error),
         createdAt: runtimeNow(),
       });
     }

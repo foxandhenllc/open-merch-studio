@@ -232,22 +232,16 @@ function StudioApp() {
     vm.dataSource === 'fixture' ||
     vm.design?.provider === 'mock' ||
     vm.checkout?.mode === 'fixture';
-  const readinessBlocked = vm.design?.readiness.status === 'blocked';
   const promptReason = !vm.selectedProduct
     ? 'Choose a product first.'
     : !vm.prompt.trim()
       ? 'Describe your design to generate a draft.'
       : '';
-  const mockupReason = !vm.design
-    ? 'Generate a draft before creating a product preview.'
-    : readinessBlocked
-      ? 'Resolve blocked print-readiness checks first.'
-      : '';
   const quoteReason =
     !vm.selectedProduct || !vm.selectedVariant ? 'Choose an available product variant first.' : '';
   const checkoutReason = vm.quoteExpired
     ? 'Refresh the expired quote before checkout.'
-    : vm.artifactsStale
+    : vm.quoteStale
       ? 'Update the price before checkout.'
       : !vm.quote
         ? 'Calculate the price before checkout.'
@@ -371,7 +365,7 @@ function StudioApp() {
           />
         </div>
 
-        <section className="workspace" id="step-design">
+        <section className="workspace" id="step-make">
           {vm.selectedProduct && (
             <button className="change-product" type="button" onClick={() => setCatalogOpen(true)}>
               <span>Product</span>
@@ -388,10 +382,11 @@ function StudioApp() {
             mockupBusy={vm.busy.mockup}
             phase={vm.generationPhase}
             startedAt={vm.operationStartedAt}
-            stale={vm.artifactsStale}
+            stale={vm.mockupStale}
             onCancel={vm.cancelGeneration}
             onRetryMockup={vm.createMockup}
             onContinueWithoutMockup={vm.createQuote}
+            error={vm.errors.mockup}
           />
 
           {!vm.selectedProduct && (
@@ -420,7 +415,7 @@ function StudioApp() {
                 <div>
                   <span className="kicker">Active step</span>
                   <h2 id="design-controls-title" ref={designHeading} tabIndex={-1}>
-                    {vm.design ? 'Refine and preview' : 'Describe your design'}
+                    {vm.design ? 'Make and refine' : 'Describe your design'}
                   </h2>
                 </div>
                 <span className="mono session-id">{vm.session?.id}</span>
@@ -511,17 +506,6 @@ function StudioApp() {
                   <button
                     className="button button--secondary"
                     type="button"
-                    onClick={vm.createMockup}
-                    disabled={Boolean(mockupReason) || vm.busy.mockup}
-                  >
-                    {vm.busy.mockup ? 'Building preview…' : 'Preview on product'}
-                  </button>
-                  {mockupReason && <small>{mockupReason}</small>}
-                </div>
-                <div>
-                  <button
-                    className="button button--secondary"
-                    type="button"
                     onClick={vm.createQuote}
                     disabled={Boolean(quoteReason) || vm.busy.quoting}
                   >
@@ -535,15 +519,8 @@ function StudioApp() {
                 </div>
               </div>
               <ErrorNote error={vm.errors.generation} onRetry={vm.generate} />
-              <ErrorNote error={vm.errors.mockup} onRetry={vm.createMockup} />
               {vm.design && (
                 <>
-                  <StatusNote tone="success" title="Draft ready">
-                    <p>
-                      Your artwork was generated. Next: review print readiness and preview it on{' '}
-                      {vm.selectedProduct.title}.
-                    </p>
-                  </StatusNote>
                   <ReadinessChecks draft={vm.design} />
                   <AllowanceMeter
                     allowance={vm.design.allowance}
@@ -571,7 +548,6 @@ function StudioApp() {
             </section>
           )}
 
-          <div id="step-preview" />
           <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
           {vm.quote && (
             <button
@@ -583,7 +559,7 @@ function StudioApp() {
               <span>Estimated total</span>
               <strong>{money(vm.quote.totalCents, vm.quote.currency)}</strong>
               <small>
-                {vm.artifactsStale || vm.quoteExpired ? 'Update required' : 'View ledger'}
+                {vm.quoteStale || vm.quoteExpired ? 'Update required' : 'View ledger'}
               </small>
             </button>
           )}
@@ -593,7 +569,13 @@ function StudioApp() {
               <div className="section-heading">
                 <div>
                   <span className="kicker">Review and order</span>
-                  <h2>{vm.order ? 'Your order' : 'Ready for checkout'}</h2>
+                  <h2>
+                    {vm.order
+                      ? 'Your order'
+                      : publicConfig.isProductionMode && !publicConfig.enablePublicCheckout
+                        ? 'Quote ready'
+                        : 'Ready for checkout'}
+                  </h2>
                 </div>
               </div>
               {!vm.order && (
@@ -621,6 +603,11 @@ function StudioApp() {
                           ? 'Continue to secure checkout'
                           : 'Place simulated order'}
                   </button>
+                  {publicConfig.isProductionMode && !publicConfig.enablePublicCheckout && (
+                    <p className="disabled-reason">
+                      Checkout is not yet enabled. Your design and quote stay in this session.
+                    </p>
+                  )}
                   {checkoutReason && <p className="disabled-reason">{checkoutReason}</p>}
                   {vm.checkout?.status === 'blocked' && (
                     <StatusNote tone="warning" title="Checkout opens soon">
@@ -641,7 +628,7 @@ function StudioApp() {
             <QuoteLedger
               quote={vm.quote}
               loading={vm.busy.quoting}
-              stale={vm.artifactsStale}
+              stale={vm.quoteStale}
               expired={vm.quoteExpired}
               onRefresh={vm.createQuote}
               onClose={() => setLedgerOpen(false)}
@@ -684,37 +671,30 @@ function StudioApp() {
             onClick={
               !vm.design
                 ? vm.generate
-                : !vm.mockup
-                  ? vm.createMockup
-                  : !vm.quote || vm.artifactsStale
-                    ? vm.createQuote
-                    : vm.createCheckout
+                : !vm.quote || vm.quoteStale
+                  ? vm.createQuote
+                  : vm.createCheckout
             }
             disabled={
               !vm.selectedProduct ||
               (!vm.design && Boolean(promptReason)) ||
-              (Boolean(vm.design) && !vm.mockup && Boolean(mockupReason)) ||
               (Boolean(vm.quote) && Boolean(checkoutReason))
             }
           >
             {!vm.design
               ? 'Generate rough draft'
-              : !vm.mockup
-                ? 'Preview on product'
-                : !vm.quote || vm.artifactsStale
-                  ? 'Calculate price'
-                  : 'Continue to order'}
+              : !vm.quote || vm.quoteStale
+                ? 'Calculate price'
+                : 'Continue to order'}
           </button>
           <small>
             {!vm.selectedProduct
               ? 'Choose a product to begin.'
               : !vm.design
                 ? promptReason
-                : !vm.mockup
-                  ? mockupReason
-                  : !vm.quote
-                    ? quoteReason
-                    : checkoutReason}
+                : !vm.quote
+                  ? quoteReason
+                  : checkoutReason}
           </small>
         </div>
       )}

@@ -839,6 +839,56 @@ function computeCenteredSquarePosition(printfile: PrintfulPrintfile) {
   };
 }
 
+export function normalizePrintfulTechnique(technique?: string): string | undefined {
+  if (!technique) return undefined;
+  const normalized = technique.trim().toUpperCase().replace(/_/g, '-');
+  const aliases: Record<string, string> = {
+    DIGITAL: 'DIGITAL',
+    DTG: 'DTG',
+    SUBLIMATION: 'SUBLIMATION',
+    EMBROIDERY: 'EMBROIDERY',
+    UV: 'UV',
+    ENGRAVING: 'ENGRAVING',
+    'CUT-SEW': 'CUT-SEW',
+    CUTSEW: 'CUT-SEW',
+  };
+  return aliases[normalized] ?? normalized;
+}
+
+export function buildPrintfulMockupPayload(params: {
+  printfulVariantId: number;
+  placement: string;
+  designImageUrl: string;
+  printfile: PrintfulPrintfile;
+}) {
+  return {
+    variant_ids: [params.printfulVariantId],
+    format: 'png',
+    files: [
+      {
+        placement: params.placement,
+        image_url: params.designImageUrl,
+        position: computeCenteredSquarePosition(params.printfile),
+      },
+    ],
+  };
+}
+
+export function describePrintfulError(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : 'Printful request failed.';
+  }
+  const data = error.response?.data as
+    | { error?: { message?: string }; result?: string; message?: string }
+    | string
+    | undefined;
+  const detail =
+    typeof data === 'string'
+      ? data
+      : (data?.error?.message ?? data?.result ?? data?.message ?? error.message);
+  return `Printful ${error.response?.status ?? 'request'}: ${detail}`;
+}
+
 async function fetchPrintfileForVariant(params: {
   client: AxiosInstance;
   printfulProductId: string;
@@ -849,7 +899,9 @@ async function fetchPrintfileForVariant(params: {
   const response = await params.client.get(
     `/mockup-generator/printfiles/${params.printfulProductId}`,
     {
-      params: params.technique ? { technique: params.technique } : undefined,
+      params: params.technique
+        ? { technique: normalizePrintfulTechnique(params.technique) }
+        : undefined,
     }
   );
   const result = unwrapPrintfulResponse<PrintfulPrintfilesResult>(response.data);
@@ -880,18 +932,12 @@ async function createPrintfulMockupTask(params: {
   const printfile = await fetchPrintfileForVariant(params);
   const response = await params.client.post(
     `/mockup-generator/create-task/${params.printfulProductId}`,
-    {
-      variant_ids: [params.printfulVariantId],
-      format: 'png',
-      width: 0,
-      files: [
-        {
-          placement: params.placement,
-          image_url: params.designImageUrl,
-          position: computeCenteredSquarePosition(printfile),
-        },
-      ],
-    }
+    buildPrintfulMockupPayload({
+      printfulVariantId: params.printfulVariantId,
+      placement: params.placement,
+      designImageUrl: params.designImageUrl,
+      printfile,
+    })
   );
   const result = unwrapPrintfulResponse<PrintfulMockupTaskCreateResult>(response.data);
   if (!result.task_key) {

@@ -153,6 +153,11 @@ export type DesignDraft = {
   prompt: string;
   imageUrl: string;
   qualityTier: 'rough' | 'final';
+  printPreparation?: {
+    status: 'transparent' | 'removed' | 'required' | 'failed';
+    provider: 'openai' | 'remove-bg' | 'none';
+    message: string;
+  };
   allowance: AllowanceState;
   policy: {
     status: 'pass' | 'blocked' | 'needs_review';

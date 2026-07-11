@@ -12,6 +12,7 @@ Open Merch Studio can be deployed as a split frontend/backend app or as separate
 
 - Printful bearer value and store ID for live catalog sync, draft-order creation, and fulfillment review
 - OpenAI key for guarded provider-backed design generation
+- remove.bg key for converting `gpt-image-2` output into transparent print-ready PNGs
 - Stripe key and webhook signing value for Checkout Sessions and webhook reconciliation
 
 Store all provider values in deployment-managed storage. Do not commit provider values or screenshots of provider dashboards.
@@ -39,6 +40,8 @@ Preview deployments should not use production provider settings. Production chec
 The current Vercel deployment shape is a static frontend plus lightweight `/api/*` functions. In production mode, those functions block simulated checkout unless `ENABLE_PUBLIC_CHECKOUT=true`. Do not turn that flag on until the full backend, Stripe webhooks, Printful fulfillment path, support policies, and launch smoke tests are approved.
 
 Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Keep it conservative in serverless environments and prefer long-running backend workers for production mockup generation.
+
+`gpt-image-2` is the default design model. Because that model does not emit transparent backgrounds, set `REMOVE_BG_API_KEY` to enable the automatic post-generation background-removal stage. Without it, generation and mockups still work, but print readiness shows a warning until a transparent file is prepared.
 
 ## Database Migration
 

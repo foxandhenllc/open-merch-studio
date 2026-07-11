@@ -318,7 +318,7 @@ h3 {
 
 .step-rail {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   width: min(1180px, 100%);
   margin: 20px auto 16px;
 }
@@ -695,6 +695,14 @@ h3 {
   box-shadow: var(--shadow-2);
   animation: artworkIn 200ms ease-out;
 }
+.mockup-preview {
+  position: absolute;
+  z-index: 2;
+  width: min(78%, 860px);
+  height: min(78%, 560px);
+  object-fit: contain;
+  animation: artworkIn 200ms ease-out;
+}
 @keyframes artworkIn {
   from {
     opacity: 0;
@@ -761,7 +769,8 @@ h3 {
   }
 }
 .stage.is-stale > .product-visual,
-.stage.is-stale > .artwork-preview {
+.stage.is-stale > .artwork-preview,
+.stage.is-stale > .mockup-preview {
   opacity: 0.48;
   filter: saturate(0.4);
 }
@@ -1652,6 +1661,10 @@ input:focus {
   }
   .artwork-preview {
     width: min(32%, 130px);
+  }
+  .mockup-preview {
+    width: min(92%, 600px);
+    height: min(74%, 420px);
   }
   .stage-progress {
     right: 10px;

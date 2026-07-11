@@ -5,8 +5,7 @@ export type { StepState, StudioStep } from './StepRail.types';
 
 const steps: Array<{ id: StudioStep; label: string }> = [
   { id: 'product', label: 'Product' },
-  { id: 'design', label: 'Design' },
-  { id: 'preview', label: 'Preview' },
+  { id: 'make', label: 'Make' },
   { id: 'price', label: 'Price' },
   { id: 'order', label: 'Order' },
 ];
