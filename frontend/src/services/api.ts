@@ -207,6 +207,17 @@ export const api = {
       }),
       () => createLocalCheckout(body.quote, body.email)
     ),
+  checkoutOrder: (sessionId: string) =>
+    withFallback(
+      request<OrderSummary>(
+        `/api/checkout/sessions/${encodeURIComponent(sessionId)}/order`
+      ),
+      () => {
+        const order = getLocalOrder();
+        if (!order) throw new Error('Checkout confirmation is still processing.');
+        return order;
+      }
+    ),
   order: (orderId: string) =>
     withFallback(request<OrderSummary>(`/api/orders/${encodeURIComponent(orderId)}`), () => {
       const order = getLocalOrder();

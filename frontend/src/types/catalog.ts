@@ -188,6 +188,7 @@ export type CheckoutSession = {
 export type OrderSummary = {
   id: string;
   orderNumber: string;
+  stripeSessionId?: string;
   status:
     | 'draft'
     | 'quoted'

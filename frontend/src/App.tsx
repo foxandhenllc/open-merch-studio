@@ -10,7 +10,9 @@ import { ReadinessChecks } from '@components/ReadinessChecks';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
 import { publicConfig } from './config';
+import { api } from './services/api';
 import { useStudioViewModel, type SurfaceError } from './studio-view-model';
+import type { OrderSummary } from './types/catalog';
 import type { PolicyRoute } from './App.types';
 
 const money = (cents: number, currency = 'USD') =>
@@ -193,10 +195,64 @@ function StudioApp() {
   const vm = useStudioViewModel();
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [checkoutReturn, setCheckoutReturn] = useState<{
+    state: 'cancelled' | 'processing' | 'paid' | 'failed';
+    order?: OrderSummary;
+    message: string;
+  } | null>(null);
   const designHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (['drafted', 'quoted', 'confirmed'].includes(vm.flow)) designHeading.current?.focus();
   }, [vm.flow]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutState = params.get('checkout');
+    if (checkoutState === 'cancelled') {
+      setCheckoutReturn({
+        state: 'cancelled',
+        message: 'No payment was made. You can return to the studio when you are ready.',
+      });
+      return undefined;
+    }
+    const stripeSessionId = params.get('session_id');
+    if (checkoutState !== 'success' || !stripeSessionId) return undefined;
+
+    let cancelled = false;
+    setCheckoutReturn({
+      state: 'processing',
+      message: 'Stripe returned successfully. Confirming the payment and order record now.',
+    });
+    const confirmOrder = async () => {
+      for (let attempt = 0; attempt < 10 && !cancelled; attempt += 1) {
+        try {
+          const result = await api.checkoutOrder(stripeSessionId);
+          const order = result.data;
+          if (order.status !== 'checkout_pending') {
+            setCheckoutReturn({
+              state: 'paid',
+              order,
+              message: `Payment received for ${order.orderNumber}. Real Printful fulfillment remains paused for operator review.`,
+            });
+            return;
+          }
+        } catch {
+          // Stripe can redirect before the webhook and database update finish.
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+      if (!cancelled) {
+        setCheckoutReturn({
+          state: 'processing',
+          message:
+            'Payment confirmation is taking longer than expected. Do not submit another payment; refresh this page in a moment.',
+        });
+      }
+    };
+    void confirmOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (vm.flow === 'booting')
     return (
@@ -335,6 +391,39 @@ function StudioApp() {
             <strong>Full journey, zero risk.</strong> Demo data is labeled; no real image
             generation, charge, or provider order is created.
           </p>
+        </div>
+      )}
+
+      {checkoutReturn && (
+        <div className="checkout-return">
+          <StatusNote
+            tone={
+              checkoutReturn.state === 'paid'
+                ? 'success'
+                : checkoutReturn.state === 'failed'
+                  ? 'error'
+                  : checkoutReturn.state === 'cancelled'
+                    ? 'warning'
+                    : 'info'
+            }
+            title={
+              checkoutReturn.state === 'paid'
+                ? 'Payment received'
+                : checkoutReturn.state === 'cancelled'
+                  ? 'Checkout cancelled'
+                  : checkoutReturn.state === 'failed'
+                    ? 'Payment confirmation failed'
+                    : 'Confirming your payment'
+            }
+          >
+            <p>{checkoutReturn.message}</p>
+            {checkoutReturn.order && (
+              <p>
+                Total: {money(checkoutReturn.order.totalCents, checkoutReturn.order.currency)} · A
+                confirmation record is saved for support.
+              </p>
+            )}
+          </StatusNote>
         </div>
       )}
 

@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createQuote, listProducts } from '../services/catalog.service.js';
 import { createDesignDraft } from '../services/design.service.js';
-import { createCheckoutSession } from '../services/order.service.js';
-import { getOrCreateSession } from '../services/runtime-store.js';
+import {
+  createCheckoutSession,
+  getOrderByCheckoutSession,
+} from '../services/order.service.js';
+import { getOrCreateSession, saveOrder } from '../services/runtime-store.js';
 
 async function firstProductSelection() {
   const products = await listProducts();
@@ -105,4 +108,34 @@ test('checkout blocks artwork that has not passed print-readiness checks', async
 
   assert.equal(checkout.status, 'blocked');
   assert.match(checkout.message, /print-readiness/i);
+});
+
+test('checkout return lookup restores the order from its Stripe session ID', async () => {
+  const stripeSessionId = 'cs_test_return_lookup';
+  saveOrder({
+    id: 'order-return-lookup',
+    orderNumber: 'OMS-TEST-RETURN',
+    stripeSessionId,
+    status: 'paid',
+    totalCents: 2595,
+    currency: 'USD',
+    fulfillment: {
+      provider: 'printful-ready',
+      status: 'needs_review',
+      message: 'Payment received. Fulfillment remains paused.',
+    },
+    timeline: [
+      {
+        at: new Date().toISOString(),
+        status: 'paid',
+        note: 'Stripe checkout completed.',
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  });
+
+  const restored = await getOrderByCheckoutSession(stripeSessionId);
+
+  assert.equal(restored?.id, 'order-return-lookup');
+  assert.equal(restored?.status, 'paid');
 });

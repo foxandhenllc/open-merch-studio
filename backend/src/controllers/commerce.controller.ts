@@ -3,6 +3,7 @@ import { asyncHandler, HttpError } from '../middleware.js';
 import {
   createCheckoutSession,
   createStudioPassCheckout,
+  getOrderByCheckoutSession,
   getOrderSummary,
   handleStripeCheckoutCompleted,
   submitFixtureFulfillment,
@@ -42,6 +43,18 @@ export const getOrder = asyncHandler(async (req: Request, res: Response) => {
   const order = await getOrderSummary(String(req.params.orderId ?? ''));
   if (!order) {
     throw new HttpError('Order not found.', 404);
+  }
+  res.json({ success: true, data: order });
+});
+
+export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response) => {
+  const sessionId = String(req.params.sessionId ?? '').trim();
+  if (!sessionId.startsWith('cs_')) {
+    throw new HttpError('A valid Stripe Checkout Session ID is required.', 400);
+  }
+  const order = await getOrderByCheckoutSession(sessionId);
+  if (!order) {
+    throw new HttpError('Checkout confirmation is still processing.', 404);
   }
   res.json({ success: true, data: order });
 });

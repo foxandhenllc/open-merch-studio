@@ -176,6 +176,7 @@ function mapPersistedOrder(order: PersistedOrder): OrderSummary {
   return {
     id: order.id,
     orderNumber: order.orderNumber,
+    stripeSessionId: order.stripeSessionId ?? undefined,
     status: runtimeOrderStatus(order.status),
     customerEmail: order.email ?? undefined,
     totalCents: order.totalCents,
@@ -515,6 +516,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
       quote,
       customerEmail: input.email,
     });
+    saveOrder({ ...order, stripeSessionId: session.id });
     await persistOrder(order, session.id);
     return {
       id: session.id,
@@ -784,6 +786,26 @@ export async function submitFixtureFulfillment(orderId: string): Promise<OrderSu
 
 export async function getOrderSummary(orderId: string): Promise<OrderSummary | undefined> {
   return loadOrder(orderId);
+}
+
+export async function getOrderByCheckoutSession(
+  stripeSessionId: string
+): Promise<OrderSummary | undefined> {
+  const runtimeOrder = listOrders().find(
+    (candidate) => candidate.stripeSessionId === stripeSessionId
+  );
+  if (runtimeOrder || !env.databaseUrl) return runtimeOrder;
+
+  try {
+    const persisted = await prisma.order.findFirst({
+      where: { stripeSessionId },
+      include: orderInclude,
+    });
+    if (!persisted) return undefined;
+    return saveOrder(mapPersistedOrder(persisted));
+  } catch {
+    return undefined;
+  }
 }
 
 export async function listOrderSummaries(limit = 50): Promise<OrderSummary[]> {

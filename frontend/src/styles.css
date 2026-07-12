@@ -302,6 +302,10 @@ h3 {
   margin: 0;
   font-size: 13px;
 }
+.checkout-return {
+  width: min(960px, 100%);
+  margin: 12px auto 0;
+}
 .icon-button {
   width: 36px;
   height: 36px;
