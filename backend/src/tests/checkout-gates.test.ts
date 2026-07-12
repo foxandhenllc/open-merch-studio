@@ -2,10 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createQuote, listProducts } from '../services/catalog.service.js';
 import { createDesignDraft } from '../services/design.service.js';
-import {
-  createCheckoutSession,
-  getOrderByCheckoutSession,
-} from '../services/order.service.js';
+import { createCheckoutSession, getOrderByCheckoutSession } from '../services/order.service.js';
 import { getOrCreateSession, saveOrder } from '../services/runtime-store.js';
 
 async function firstProductSelection() {

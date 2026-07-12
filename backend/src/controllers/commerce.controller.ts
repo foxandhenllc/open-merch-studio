@@ -60,10 +60,15 @@ export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response)
 });
 
 export const postStripeWebhook = asyncHandler(async (req: Request, res: Response) => {
-  const event = constructStripeWebhookEvent(
-    req.body as Buffer,
-    req.header('stripe-signature') ?? undefined
-  );
+  let event: ReturnType<typeof constructStripeWebhookEvent>;
+  try {
+    event = constructStripeWebhookEvent(
+      req.body as Buffer,
+      req.header('stripe-signature') ?? undefined
+    );
+  } catch {
+    throw new HttpError('Invalid Stripe webhook signature.', 400);
+  }
   if (event.type === 'checkout.session.completed') {
     await handleStripeCheckoutCompleted(event.data.object, event.id);
   }
