@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQuoteBreakdown } from '../services/pricing.service.js';
+import { buildQuoteBreakdown, estimateRetailTotalCents } from '../services/pricing.service.js';
 import { sampleCatalog } from '../services/catalog-fixtures.js';
 
 test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
@@ -37,6 +37,47 @@ test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
     true
   );
   assert.ok(quote.totalCents > quote.productCostCents);
+  assert.deepEqual(
+    quote.costLines.map((line) => line.label),
+    [
+      'Product & printing',
+      'Design work',
+      'Open Merch Studio margin',
+      'Estimated shipping',
+      'Card processing estimate',
+    ]
+  );
+  assert.equal(
+    estimateRetailTotalCents(variant.costCents, product.type, {
+      currency: 'USD',
+      targetMarginPercent: 30,
+      minMarginCents: 500,
+      aiDesignFeeCents: 300,
+      paymentFeePercent: 2.9,
+      paymentFeeFixedCents: 30,
+      studioPassCreditCents: 500,
+    }),
+    buildQuoteBreakdown(
+      [product],
+      [
+        {
+          productId: product.id,
+          variantId: variant.id,
+          quantity: 1,
+          placementCodes: ['front'],
+        },
+      ],
+      {
+        currency: 'USD',
+        targetMarginPercent: 30,
+        minMarginCents: 500,
+        aiDesignFeeCents: 300,
+        paymentFeePercent: 2.9,
+        paymentFeeFixedCents: 30,
+        studioPassCreditCents: 500,
+      }
+    ).totalCents
+  );
 });
 
 test('buildQuoteBreakdown applies Studio Pass credit once', () => {

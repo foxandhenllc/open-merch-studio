@@ -17,6 +17,7 @@ export type CatalogVariantDto = {
   imageUrl?: string | null;
   isAvailable: boolean;
   costCents: number;
+  retailEstimateCents?: number;
 };
 
 export type CatalogProductDto = {

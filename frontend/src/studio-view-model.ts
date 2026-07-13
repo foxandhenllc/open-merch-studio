@@ -13,10 +13,12 @@ import type {
   OrderSummary,
   PlacementOption,
   QuoteBreakdown,
+  StudioCapabilities,
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
 import type { StepState, StudioStep } from '@components/StepRail.types';
+import { readStudioResumeState, writeStudioResumeState } from './studio-persistence';
 
 export type FlowState =
   | 'booting'
@@ -93,6 +95,14 @@ function mapError(error: unknown, surface: Surface): SurfaceError {
   const status = error instanceof ApiError ? error.status : 0;
   const code = error instanceof ApiError ? error.code : undefined;
   const normalized = `${code || ''} ${message}`.toLowerCase();
+  if (code === 'revision_allowance_required')
+    return {
+      cause: 'revision_allowance_required',
+      title: 'A Studio Pass is needed for another variation',
+      message,
+      recovery: 'Your current artwork, mockup, and price are unchanged.',
+      retryable: false,
+    };
   if (status === 429 || normalized.includes('rate') || normalized.includes('budget'))
     return {
       cause: 'rate_limited',
@@ -171,6 +181,11 @@ export function useStudioViewModel() {
   const [session, setSession] = useState<StudioSession | null>(null);
   const [studioPass, setStudioPass] = useState<StudioPass | null>(null);
   const [adminReport, setAdminReport] = useState<AdminReport | null>(null);
+  const [capabilities, setCapabilities] = useState<StudioCapabilities>({
+    ai: 'demo',
+    checkout: 'demo',
+    fulfillment: 'demo',
+  });
   const [selectedCategory, setSelectedCategoryState] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedVariantId, setSelectedVariantIdState] = useState('');
@@ -179,7 +194,7 @@ export function useStudioViewModel() {
     PreviewOrientation | undefined
   >();
   const [prompt, setPrompt] = useState('');
-  const [revision, setRevision] = useState('Make it bolder and easier to read at small sizes');
+  const [revision, setRevision] = useState('');
   const [email, setEmail] = useState('');
   const [idea, setIdea] = useState<DesignIdea | null>(null);
   const [design, setDesign] = useState<DesignDraft | null>(null);
@@ -196,8 +211,13 @@ export function useStudioViewModel() {
   const [generationPhase, setGenerationPhase] = useState('Queued');
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [recoveryMessage, setRecoveryMessage] = useState('');
+  const [activeMockupViewIndex, setActiveMockupViewIndex] = useState(0);
+  const [designHistory, setDesignHistory] = useState<DesignDraft[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const generationController = useRef<AbortController | null>(null);
+  const quoteController = useRef<AbortController | null>(null);
+  const quoteRequestId = useRef(0);
   const mockupRequestId = useRef(0);
   const mockupCache = useRef(new Map<string, DesignMockup>());
   const productSelections = useRef(
@@ -206,6 +226,7 @@ export function useStudioViewModel() {
       { variantId: string; placements: string[]; orientation?: PreviewOrientation }
     >()
   );
+  const resumeState = useRef(readStudioResumeState());
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -216,6 +237,41 @@ export function useStudioViewModel() {
     [selectedProduct, selectedVariantId]
   );
   const quoteExpired = Boolean(quote && new Date(quote.expiresAt).getTime() <= Date.now());
+  const artworkReady = Boolean(
+    design?.id && design.policy.status === 'pass' && design.readiness.status === 'pass'
+  );
+  const emailValid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const checkoutReadiness = useMemo(() => {
+    const quoteReady = Boolean(quote && !quoteStale && !quoteExpired);
+    const canOpen = artworkReady && quoteReady && canUseCustomerCheckout;
+    const blocker = !artworkReady
+      ? 'Finish artwork checks before checkout.'
+      : !quote
+        ? 'Preparing your price estimate.'
+        : quoteExpired
+          ? 'Refresh the expired estimate before checkout.'
+          : quoteStale
+            ? 'Updating the estimate for your current selection.'
+            : !canUseCustomerCheckout
+              ? 'Secure checkout is temporarily unavailable.'
+              : !emailValid
+                ? 'Enter a valid email for your receipt.'
+                : '';
+    return {
+      artworkReady,
+      quoteReady,
+      emailValid,
+      paymentAvailable: canUseCustomerCheckout,
+      fulfillmentReview: 'Orders are reviewed before Printful submission.',
+      canOpen,
+      ready: canOpen && emailValid,
+      blocker,
+    };
+  }, [artworkReady, emailValid, quote, quoteExpired, quoteStale]);
+  const canGenerateAnother = Boolean(
+    !design || design.allowance.freeDraftsRemaining + design.allowance.roughDraftsRemaining > 0
+  );
+  const canRevise = Boolean(design?.id && design.allowance.editsRemaining > 0);
 
   const consumeSource = useCallback(<T>(result: Sourced<T>): T => {
     setDataSource(result.source);
@@ -232,20 +288,157 @@ export function useStudioViewModel() {
   const boot = useCallback(async () => {
     setFlow('booting');
     clearError('boot');
+    setRecoveryMessage('');
     try {
-      const [categoryResult, productResult, sessionResult, reportResult] = await Promise.all([
+      const saved = readStudioResumeState();
+      resumeState.current = saved;
+      const [categoryResult, productResult, sessionResult, capabilityResult, reportResult] =
+        await Promise.all([
         api.categories(),
-        api.products(),
-        api.session(),
+        api.products(saved?.selectedCategory || undefined),
+        api.session(saved?.sessionId),
+        api.capabilities(),
         publicConfig.isProductionMode ? Promise.resolve(null) : api.adminReport(),
       ]);
+      const nextProducts = consumeSource(productResult);
       setCategories(consumeSource(categoryResult));
-      setProducts(consumeSource(productResult));
+      setProducts(nextProducts);
       const nextSession = consumeSource(sessionResult);
+      setCapabilities(consumeSource(capabilityResult));
       setSession(nextSession);
       setStudioPass(nextSession.studioPass ?? null);
       if (reportResult) setAdminReport(reportResult.data);
-      setFlow('configuring');
+
+      if (!saved) {
+        setFlow('configuring');
+        return;
+      }
+
+      setSelectedCategoryState(saved.selectedCategory);
+      setPrompt(saved.prompt);
+      const product = nextProducts.find((candidate) => candidate.id === saved.productId);
+      const variant = product?.variants.find(
+        (candidate) => candidate.id === saved.variantId && candidate.isAvailable
+      );
+      if (!product || !variant) {
+        setRecoveryMessage(
+          'Your previous product selection is no longer available. Your guest session was restored so you can choose another product.'
+        );
+        setFlow('configuring');
+        return;
+      }
+
+      const placementCodes = saved.placementCodes.filter((code) =>
+        product.placements.some((placement) => placement.code === code)
+      );
+      const placements = placementCodes.length
+        ? placementCodes
+        : product.placements.filter((placement) => placement.isDefault).map((item) => item.code);
+      const orientation = saved.orientation ?? previewOrientation(product, variant);
+      setSelectedProductId(product.id);
+      setSelectedVariantIdState(variant.id);
+      setSelectedPlacements(placements);
+      setSelectedOrientationState(orientation);
+      productSelections.current.set(product.id, {
+        variantId: variant.id,
+        placements,
+        orientation,
+      });
+
+      let restoredDraft: DesignDraft | null = null;
+      if (saved.designId) {
+        try {
+          restoredDraft = consumeSource(
+            await api.designDraftById(saved.designId, nextSession.id)
+          );
+          if (!restoredDraft.id) restoredDraft = null;
+        } catch {
+          setRecoveryMessage(
+            'Your saved artwork is no longer available. The product and prompt were restored so you can generate a new draft.'
+          );
+        }
+      }
+      setDesign(restoredDraft);
+      setDesignHistory([]);
+      setActiveMockupViewIndex(saved.mockupViewIndex);
+
+      let restoredQuote: QuoteBreakdown | null = null;
+      if (saved.quoteId && restoredDraft?.id) {
+        try {
+          const candidate = consumeSource(await api.quoteById(saved.quoteId));
+          const item = candidate.items[0];
+          if (
+            item?.productId === product.id &&
+            item.variantId === variant.id &&
+            item.designAssetId === restoredDraft.id
+          ) {
+            restoredQuote = candidate;
+          }
+        } catch {
+          setRecoveryMessage(
+            'Your saved price estimate expired or is unavailable. A fresh estimate will be prepared automatically.'
+          );
+        }
+      }
+      setQuote(restoredQuote);
+      setQuoteStale(false);
+
+      if (restoredDraft?.id && restoredDraft.readiness.status !== 'blocked') {
+        const savedMockup = saved.mockup;
+        const savedMockupMatches = Boolean(
+          savedMockup &&
+            savedMockup.productId === product.id &&
+            savedMockup.variantId === variant.id &&
+            savedMockup.designAssetId === restoredDraft.id &&
+            savedMockup.placementCodes.join('|') === placements.join('|') &&
+            savedMockup.orientation === orientation
+        );
+        if (savedMockup && savedMockupMatches) {
+          setMockup(savedMockup);
+          mockupCache.current.set(
+            mockupKey({
+              productId: product.id,
+              variantId: variant.id,
+              placements,
+              draftId: restoredDraft.id,
+              orientation,
+            }),
+            savedMockup
+          );
+        } else try {
+          const restoredMockup = consumeSource(
+            await api.mockup({
+              sessionId: nextSession.id,
+              productId: product.id,
+              variantId: variant.id,
+              placementCodes: placements,
+              designAssetId: restoredDraft.id,
+              imageUrl: restoredDraft.imageUrl,
+              orientation,
+            })
+          );
+          setMockup(restoredMockup);
+          if (restoredMockup.status === 'complete') {
+            mockupCache.current.set(
+              mockupKey({
+                productId: product.id,
+                variantId: variant.id,
+                placements,
+                draftId: restoredDraft.id,
+                orientation,
+              }),
+              restoredMockup
+            );
+          }
+        } catch {
+          setRecoveryMessage(
+            'Your artwork was restored, but its saved product preview needs to be rebuilt.'
+          );
+        }
+      }
+
+      setFlow(restoredQuote ? 'quoted' : restoredDraft ? 'drafted' : 'configuring');
+      setAnnouncement('Your previous guest session was restored.');
     } catch (error) {
       fail('boot', error);
       setFlow('boot_failed');
@@ -255,6 +448,36 @@ export function useStudioViewModel() {
   useEffect(() => {
     void boot();
   }, [boot]);
+  useEffect(() => {
+    if (!session || flow === 'booting' || flow === 'boot_failed') return;
+    writeStudioResumeState({
+      version: 1,
+      sessionId: session.id,
+      selectedCategory,
+      productId: selectedProductId,
+      variantId: selectedVariantId,
+      placementCodes: selectedPlacements,
+      orientation: selectedOrientation,
+      prompt,
+      designId: design?.id ?? undefined,
+      mockup: mockup?.status === 'complete' ? mockup : undefined,
+      mockupViewIndex: activeMockupViewIndex,
+      quoteId: quote?.id ?? undefined,
+    });
+  }, [
+    activeMockupViewIndex,
+    design?.id,
+    flow,
+    prompt,
+    mockup,
+    quote?.id,
+    selectedCategory,
+    selectedOrientation,
+    selectedPlacements,
+    selectedProductId,
+    selectedVariantId,
+    session,
+  ]);
   useEffect(() => {
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
@@ -306,13 +529,14 @@ export function useStudioViewModel() {
       setAction('mockup', false);
       setOperationStartedAt(null);
       setMockup(cached);
+      setActiveMockupViewIndex(0);
       setMockupStale(false);
       clearError('mockup');
       setFlow(quote ? 'quote_stale' : 'drafted');
       setAnnouncement('Saved product mockup restored.');
       return;
     }
-    setMockup(null);
+    if (mockup) setMockupStale(true);
     setAction('mockup', true);
     setFlow('previewing');
     setOperationStartedAt(Date.now());
@@ -331,6 +555,7 @@ export function useStudioViewModel() {
       );
       if (requestId !== mockupRequestId.current) return;
       setMockup(result);
+      setActiveMockupViewIndex(0);
       setMockupStale(false);
       if (result.status === 'failed') {
         fail(
@@ -341,7 +566,7 @@ export function useStudioViewModel() {
       } else {
         mockupCache.current.set(key, result);
         setFlow(quote ? 'quote_stale' : 'drafted');
-        setAnnouncement('Product mockup ready. You can refine the design or calculate the price.');
+        setAnnouncement('Product mockup ready. Your price estimate is updating automatically.');
       }
     } catch (error) {
       if (requestId !== mockupRequestId.current) return;
@@ -355,6 +580,10 @@ export function useStudioViewModel() {
     }
   };
   const markStale = () => {
+    quoteRequestId.current += 1;
+    quoteController.current?.abort();
+    quoteController.current = null;
+    setAction('quoting', false);
     if (mockup) setMockupStale(true);
     if (quote) setQuoteStale(true);
     if (quote) setFlow('quote_stale');
@@ -363,6 +592,7 @@ export function useStudioViewModel() {
     setOrder(null);
   };
   const selectProduct = (product: CatalogProduct) => {
+    setRecoveryMessage('');
     if (selectedProductId && selectedVariantId) {
       productSelections.current.set(selectedProductId, {
         variantId: selectedVariantId,
@@ -482,6 +712,11 @@ export function useStudioViewModel() {
     }
   };
 
+  const updatePrompt = (value: string) => {
+    setPrompt(value);
+    if (idea) setIdea(null);
+  };
+
   const refineIdea = async () => {
     if (!prompt.trim()) return;
     setFlow('refining');
@@ -539,8 +774,13 @@ export function useStudioViewModel() {
           400,
           'policy_blocked'
         );
+      if (design?.id) {
+        setDesignHistory((current) =>
+          current.some((item) => item.id === design.id) ? current : [...current, design]
+        );
+      }
       setDesign(draft);
-      setMockup(null);
+      if (mockup) setMockupStale(true);
       setQuote(null);
       setMockupStale(false);
       setQuoteStale(false);
@@ -576,6 +816,20 @@ export function useStudioViewModel() {
   const cancelGeneration = () => generationController.current?.abort();
   const reviseDraft = async () => {
     if (!design?.id || !revision.trim()) return;
+    if (!canRevise) {
+      setErrors((current) => ({
+        ...current,
+        generation: {
+          cause: 'revision_allowance_required',
+          title: 'A Studio Pass is needed for another variation',
+          message: 'This session has no revision credits remaining.',
+          recovery: 'Your current artwork, product preview, and price are unchanged.',
+          retryable: false,
+        },
+      }));
+      setAnnouncement('Revision blocked. Your current artwork is unchanged.');
+      return;
+    }
     setAction('revising', true);
     clearError('generation');
     try {
@@ -586,12 +840,15 @@ export function useStudioViewModel() {
           sessionId: session?.id,
         })
       );
+      setDesignHistory((current) =>
+        current.some((item) => item.id === design.id) ? current : [...current, design]
+      );
       setDesign(revised);
-      setMockup(null);
-      setMockupStale(false);
+      if (mockup) setMockupStale(true);
       setQuoteStale(Boolean(quote));
       setFlow('drafted');
-      setAnnouncement('Edit applied. Rebuilding your product mockup.');
+      setRevision('');
+      setAnnouncement('New variation ready. Rebuilding your product mockup.');
       if (selectedProduct && selectedVariant) {
         await requestMockup({
           product: selectedProduct,
@@ -607,6 +864,26 @@ export function useStudioViewModel() {
       setAction('revising', false);
     }
   };
+  const undoDraft = async () => {
+    const previous = designHistory[designHistory.length - 1];
+    if (!previous) return;
+    setDesignHistory((current) => current.slice(0, -1));
+    setDesign(previous);
+    setRevision('');
+    setQuoteStale(Boolean(quote));
+    setCheckout(null);
+    setOrder(null);
+    setAnnouncement('Previous artwork restored. Rebuilding its product preview.');
+    if (selectedProduct && selectedVariant) {
+      await requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: selectedPlacements,
+        draft: previous,
+        orientation: selectedOrientation,
+      });
+    }
+  };
   const createMockup = async () => {
     if (!selectedProduct || !selectedVariant || !design) return;
     await requestMockup({
@@ -617,8 +894,12 @@ export function useStudioViewModel() {
       orientation: selectedOrientation,
     });
   };
-  const createQuote = async () => {
-    if (!selectedProduct || !selectedVariant) return;
+  const createQuote = async (options: { automatic?: boolean } = {}) => {
+    if (!selectedProduct || !selectedVariant || !artworkReady || !design?.id) return;
+    const requestId = ++quoteRequestId.current;
+    quoteController.current?.abort();
+    const controller = new AbortController();
+    quoteController.current = controller;
     setAction('quoting', true);
     clearError('quote');
     try {
@@ -633,23 +914,60 @@ export function useStudioViewModel() {
               quantity: 1,
               placementCodes: selectedPlacements,
               orientation: selectedOrientation,
-              designAssetId: design?.id ?? undefined,
+              designAssetId: design.id,
             },
           ],
-        })
+        }, controller.signal)
       );
+      if (requestId !== quoteRequestId.current) return;
       setQuote(result);
       setQuoteStale(false);
       setFlow('quoted');
       setAnnouncement(
-        `Price updated: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: result.currency }).format(result.totalCents / 100)}.`
+        `${options.automatic ? 'Price estimate ready' : 'Price updated'}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: result.currency }).format(result.totalCents / 100)}.`
       );
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (requestId !== quoteRequestId.current) return;
       fail('quote', error);
     } finally {
-      setAction('quoting', false);
+      if (requestId === quoteRequestId.current) {
+        setAction('quoting', false);
+        quoteController.current = null;
+      }
     }
   };
+  useEffect(() => {
+    if (!artworkReady || !design?.id || !selectedProduct || !selectedVariant) {
+      quoteController.current?.abort();
+      setQuote(null);
+      setQuoteStale(false);
+      setCheckout(null);
+      return undefined;
+    }
+    if (quote && !quoteStale && !quoteExpired) return undefined;
+    const timer = window.setTimeout(() => {
+      void createQuote({ automatic: true });
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    artworkReady,
+    design?.id,
+    quote,
+    quoteExpired,
+    quoteStale,
+    selectedOrientation,
+    selectedPlacements,
+    selectedProduct?.id,
+    selectedVariant?.id,
+    studioPass?.id,
+  ]);
+  useEffect(
+    () => () => {
+      quoteController.current?.abort();
+    },
+    []
+  );
   const buyStudioPass = async () => {
     if (!session) return;
     if (!canUseCustomerCheckout) {
@@ -688,7 +1006,7 @@ export function useStudioViewModel() {
           createdAt: new Date().toISOString(),
         });
       setAnnouncement(
-        'Studio Pass activated for this session. Refresh the price to apply its credit.'
+        'Studio Pass activated. The eligible order credit will be applied automatically.'
       );
     } catch (error) {
       fail('checkout', error);
@@ -697,7 +1015,19 @@ export function useStudioViewModel() {
     }
   };
   const createCheckout = async () => {
-    if (!quote) return;
+    if (!quote || !checkoutReadiness.ready) {
+      setErrors((current) => ({
+        ...current,
+        checkout: {
+          cause: 'checkout_not_ready',
+          title: 'Checkout needs one more step',
+          message: checkoutReadiness.blocker,
+          recovery: 'Your artwork and estimate are saved.',
+          retryable: false,
+        },
+      }));
+      return;
+    }
     if (!canUseCustomerCheckout) {
       setCheckout({
         id: 'checkout-disabled',
@@ -783,18 +1113,31 @@ export function useStudioViewModel() {
         quoteStale || flow === 'quote_stale' || flow === 'quote_expired'
           ? 'stale'
           : quote
-            ? flow === 'quoted'
+            ? 'done'
+            : artworkReady
               ? 'active'
-              : 'done'
-            : design
-              ? 'todo'
               : 'todo',
-      order: order || flow === 'confirmed' ? 'active' : quote ? 'todo' : 'todo',
+      order:
+        order || flow === 'confirmed' ? 'active' : checkoutReadiness.canOpen ? 'active' : 'todo',
     }),
-    [selectedProduct, design, mockup, quote, order, flow, mockupStale, quoteStale]
+    [
+      selectedProduct,
+      design,
+      mockup,
+      quote,
+      order,
+      flow,
+      mockupStale,
+      quoteStale,
+      artworkReady,
+      checkoutReadiness.canOpen,
+    ]
   );
-  const navigate = (step: StudioStep) =>
-    document.getElementById(`step-${step}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const navigate = (step: StudioStep) => {
+    const target = document.getElementById(`step-${step}`);
+    target?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    target?.focus({ preventScroll: true });
+  };
 
   return {
     flow,
@@ -803,6 +1146,7 @@ export function useStudioViewModel() {
     session,
     studioPass,
     adminReport,
+    capabilities,
     selectedCategory,
     selectedProduct,
     selectedVariant,
@@ -828,10 +1172,17 @@ export function useStudioViewModel() {
     generationPhase,
     operationStartedAt,
     announcement,
+    recoveryMessage,
+    activeMockupViewIndex,
+    designHistory,
     online,
     quoteExpired,
+    artworkReady,
+    checkoutReadiness,
+    canGenerateAnother,
+    canRevise,
     stepStates,
-    setPrompt,
+    setPrompt: updatePrompt,
     setRevision,
     setEmail,
     setSelectedCategory,
@@ -843,6 +1194,8 @@ export function useStudioViewModel() {
     generate,
     cancelGeneration,
     reviseDraft,
+    undoDraft,
+    setActiveMockupViewIndex,
     createMockup,
     createQuote,
     buyStudioPass,

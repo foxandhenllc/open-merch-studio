@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AllowanceMeter } from '@components/AllowanceMeter';
 import { CatalogPanel } from '@components/CatalogPanel';
 import { GenerationStage } from '@components/GenerationStage';
@@ -18,12 +18,11 @@ import type { PolicyRoute } from './App.types';
 const money = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 const normalizedPathname = () => window.location.pathname.replace(/\/+$/, '') || '/';
-const providerState = (value?: string): ProviderState =>
-  value === 'openai' || value === 'stripe' || value === 'printful'
-    ? 'live'
-    : value === 'openai-ready' || value === 'stripe-ready' || value === 'printful-ready'
-      ? 'ready'
-      : 'fixture';
+const providerState = (
+  online: boolean,
+  configured: ProviderState,
+  working: boolean
+): ProviderState => (!online ? 'offline' : working ? 'working' : configured);
 
 const policyRoutes: Record<string, PolicyRoute> = {
   '/privacy': {
@@ -200,10 +199,6 @@ function StudioApp() {
     order?: OrderSummary;
     message: string;
   } | null>(null);
-  const designHeading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    if (['drafted', 'quoted', 'confirmed'].includes(vm.flow)) designHeading.current?.focus();
-  }, [vm.flow]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutState = params.get('checkout');
@@ -293,24 +288,39 @@ function StudioApp() {
     : !vm.prompt.trim()
       ? 'Describe your design to generate a draft.'
       : '';
-  const quoteReason =
-    !vm.selectedProduct || !vm.selectedVariant ? 'Choose an available product variant first.' : '';
-  const checkoutReason = vm.quoteExpired
-    ? 'Refresh the expired quote before checkout.'
-    : vm.quoteStale
-      ? 'Update the price before checkout.'
-      : !vm.quote
-        ? 'Calculate the price before checkout.'
-        : '';
+  const checkoutReason = vm.checkoutReadiness.blocker;
   const showLedger = Boolean(
-    vm.quote ||
+    vm.artworkReady &&
+    (vm.quote ||
     vm.busy.quoting ||
     vm.flow === 'quoted' ||
     vm.flow === 'quote_stale' ||
-    vm.flow === 'quote_expired'
+    vm.flow === 'quote_expired')
   );
   const firstTee =
     vm.products.find((product) => product.categorySlug === 'apparel') ?? vm.products[0];
+  const focusElement = (id: string) => {
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(id);
+      target?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      target?.focus({ preventScroll: true });
+    });
+  };
+  const navigateStep = (step: 'product' | 'make' | 'price' | 'order') => {
+    if (step === 'product') {
+      if (window.matchMedia('(max-width: 1439px)').matches) setCatalogOpen(true);
+      focusElement('catalog-title');
+      return;
+    }
+    if (step === 'price') {
+      if (!vm.quote) return;
+      setLedgerOpen(true);
+      focusElement('price-ledger-title');
+      return;
+    }
+    if (step === 'order' && !vm.checkoutReadiness.canOpen) return;
+    vm.navigate(step);
+  };
 
   return (
     <main className="app-shell">
@@ -333,19 +343,23 @@ function StudioApp() {
         <div className="provider-bar" aria-label="Provider status">
           <ProviderChip
             label="AI"
-            state={!vm.online ? 'offline' : providerState(vm.design?.provider)}
+            state={providerState(
+              vm.online,
+              vm.capabilities.ai,
+              vm.busy.generating || vm.busy.refining || vm.busy.revising
+            )}
           />
           <ProviderChip
             label="Checkout"
-            state={!vm.online ? 'offline' : providerState(vm.checkout?.mode)}
+            state={providerState(
+              vm.online,
+              vm.capabilities.checkout,
+              vm.busy.checkout || vm.flow === 'redirecting'
+            )}
           />
           <ProviderChip
             label="Fulfillment"
-            state={
-              !vm.online
-                ? 'offline'
-                : providerState(vm.order?.fulfillment.provider || vm.mockup?.provider)
-            }
+            state={providerState(vm.online, vm.capabilities.fulfillment, vm.busy.mockup)}
           />
         </div>
         <nav className="header-links" aria-label="Project links">
@@ -427,11 +441,19 @@ function StudioApp() {
         </div>
       )}
 
-      <StepRail states={vm.stepStates} onNavigate={vm.navigate} />
+      {vm.recoveryMessage && (
+        <div className="checkout-return">
+          <StatusNote tone="info" title="Your guest session was recovered">
+            <p>{vm.recoveryMessage}</p>
+          </StatusNote>
+        </div>
+      )}
 
-      <section className={`workbench ${showLedger ? 'has-ledger' : ''}`}>
+      <StepRail states={vm.stepStates} onNavigate={navigateStep} />
+
+      <section className={`workbench ${showLedger && ledgerOpen ? 'has-ledger' : ''}`}>
         <div
-          className={`sheet-backdrop ${catalogOpen || ledgerOpen ? 'is-open' : ''}`}
+          className={`sheet-backdrop ${catalogOpen ? 'is-open' : ''} ${ledgerOpen ? 'is-ledger-open' : ''}`}
           onClick={() => {
             setCatalogOpen(false);
             setLedgerOpen(false);
@@ -454,7 +476,11 @@ function StudioApp() {
           />
         </div>
 
-        <section className="workspace" id="step-make">
+        <section
+          className={`workspace ${vm.selectedProduct ? 'has-product' : ''}`}
+          id="step-make"
+          tabIndex={-1}
+        >
           {vm.selectedProduct && (
             <button className="change-product" type="button" onClick={() => setCatalogOpen(true)}>
               <span>Product</span>
@@ -477,6 +503,8 @@ function StudioApp() {
             onContinueWithoutMockup={vm.createQuote}
             error={vm.errors.mockup}
             orientation={vm.selectedOrientation}
+            activeViewIndex={vm.activeMockupViewIndex}
+            onViewIndexChange={vm.setActiveMockupViewIndex}
           />
 
           {!vm.selectedProduct && (
@@ -504,11 +532,23 @@ function StudioApp() {
               <div className="section-heading">
                 <div>
                   <span className="kicker">Active step</span>
-                  <h2 id="design-controls-title" ref={designHeading} tabIndex={-1}>
+                  <h2 id="design-controls-title" tabIndex={-1}>
                     {vm.design ? 'Make and refine' : 'Describe your design'}
                   </h2>
                 </div>
-                <span className="mono session-id">{vm.session?.id}</span>
+                {vm.session?.id && (
+                  <details className="support-details">
+                    <summary>Support details</summary>
+                    <code>{vm.session.id}</code>
+                    <button
+                      className="text-action"
+                      type="button"
+                      onClick={() => void navigator.clipboard?.writeText(vm.session?.id ?? '')}
+                    >
+                      Copy session reference
+                    </button>
+                  </details>
+                )}
               </div>
               <div className="selection-grid">
                 <label>
@@ -520,7 +560,11 @@ function StudioApp() {
                     {vm.selectedProduct.variants.map((variant) => (
                       <option key={variant.id} value={variant.id} disabled={!variant.isAvailable}>
                         {variant.name} —{' '}
-                        {variant.isAvailable ? money(variant.costCents) : 'unavailable'}
+                        {variant.isAvailable
+                          ? variant.retailEstimateCents
+                            ? `est. ${money(variant.retailEstimateCents)}`
+                            : 'estimate after selection'
+                          : 'unavailable'}
                       </option>
                     ))}
                   </select>
@@ -602,73 +646,123 @@ function StudioApp() {
                 </div>
               )}
               <div className="control-actions">
-                <div>
-                  <button
-                    className="button button--primary"
-                    type="button"
-                    onClick={vm.generate}
-                    disabled={Boolean(promptReason) || vm.busy.generating}
-                  >
-                    {vm.busy.generating ? 'Generating draft…' : 'Generate rough draft'}
-                  </button>
-                  {promptReason && <small id="prompt-disabled-reason">{promptReason}</small>}
-                </div>
-                <button
-                  className="button button--secondary"
-                  type="button"
-                  onClick={vm.refineIdea}
-                  disabled={!vm.prompt.trim() || vm.busy.refining}
-                >
-                  {vm.busy.refining ? 'Refining…' : 'Refine prompt'}
-                </button>
-                <div>
-                  <button
-                    className="button button--secondary"
-                    type="button"
-                    onClick={vm.createQuote}
-                    disabled={Boolean(quoteReason) || vm.busy.quoting}
-                  >
-                    {vm.busy.quoting
-                      ? 'Calculating…'
-                      : vm.quote
-                        ? 'Update price'
-                        : 'Calculate price'}
-                  </button>
-                  {quoteReason && <small>{quoteReason}</small>}
-                </div>
+                {!vm.design ? (
+                  <>
+                    <div>
+                      <button
+                        className="button button--primary"
+                        type="button"
+                        onClick={vm.generate}
+                        disabled={Boolean(promptReason) || vm.busy.generating}
+                      >
+                        {vm.busy.generating ? 'Generating draft…' : 'Generate rough draft'}
+                      </button>
+                      {promptReason && <small id="prompt-disabled-reason">{promptReason}</small>}
+                    </div>
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      onClick={vm.refineIdea}
+                      disabled={!vm.prompt.trim() || vm.busy.refining}
+                    >
+                      {vm.busy.refining ? 'Refining…' : 'Refine prompt'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="button button--primary"
+                      type="button"
+                      onClick={() => navigateStep('price')}
+                      disabled={!vm.quote || vm.busy.quoting || vm.quoteStale || vm.quoteExpired}
+                    >
+                      {vm.busy.quoting ? 'Preparing estimate…' : 'Review price'}
+                    </button>
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      onClick={vm.generate}
+                      disabled={
+                        !vm.canGenerateAnother || Boolean(promptReason) || vm.busy.generating
+                      }
+                    >
+                      {vm.busy.generating ? 'Generating…' : 'Generate another'}
+                    </button>
+                  </>
+                )}
               </div>
               <ErrorNote error={vm.errors.generation} onRetry={vm.generate} />
               {vm.design && (
                 <>
                   <ReadinessChecks draft={vm.design} />
-                  <AllowanceMeter
-                    allowance={vm.design.allowance}
-                    onBuyPass={vm.buyStudioPass}
-                    busy={vm.busy.pass}
-                  />
-                  <label className="revision-field">
-                    <span>Revision instructions</span>
-                    <textarea
-                      rows={3}
-                      value={vm.revision}
-                      onChange={(event) => vm.setRevision(event.target.value)}
+                  <details className="refine-panel">
+                    <summary>
+                      <span>
+                        <b>Refine</b>
+                        <small>Create another generated variation or restore the prior draft.</small>
+                      </span>
+                      <span>{vm.design.allowance.editsRemaining} edits available</span>
+                    </summary>
+                    <AllowanceMeter
+                      allowance={vm.design.allowance}
+                      onBuyPass={vm.buyStudioPass}
+                      busy={vm.busy.pass}
                     />
-                    <button
-                      className="button button--secondary"
-                      type="button"
-                      onClick={vm.reviseDraft}
-                      disabled={!vm.design.id || !vm.revision.trim() || vm.busy.revising}
-                    >
-                      {vm.busy.revising ? 'Applying edit…' : 'Apply edit'}
-                    </button>
-                  </label>
+                    <label className="revision-field">
+                      <span>Variation instructions</span>
+                      <textarea
+                        rows={3}
+                        value={vm.revision}
+                        onChange={(event) => vm.setRevision(event.target.value)}
+                        placeholder="For example: simplify the border and make the main subject larger"
+                      />
+                      <small>
+                        This regenerates the artwork as a new variation; it is not a precise pixel
+                        edit.
+                      </small>
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        onClick={vm.reviseDraft}
+                        disabled={
+                          !vm.canRevise || !vm.revision.trim() || vm.busy.revising
+                        }
+                      >
+                        {vm.busy.revising ? 'Creating variation…' : 'Create variation'}
+                      </button>
+                    </label>
+                    {!vm.canRevise && (
+                      <StatusNote tone="info" title="Want another variation?">
+                        <p>
+                          The $5 Studio Pass includes two variations and a $5 credit toward an
+                          eligible order. Your current artwork stays selected until you choose to
+                          replace it.
+                        </p>
+                        <div className="status-note__actions">
+                          <button
+                            className="button button--secondary"
+                            type="button"
+                            onClick={vm.buyStudioPass}
+                            disabled={vm.busy.pass}
+                          >
+                            {vm.busy.pass ? 'Opening…' : 'Get Studio Pass'}
+                          </button>
+                        </div>
+                      </StatusNote>
+                    )}
+                    {vm.designHistory.length > 0 && (
+                      <button className="text-action" type="button" onClick={vm.undoDraft}>
+                        Undo to previous draft
+                      </button>
+                    )}
+                  </details>
                 </>
               )}
             </section>
           )}
 
-          <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
-          {vm.quote && (
+          {vm.artworkReady && <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />}
+          {vm.artworkReady && vm.quote && (
             <button
               className="mobile-ledger-summary"
               id="step-price"
@@ -683,8 +777,8 @@ function StudioApp() {
             </button>
           )}
 
-          {vm.quote && (
-            <section className="checkout-section" id="step-order">
+          {vm.artworkReady && vm.quote && (
+            <section className="checkout-section" id="step-order" tabIndex={-1}>
               <div className="section-heading">
                 <div>
                   <span className="kicker">Review and order</span>
@@ -706,13 +800,14 @@ function StudioApp() {
                       value={vm.email}
                       onChange={(event) => vm.setEmail(event.target.value)}
                       placeholder="you@example.com"
+                      aria-describedby="checkout-readiness-message"
                     />
                   </label>
                   <button
                     className="button button--primary button--wide"
                     type="button"
                     onClick={vm.createCheckout}
-                    disabled={Boolean(checkoutReason) || vm.busy.checkout}
+                    disabled={!vm.checkoutReadiness.ready || vm.busy.checkout}
                   >
                     {vm.busy.checkout
                       ? 'Submitting — don’t refresh…'
@@ -727,7 +822,13 @@ function StudioApp() {
                       Checkout is not yet enabled. Your design and quote stay in this session.
                     </p>
                   )}
-                  {checkoutReason && <p className="disabled-reason">{checkoutReason}</p>}
+                  <p
+                    className={checkoutReason ? 'checkout-gate is-blocked' : 'checkout-gate'}
+                    id="checkout-readiness-message"
+                    role="status"
+                  >
+                    {checkoutReason || vm.checkoutReadiness.fulfillmentReview}
+                  </p>
                   {vm.checkout?.status === 'blocked' && (
                     <StatusNote tone="warning" title="Checkout opens soon">
                       <p>{vm.checkout.message} Your design and quote stay in this session.</p>
@@ -787,33 +888,31 @@ function StudioApp() {
           <button
             className="button button--primary"
             type="button"
-            onClick={
-              !vm.design
-                ? vm.generate
-                : !vm.quote || vm.quoteStale
-                  ? vm.createQuote
-                  : vm.createCheckout
-            }
+            onClick={() => {
+              if (!vm.design) void vm.generate();
+              else if (vm.checkoutReadiness.canOpen) navigateStep('order');
+              else vm.navigate('make');
+            }}
             disabled={
-              !vm.selectedProduct ||
               (!vm.design && Boolean(promptReason)) ||
-              (Boolean(vm.quote) && Boolean(checkoutReason))
+              Boolean(vm.design && vm.busy.quoting) ||
+              Boolean(vm.design && !vm.artworkReady)
             }
           >
             {!vm.design
               ? 'Generate rough draft'
-              : !vm.quote || vm.quoteStale
-                ? 'Calculate price'
+              : vm.busy.quoting || !vm.quote
+                ? 'Preparing estimate…'
                 : 'Continue to order'}
           </button>
           <small>
-            {!vm.selectedProduct
-              ? 'Choose a product to begin.'
-              : !vm.design
+            {!vm.design
                 ? promptReason
-                : !vm.quote
-                  ? quoteReason
-                  : checkoutReason}
+                : !vm.artworkReady
+                  ? 'Resolve the artwork check above before checkout.'
+                  : vm.busy.quoting || !vm.quote
+                    ? 'Your estimate updates automatically.'
+                    : 'Review the estimate, then enter your receipt email.'}
           </small>
         </div>
       )}

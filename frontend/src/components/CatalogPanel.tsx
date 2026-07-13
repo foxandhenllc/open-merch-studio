@@ -28,7 +28,7 @@ export function CatalogPanel({
       <div className="section-heading">
         <div>
           <span className="kicker">Curated catalog</span>
-          <h2>Choose a product</h2>
+          <h2 id="catalog-title" tabIndex={-1}>Choose a product</h2>
         </div>
         {onClose && (
           <button
@@ -102,15 +102,15 @@ export function CatalogPanel({
                 />
                 <span className="product-row__copy">
                   <strong>{product.title}</strong>
-                  <small>
-                    {product.categoryTitle || product.type || 'Catalog item'} ·{' '}
-                    {product.placements.length} placement
-                    {product.placements.length === 1 ? '' : 's'}
-                  </small>
+                  <small>{product.categoryTitle || product.type || 'Catalog item'}</small>
                 </span>
                 <span className="product-row__price">
-                  <small>from</small>
-                  <b>{variant ? money(variant.costCents) : 'Price after sync'}</b>
+                  <small>estimated from</small>
+                  <b>
+                    {variant?.retailEstimateCents
+                      ? money(variant.retailEstimateCents)
+                      : 'After sync'}
+                  </b>
                 </span>
               </button>
             );

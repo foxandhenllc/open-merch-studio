@@ -1,9 +1,16 @@
+import { useEffect, useState } from 'react';
 import type { DesignDraft } from '@app-types/catalog';
 
 export function ReadinessChecks({ draft }: { draft: DesignDraft }) {
+  const [open, setOpen] = useState(draft.readiness.status !== 'pass');
+  useEffect(() => setOpen(draft.readiness.status !== 'pass'), [draft.id, draft.readiness.status]);
   return (
-    <section className="readiness" aria-label="Print readiness checks">
-      <div className="section-heading">
+    <details
+      className="readiness"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="section-heading">
         <div>
           <span className="kicker">Production check</span>
           <h3>Print readiness</h3>
@@ -13,7 +20,7 @@ export function ReadinessChecks({ draft }: { draft: DesignDraft }) {
         >
           {draft.readiness.status.replace('_', ' ')}
         </span>
-      </div>
+      </summary>
       <div className="readiness__list">
         {draft.readiness.checks.map((check) => (
           <div key={check.label} className={`readiness__item is-${check.severity ?? 'pass'}`}>
@@ -25,6 +32,6 @@ export function ReadinessChecks({ draft }: { draft: DesignDraft }) {
           </div>
         ))}
       </div>
-    </section>
+    </details>
   );
 }

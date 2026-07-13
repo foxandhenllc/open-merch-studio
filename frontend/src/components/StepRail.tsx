@@ -42,6 +42,7 @@ export function StepRail({
             }}
             type="button"
             className={`step-rail__item is-${state}`}
+            aria-label={`Step ${index + 1}: ${step.label}${state === 'stale' ? ' — update required' : ''}`}
             aria-current={state === 'active' ? 'step' : undefined}
             disabled={!enabled}
             onClick={() => onNavigate(step.id)}

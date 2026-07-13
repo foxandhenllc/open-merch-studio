@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
+import { HttpError } from '../middleware.js';
 import type { DesignDraft, DesignIdea, DesignMockup } from '../types/catalog.js';
 import {
   createMockDesignImage,
@@ -408,7 +409,7 @@ export async function createDesignDraft(
         estimatedCostCents: generated.estimatedCostCents,
       });
     }
-    return draft;
+    return saveDraft({ ...draft, allowance: getAllowanceState(session.id) });
   }
 
   try {
@@ -442,7 +443,7 @@ export async function createDesignDraft(
       imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
       qualityTier,
       printPreparation,
-      allowance,
+      allowance: getAllowanceState(session.id),
       policy,
       readiness,
       createdAt: runtimeNow(),
@@ -464,7 +465,7 @@ export async function createDesignDraft(
       imageUrl: preparedImageUrl,
       qualityTier,
       printPreparation,
-      allowance,
+      allowance: getAllowanceState(session.id),
       policy,
       readiness,
       createdAt: runtimeNow(),
@@ -485,30 +486,11 @@ export async function reviseDesignDraft(params: {
     canUseLiveOpenAi() ? 12 : 1
   );
   if (!authorization.allowed) {
-    return {
-      id: null,
-      sessionId: session.id,
-      provider: 'mock',
-      prompt: params.instructions,
-      imageUrl: createMockDesignImage('Studio Pass required').imageUrl,
-      qualityTier: 'rough',
-      allowance: authorization.allowance,
-      policy: {
-        status: 'needs_review',
-        reasons: [authorization.message ?? authorization.allowance.message],
-      },
-      readiness: {
-        status: 'blocked',
-        checks: [
-          {
-            label: 'Revision paused',
-            result: authorization.message ?? 'Buy a Studio Pass to continue revisions.',
-            severity: 'block',
-          },
-        ],
-      },
-      createdAt: runtimeNow(),
-    };
+    throw new HttpError(
+      authorization.message ?? 'A Studio Pass is required to create another variation.',
+      409,
+      'revision_allowance_required'
+    );
   }
   await recordDesignSpend({
     sessionId: session.id,
@@ -524,6 +506,48 @@ export async function reviseDesignDraft(params: {
       skipAllowanceSpend: true,
     }
   );
+}
+
+export async function getDesignDraftById(
+  draftId: string,
+  sessionId?: string
+): Promise<DesignDraft | null> {
+  const runtimeDraft = getDraft(draftId);
+  if (runtimeDraft) {
+    const allowance = sessionId
+      ? getAllowanceState((await getOrCreateDurableSession(sessionId)).id)
+      : runtimeDraft.allowance;
+    return { ...runtimeDraft, allowance };
+  }
+
+  if (!env.databaseUrl) return null;
+  try {
+    const asset = await prisma.designAsset.findUnique({ where: { id: draftId } });
+    if (!asset || !asset.imageUrl || asset.generationStatus !== 'complete') return null;
+    const session = await getOrCreateDurableSession(sessionId);
+    const policy = (asset.policyReport as DesignDraft['policy'] | null) ?? {
+      status: asset.policyStatus as DesignDraft['policy']['status'],
+      reasons: [],
+    };
+    const readiness = (asset.readinessReport as DesignDraft['readiness'] | null) ?? {
+      status: asset.readinessStatus as DesignDraft['readiness']['status'],
+      checks: [],
+    };
+    return saveDraft({
+      id: asset.id,
+      sessionId: session.id,
+      provider: asset.provider as DesignDraft['provider'],
+      prompt: asset.prompt,
+      imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
+      qualityTier: 'rough',
+      allowance: getAllowanceState(session.id),
+      policy,
+      readiness,
+      createdAt: asset.createdAt.toISOString(),
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function checkReadiness(params: {

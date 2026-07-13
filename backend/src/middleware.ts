@@ -3,10 +3,12 @@ import { env } from './config/env.js';
 
 export class HttpError extends Error {
   statusCode: number;
+  errorCode?: string;
 
-  constructor(message: string, statusCode = 500) {
+  constructor(message: string, statusCode = 500, errorCode?: string) {
     super(message);
     this.statusCode = statusCode;
+    this.errorCode = errorCode;
   }
 }
 
@@ -28,6 +30,7 @@ export function errorHandler(error: Error, _req: Request, res: Response, _next: 
   res.status(statusCode).json({
     success: false,
     error: error.message || 'Internal server error',
+    errorCode: error instanceof HttpError ? error.errorCode : undefined,
   });
 }
 

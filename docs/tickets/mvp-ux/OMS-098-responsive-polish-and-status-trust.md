@@ -1,6 +1,6 @@
 # OMS-098: Responsive Polish And Provider-Status Trust
 
-**Status:** Ready  
+**Status:** MVP trust/accessibility subset implemented (2026-07-12)
 **Priority:** P2, with trust/accessibility subset promoted to P1  
 **MVP timing:** Trust/accessibility fixes in MVP; richer selectors after payment QA  
 **Visibility:** Public  
@@ -78,3 +78,10 @@ Customers can see every important control/status at narrow widths and can trust 
 
 - Provider capability reporting should not expose credentials or operational secrets.
 - Custom swatches must not replace a more accessible native control until keyboard and screen-reader parity is verified.
+
+## Implementation Notes
+
+- Provider chips now use server-reported capability plus active-operation state and consistently present `Available`, `Working`, `Live`, `Demo`, or `Offline` without exposing credentials.
+- Provider chips, category controls, progress labels, and entry actions remain visible without page-level clipping at the specified narrow viewports.
+- Shopper surfaces no longer expose placement counts or the raw session ID, and the empty-stage arrow was removed.
+- Separate apparel color/size controls and custom swatches remain intentionally deferred until after payment QA; the synchronized native variant selector remains the accessible MVP control.

@@ -155,7 +155,7 @@ function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
   };
 }
 
-async function loadQuoteForCheckout(quoteId?: string | null): Promise<QuoteBreakdown | undefined> {
+export async function getQuoteById(quoteId?: string | null): Promise<QuoteBreakdown | undefined> {
   const runtimeQuote = getQuote(quoteId);
   if (runtimeQuote || !quoteId || !env.databaseUrl) return runtimeQuote;
 
@@ -432,7 +432,7 @@ export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<s
 
 export async function createCheckoutSession(input: CheckoutInput): Promise<CheckoutSession> {
   const settings = getRuntimeSettings();
-  const quote = await loadQuoteForCheckout(input.quoteId);
+  const quote = await getQuoteById(input.quoteId);
   if (!quote) {
     return {
       id: runtimeId('checkout'),

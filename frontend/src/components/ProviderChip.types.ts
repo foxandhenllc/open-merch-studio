@@ -1,1 +1,1 @@
-export type ProviderState = 'fixture' | 'live' | 'ready' | 'offline';
+export type ProviderState = 'available' | 'working' | 'live' | 'demo' | 'offline';

@@ -7,6 +7,7 @@ import {
   createDesignMockup,
   reviseDesignDraft,
   getDesignAssetImage,
+  getDesignDraftById,
 } from '../services/design.service.js';
 import { getAllowanceState, getOrCreateDurableSession } from '../services/runtime-store.js';
 
@@ -51,6 +52,15 @@ export const postDesignDraft = asyncHandler(async (req: Request, res: Response) 
     qualityTier: req.body?.qualityTier === 'final' ? 'final' : 'rough',
   });
   res.status(201).json({ success: true, data: draft });
+});
+
+export const getDesignDraft = asyncHandler(async (req: Request, res: Response) => {
+  const draft = await getDesignDraftById(
+    String(req.params.id ?? ''),
+    String(req.query.sessionId ?? '') || undefined
+  );
+  if (!draft) throw new HttpError('Saved artwork is no longer available.', 404, 'draft_not_found');
+  res.json({ success: true, data: draft });
 });
 
 export const postDesignRevision = asyncHandler(async (req: Request, res: Response) => {

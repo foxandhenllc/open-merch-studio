@@ -1,6 +1,6 @@
 # OMS-095: Revision Safety And Guest-Session Recovery
 
-**Status:** Ready  
+**Status:** Implemented for MVP (2026-07-12)
 **Priority:** P0  
 **MVP timing:** Before external paid beta  
 **Visibility:** Public  
@@ -88,3 +88,10 @@ Customers can experiment without losing paid/generated work, spending an edit th
 - Coordinate with OMS-052/OMS-054 so checkout return state and session restoration use the same order reference.
 - Never store provider secrets or payment details in browser persistence.
 - Server policy/readiness remains authoritative even when client state is restored.
+
+## Implementation Notes
+
+- Unauthorized revisions now return a typed `409 revision_allowance_required` response and cannot replace the current draft, mockup, quote, or provider state.
+- The workbench prevents empty or unavailable revisions, labels them as regenerated variations, retains draft history, and offers undo.
+- Versioned guest state persists only safe identifiers and customer inputs; draft and quote records are rehydrated from authoritative server endpoints.
+- Invalid saved references are cleared with a specific recovery message, and checkout remains gated on current server-backed artwork readiness.

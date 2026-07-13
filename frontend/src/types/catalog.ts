@@ -26,6 +26,13 @@ export type CatalogVariant = {
   imageUrl?: string | null;
   isAvailable: boolean;
   costCents: number;
+  retailEstimateCents?: number;
+};
+
+export type StudioCapabilities = {
+  ai: 'live' | 'available' | 'demo' | 'offline';
+  checkout: 'live' | 'available' | 'demo' | 'offline';
+  fulfillment: 'live' | 'available' | 'demo' | 'offline';
 };
 
 export type CatalogProduct = {

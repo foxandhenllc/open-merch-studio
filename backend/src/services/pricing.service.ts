@@ -56,6 +56,23 @@ export function calculateTargetMarginCents(
   );
 }
 
+export function estimateRetailTotalCents(
+  productCostCents: number,
+  productType?: string | null,
+  settings = pricingSettingsFromEnv()
+): number {
+  const itemRetailCents =
+    productCostCents +
+    calculateTargetMarginCents(productCostCents, productType, settings) +
+    settings.aiDesignFeeCents;
+  const shippingEstimateCents = estimateShippingCents(1);
+  return (
+    itemRetailCents +
+    shippingEstimateCents +
+    calculatePaymentFeeCents(itemRetailCents + shippingEstimateCents, settings)
+  );
+}
+
 export function buildQuoteBreakdown(
   products: CatalogProductDto[],
   inputItems: QuoteLineInput[],
@@ -152,31 +169,31 @@ export function buildQuoteBreakdown(
   const costLines: QuoteBreakdown['costLines'] = [
     {
       code: 'product-cost',
-      label: 'Product and fulfillment base',
+      label: 'Product & printing',
       amountCents: productCostCents,
       kind: 'cost',
     },
     {
       code: 'design-allocation',
-      label: 'Design readiness allocation',
+      label: 'Design work',
       amountCents: aiDesignFeeCents,
       kind: 'fee',
     },
     {
       code: 'margin',
-      label: 'Studio margin',
+      label: 'Open Merch Studio margin',
       amountCents: targetMarginCents,
       kind: 'margin',
     },
     {
       code: 'shipping-estimate',
-      label: 'Shipping estimate',
+      label: 'Estimated shipping',
       amountCents: shippingEstimateCents,
       kind: 'estimate',
     },
     {
       code: 'payment-fee-estimate',
-      label: 'Payment fee estimate',
+      label: 'Card processing estimate',
       amountCents: paymentFeeCents,
       kind: 'estimate',
     },

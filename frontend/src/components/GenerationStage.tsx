@@ -24,6 +24,8 @@ export function GenerationStage({
   onContinueWithoutMockup,
   error,
   orientation,
+  activeViewIndex,
+  onViewIndexChange,
 }: {
   product: CatalogProduct | null;
   variant: CatalogVariant | null;
@@ -39,17 +41,17 @@ export function GenerationStage({
   onContinueWithoutMockup: () => void;
   error?: { title: string; message: string; recovery: string };
   orientation?: 'portrait' | 'landscape' | 'square';
+  activeViewIndex: number;
+  onViewIndexChange: (index: number) => void;
 }) {
   const [, tick] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
-  const [activeViewIndex, setActiveViewIndex] = useState(0);
   useEffect(() => {
     if (!generating && !mockupBusy) return undefined;
     const timer = window.setInterval(() => tick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [generating, mockupBusy]);
   useEffect(() => setImageFailed(false), [draft?.imageUrl, mockup?.imageUrl]);
-  useEffect(() => setActiveViewIndex(0), [mockup?.id]);
 
   if (!product || !variant) {
     return (
@@ -108,7 +110,7 @@ export function GenerationStage({
                   aria-pressed={index === activeViewIndex}
                   onClick={() => {
                     setImageFailed(false);
-                    setActiveViewIndex(index);
+                    onViewIndexChange(index);
                   }}
                 >
                   <img src={view.imageUrl} alt="" />
@@ -142,12 +144,6 @@ export function GenerationStage({
         <div className="image-fallback">
           <strong>Preview image unavailable</strong>
           <span>Your draft is safe. Retry the preview when your connection returns.</span>
-        </div>
-      )}
-      {!draft && !generating && (
-        <div className="stage__hint">
-          <span aria-hidden="true">↗</span>
-          <p>Your artwork will appear here. Start with the design prompt beside the preview.</p>
         </div>
       )}
       {(generating || mockupBusy) && (

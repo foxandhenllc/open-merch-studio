@@ -8,6 +8,8 @@ import {
   listProducts,
 } from '../services/catalog.service.js';
 import type { QuoteLineInput } from '../types/catalog.js';
+import { getQuoteById } from '../services/order.service.js';
+import { env } from '../config/env.js';
 
 export const getCatalogHealth = asyncHandler(async (_req: Request, res: Response) => {
   res.json({
@@ -15,6 +17,26 @@ export const getCatalogHealth = asyncHandler(async (_req: Request, res: Response
     data: {
       service: 'open-merch-studio-api',
       catalog: catalogRuntime,
+      capabilities: {
+        ai:
+          env.openaiApiKey && env.enableLiveOpenAi
+            ? 'live'
+            : env.openaiApiKey
+              ? 'available'
+              : 'demo',
+        checkout:
+          env.stripeSecretKey && env.enableLiveStripe && env.checkoutEnabled
+            ? 'live'
+            : env.stripeSecretKey
+              ? 'available'
+              : 'demo',
+        fulfillment:
+          env.printfulApiKey && env.enableLivePrintful
+            ? 'live'
+            : env.printfulApiKey
+              ? 'available'
+              : 'demo',
+      },
     },
   });
 });
@@ -49,4 +71,10 @@ export const postQuote = asyncHandler(async (req: Request, res: Response) => {
     studioPassId: String(req.body?.studioPassId ?? '') || undefined,
   });
   res.status(201).json({ success: true, data: quote });
+});
+
+export const getQuote = asyncHandler(async (req: Request, res: Response) => {
+  const quote = await getQuoteById(String(req.params.id ?? ''));
+  if (!quote) throw new HttpError('Saved price estimate is no longer available.', 404);
+  res.json({ success: true, data: quote });
 });

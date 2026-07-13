@@ -41,8 +41,8 @@ export function QuoteLedger({
     >
       <div className="section-heading">
         <div>
-          <span className="kicker">Cost-plus ledger</span>
-          <h2>Your price</h2>
+          <span className="kicker">Transparent estimate</span>
+          <h2 id="price-ledger-title" tabIndex={-1}>Your price</h2>
         </div>
         {onClose && (
           <button
@@ -110,6 +110,10 @@ export function QuoteLedger({
             <span>Estimated total</span>
             <strong>{money(quote.totalCents, quote.currency)}</strong>
           </div>
+          <p className="ledger-promise">
+            We show product, printing, design, and operating costs plainly. Shipping, tax, and card
+            processing can change when Stripe confirms the final address and payment method.
+          </p>
           <p className="ledger-expiry">
             Quote {expired ? 'expired' : `held for ${expiry}`} · taxes remain estimated until
             checkout.

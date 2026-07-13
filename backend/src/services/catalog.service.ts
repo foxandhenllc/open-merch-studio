@@ -10,7 +10,7 @@ import type {
   QuoteBreakdown,
   QuoteLineInput,
 } from '../types/catalog.js';
-import { buildQuoteBreakdown } from './pricing.service.js';
+import { buildQuoteBreakdown, estimateRetailTotalCents } from './pricing.service.js';
 import { getStudioPassById, getStudioPassForSession, saveQuote } from './runtime-store.js';
 
 const launchCategorySlugs = new Set(sampleCatalog.categories.map((category) => category.slug));
@@ -63,7 +63,15 @@ const decimalToCents = (value: Prisma.Decimal | number | string | null | undefin
 };
 
 const fixtureCategories = (): CatalogCategoryDto[] => sampleCatalog.categories;
-const fixtureProducts = (): CatalogProductDto[] => sampleCatalog.products;
+const withRetailEstimates = (product: CatalogProductDto): CatalogProductDto => ({
+  ...product,
+  variants: product.variants.map((variant) => ({
+    ...variant,
+    retailEstimateCents: estimateRetailTotalCents(variant.costCents, product.type),
+  })),
+});
+
+const fixtureProducts = (): CatalogProductDto[] => sampleCatalog.products.map(withRetailEstimates);
 
 const mapCategory = (category: {
   id: string;
@@ -115,6 +123,10 @@ const mapProduct = (product: ProductWithCatalog): CatalogProductDto => {
       ...curatedPosterVariants.filter((variant) => !existing.has(variant.printfulVariantId)),
     ];
   }
+  variants = variants.map((variant) => ({
+    ...variant,
+    retailEstimateCents: estimateRetailTotalCents(variant.costCents, product.type),
+  }));
 
   const placements: PlacementOption[] = product.placements.map((placement) => ({
     code: placement.code,

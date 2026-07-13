@@ -1,6 +1,6 @@
 # OMS-096: Guided Workbench Layout And Navigation
 
-**Status:** Ready  
+**Status:** Implemented for MVP (2026-07-12)
 **Priority:** P1  
 **MVP timing:** Same milestone as paid-beta polish  
 **Visibility:** Public  
@@ -81,3 +81,10 @@ Customers can understand where they are, what changed, and what to do next witho
 
 - Coordinate with OMS-097 if Price is collapsed into checkout.
 - Preserve the product-selection and mockup caches added for provider latency.
+
+## Implementation Notes
+
+- The laptop workbench no longer reserves an empty ledger rail; the compact composer and contained preview share the available canvas until pricing is opened.
+- Progress controls now open or focus their real destination, retain visible accessible labels, and avoid automatic smooth-scroll focus changes.
+- Primary actions advance with the journey—generate, review price, then checkout—while regeneration and revision remain allowance-aware secondary actions.
+- Passing readiness checks, refinement controls, and the support session reference use progressive disclosure.

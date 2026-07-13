@@ -254,7 +254,23 @@ let localDraftCount = 0;
 const localId = (prefix: string) => `${prefix}_${Date.now().toString(36)}`;
 
 export function localProductsForCategory(category?: string): CatalogProduct[] {
-  return category ? localProducts.filter((product) => product.categorySlug === category) : localProducts;
+  const products = category
+    ? localProducts.filter((product) => product.categorySlug === category)
+    : localProducts;
+  return products.map((product) => ({
+    ...product,
+    variants: product.variants.map((variant) => {
+      const itemRetailCents = variant.costCents + marginFor(variant.costCents, product.type) + 300;
+      const shippingEstimateCents = shippingFor(1);
+      return {
+        ...variant,
+        retailEstimateCents:
+          itemRetailCents +
+          shippingEstimateCents +
+          paymentFeeFor(itemRetailCents + shippingEstimateCents),
+      };
+    }),
+  }));
 }
 
 export function createLocalQuote(
@@ -317,11 +333,11 @@ export function createLocalQuote(
     totalCents: subtotalBeforeCreditsCents - studioPassCreditCents,
     estimateFlags: { shipping: true, tax: true, paymentFee: true },
     costLines: [
-      { code: 'product-cost', label: 'Product and fulfillment base', amountCents: productCostCents, kind: 'cost' },
-      { code: 'design-allocation', label: 'Design readiness allocation', amountCents: quantity * 300, kind: 'fee' },
-      { code: 'margin', label: 'Studio margin', amountCents: targetMarginCents, kind: 'margin' },
-      { code: 'shipping-estimate', label: 'Shipping estimate', amountCents: shippingEstimateCents, kind: 'estimate' },
-      { code: 'payment-fee-estimate', label: 'Payment fee estimate', amountCents: paymentFeeCents, kind: 'estimate' },
+      { code: 'product-cost', label: 'Product & printing', amountCents: productCostCents, kind: 'cost' },
+      { code: 'design-allocation', label: 'Design work', amountCents: quantity * 300, kind: 'fee' },
+      { code: 'margin', label: 'Open Merch Studio margin', amountCents: targetMarginCents, kind: 'margin' },
+      { code: 'shipping-estimate', label: 'Estimated shipping', amountCents: shippingEstimateCents, kind: 'estimate' },
+      { code: 'payment-fee-estimate', label: 'Card processing estimate', amountCents: paymentFeeCents, kind: 'estimate' },
       ...(studioPassCreditCents
         ? [
             {
@@ -338,11 +354,11 @@ export function createLocalQuote(
   };
 }
 
-export function createLocalSession(): StudioSession {
+export function createLocalSession(sessionId?: string): StudioSession {
   if (localSession) return { ...localSession, studioPass: localPass ?? undefined };
   const now = new Date().toISOString();
   localSession = {
-    id: localId('sess'),
+    id: sessionId || localId('sess'),
     status: 'guest',
     freeDraftsUsed: 0,
     freeDraftLimit: 1,
@@ -414,13 +430,13 @@ export function createLocalDesignDraft(prompt: string, sessionId?: string): Desi
     qualityTier: 'rough',
     allowance: {
       sessionId: sessionId ?? session.id,
-      studioPassStatus: localPass ? 'available' : localDraftCount > 1 ? 'required' : 'not_required',
-      freeDraftsRemaining: localDraftCount > 1 ? 0 : 1,
+      studioPassStatus: localPass ? 'available' : localDraftCount >= 1 ? 'required' : 'not_required',
+      freeDraftsRemaining: Math.max(0, 1 - localDraftCount),
       roughDraftsRemaining: localPass ? Math.max(0, 8 - localPass.roughDraftsUsed) : 0,
       editsRemaining: localPass ? Math.max(0, 2 - localPass.editsUsed) : 0,
       finalsRemaining: localPass ? Math.max(0, 1 - localPass.finalsUsed) : 0,
-      nextAction: localPass || localDraftCount <= 1 ? 'continue_free' : 'buy_studio_pass',
-      message: localPass || localDraftCount <= 1
+      nextAction: localPass ? 'continue_free' : 'buy_studio_pass',
+      message: localPass
         ? 'You can keep designing within the current allowance.'
         : 'A $5 Studio Pass unlocks more drafts and applies to purchase.',
     },

@@ -1,6 +1,6 @@
 # OMS-097: Honest Pricing And Checkout Simplification
 
-**Status:** Ready  
+**Status:** Implemented for MVP (2026-07-12)
 **Priority:** P1  
 **MVP timing:** Minimum pricing changes before external paid beta; auto-quote in the same MVP milestone  
 **Visibility:** Public  
@@ -93,3 +93,10 @@ Customers understand the likely all-in price before investing in generation, see
 
 - Do not make the early estimate look guaranteed; shipping/tax remain provider/address dependent.
 - Automatic quote creation must not bypass artwork/readiness validation or increase provider calls unnecessarily.
+
+## Implementation Notes
+
+- Catalog rows and selected variants show a realistic estimated retail total before generation while retaining estimate language.
+- Ready artwork triggers a debounced, cancellable automatic quote; variant changes invalidate stale requests without requiring a manual calculate action.
+- The visible ledger uses customer-language labels and explains the cost-plus estimate while preserving internal accounting codes.
+- Checkout derives one readiness gate from artwork, quote, email, payment availability, and manual fulfillment review, with one adjacent blocker.

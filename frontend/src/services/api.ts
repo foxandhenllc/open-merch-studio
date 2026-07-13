@@ -8,6 +8,7 @@ import type {
   DesignMockup,
   OrderSummary,
   QuoteBreakdown,
+  StudioCapabilities,
   StudioSession,
 } from '@app-types/catalog';
 import {
@@ -93,6 +94,13 @@ async function withFallback<T>(
 }
 
 export const api = {
+  capabilities: () =>
+    withFallback(
+      request<{ capabilities: StudioCapabilities }>('/api/health').then(
+        (result) => result.capabilities
+      ),
+      () => ({ ai: 'demo', checkout: 'demo', fulfillment: 'demo' }) as StudioCapabilities
+    ),
   categories: () =>
     withFallback(request<CatalogCategory[]>('/api/catalog/categories'), () => localCategories),
   products: (category?: string) => {
@@ -112,13 +120,20 @@ export const api = {
       orientation?: 'portrait' | 'landscape' | 'square';
       designAssetId?: string;
     }>;
-  }) =>
+  }, signal?: AbortSignal) =>
     withFallback(
       request<QuoteBreakdown>('/api/catalog/quotes', {
         method: 'POST',
         body: JSON.stringify(body),
-      }),
+      }, signal),
       () => createLocalQuote(body.items, body.studioPassId)
+    ),
+  quoteById: (quoteId: string) =>
+    withFallback(
+      request<QuoteBreakdown>(`/api/catalog/quotes/${encodeURIComponent(quoteId)}`),
+      () => {
+        throw new Error('Saved demo estimates are not available after a refresh.');
+      }
     ),
   session: (sessionId?: string) =>
     withFallback(
@@ -126,7 +141,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ sessionId }),
       }),
-      () => createLocalSession()
+      () => createLocalSession(sessionId)
     ),
   designIdea: (body: {
     prompt: string;
@@ -160,6 +175,15 @@ export const api = {
       ),
       () => createLocalDesignDraft(body.prompt, body.sessionId)
     ),
+  designDraftById: (draftId: string, sessionId?: string) => {
+    const search = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
+    return withFallback(
+      request<DesignDraft>(`/api/design/drafts/${encodeURIComponent(draftId)}${search}`),
+      () => {
+        throw new Error('Saved demo artwork is not available after a refresh.');
+      }
+    );
+  },
   reviseDraft: (body: { draftId: string; instructions: string; sessionId?: string }) =>
     withFallback(
       request<DesignDraft>(`/api/design/drafts/${encodeURIComponent(body.draftId)}/revisions`, {
