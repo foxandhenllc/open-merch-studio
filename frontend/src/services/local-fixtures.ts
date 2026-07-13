@@ -14,17 +14,67 @@ import type {
 } from '@app-types/catalog';
 
 export const localCategories: CatalogCategory[] = [
-  { id: 'fixture-category-apparel', title: 'Apparel', slug: 'apparel', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-hats', title: 'Hats', slug: 'hats', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-drinkware', title: 'Drinkware', slug: 'drinkware', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-wall-art', title: 'Wall art', slug: 'wall-art', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-bags', title: 'Bags', slug: 'bags', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-stickers', title: 'Stickers', slug: 'stickers', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-phone-cases', title: 'Phone cases', slug: 'phone-cases', imageUrl: null, isLaunchCategory: true },
-  { id: 'fixture-category-stationery', title: 'Stationery', slug: 'stationery', imageUrl: null, isLaunchCategory: true },
+  {
+    id: 'fixture-category-apparel',
+    title: 'Apparel',
+    slug: 'apparel',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-hats',
+    title: 'Hats',
+    slug: 'hats',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-drinkware',
+    title: 'Drinkware',
+    slug: 'drinkware',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-wall-art',
+    title: 'Wall art',
+    slug: 'wall-art',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-bags',
+    title: 'Bags',
+    slug: 'bags',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-stickers',
+    title: 'Stickers',
+    slug: 'stickers',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-phone-cases',
+    title: 'Phone cases',
+    slug: 'phone-cases',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
+  {
+    id: 'fixture-category-stationery',
+    title: 'Stationery',
+    slug: 'stationery',
+    imageUrl: null,
+    isLaunchCategory: true,
+  },
 ];
 
-const defaultPlacement = [{ code: 'default', displayName: 'Default print area', technique: 'dtg', isDefault: true }];
+const defaultPlacement = [
+  { code: 'default', displayName: 'Default print area', technique: 'dtg', isDefault: true },
+];
 
 export const localProducts: CatalogProduct[] = [
   {
@@ -62,8 +112,22 @@ export const localProducts: CatalogProduct[] = [
       },
     ],
     placements: [
-      { code: 'front', displayName: 'Front print', technique: 'dtg', isDefault: true, width: 12, height: 16 },
-      { code: 'back', displayName: 'Back print', technique: 'dtg', isDefault: false, width: 12, height: 16 },
+      {
+        code: 'front',
+        displayName: 'Front print',
+        technique: 'dtg',
+        isDefault: true,
+        width: 12,
+        height: 16,
+      },
+      {
+        code: 'back',
+        displayName: 'Back print',
+        technique: 'dtg',
+        isDefault: false,
+        width: 12,
+        height: 16,
+      },
     ],
   },
   {
@@ -72,7 +136,8 @@ export const localProducts: CatalogProduct[] = [
     slug: 'structured-embroidered-cap',
     type: 'hat',
     brand: 'Fixture',
-    description: 'A six-panel cap with a flat front panel — built for crisp embroidered logos, badges, and short text.',
+    description:
+      'A six-panel cap with a flat front panel — built for crisp embroidered logos, badges, and short text.',
     thumbnailUrl: null,
     categorySlug: 'hats',
     categoryTitle: 'Hats',
@@ -105,7 +170,8 @@ export const localProducts: CatalogProduct[] = [
     slug: 'ceramic-mug',
     type: 'drinkware',
     brand: 'Fixture',
-    description: 'A dishwasher-safe 11oz mug with a full wraparound print — a go-to gift and desk companion.',
+    description:
+      'A dishwasher-safe 11oz mug with a full wraparound print — a go-to gift and desk companion.',
     thumbnailUrl: null,
     categorySlug: 'drinkware',
     categoryTitle: 'Drinkware',
@@ -130,7 +196,8 @@ export const localProducts: CatalogProduct[] = [
     slug: 'matte-poster',
     type: 'wall-art',
     brand: 'Fixture',
-    description: 'Gallery-grade matte paper with rich, fade-resistant color for art prints and event graphics.',
+    description:
+      'Gallery-grade matte paper with rich, fade-resistant color for art prints and event graphics.',
     thumbnailUrl: null,
     categorySlug: 'wall-art',
     categoryTitle: 'Wall art',
@@ -153,7 +220,8 @@ export const localProducts: CatalogProduct[] = [
     slug: 'canvas-tote-bag',
     type: 'bag',
     brand: 'Fixture',
-    description: 'A sturdy cotton tote with a roomy print area — practical merch people actually carry every day.',
+    description:
+      'A sturdy cotton tote with a roomy print area — practical merch people actually carry every day.',
     thumbnailUrl: null,
     categorySlug: 'bags',
     categoryTitle: 'Bags',
@@ -177,7 +245,8 @@ export const localProducts: CatalogProduct[] = [
     slug: 'kiss-cut-sticker',
     type: 'sticker',
     brand: 'Fixture',
-    description: 'Durable, weatherproof vinyl with a glossy finish — the easiest way to spread a logo or mascot.',
+    description:
+      'Durable, weatherproof vinyl with a glossy finish — the easiest way to spread a logo or mascot.',
     thumbnailUrl: null,
     categorySlug: 'stickers',
     categoryTitle: 'Stickers',
@@ -222,7 +291,8 @@ export const localProducts: CatalogProduct[] = [
     slug: 'spiral-notebook',
     type: 'stationery',
     brand: 'Fixture',
-    description: 'A wire-bound notebook with a fully custom cover — a handy giveaway or creator-bundle add-on.',
+    description:
+      'A wire-bound notebook with a fully custom cover — a handy giveaway or creator-bundle add-on.',
     thumbnailUrl: null,
     categorySlug: 'stationery',
     categoryTitle: 'Stationery',
@@ -244,7 +314,8 @@ const marginFor = (costCents: number, productType?: string | null) => {
   const multiplier = productType === 'sticker' ? 1.45 : productType === 'wall-art' ? 1.2 : 1;
   return Math.max(500, Math.round(costCents * 0.3 * multiplier));
 };
-const shippingFor = (quantity: number) => (quantity <= 0 ? 0 : 495 + Math.max(0, quantity - 1) * 175);
+const shippingFor = (quantity: number) =>
+  quantity <= 0 ? 0 : 495 + Math.max(0, quantity - 1) * 175;
 const paymentFeeFor = (subtotalCents: number) => Math.round(subtotalCents * 0.029 + 30);
 let localSession: StudioSession | null = null;
 let localPass: StudioPass | null = null;
@@ -292,7 +363,9 @@ export function createLocalQuote(
     const quantity = Math.max(1, Math.floor(item.quantity || 1));
     const placementCodes = item.placementCodes.length
       ? item.placementCodes
-      : product.placements.filter((placement) => placement.isDefault).map((placement) => placement.code);
+      : product.placements
+          .filter((placement) => placement.isDefault)
+          .map((placement) => placement.code);
     return {
       productId: product.id,
       variantId: variant.id,
@@ -307,8 +380,14 @@ export function createLocalQuote(
       unitRetailCents: variant.costCents + marginFor(variant.costCents, product.type) + 300,
     };
   });
-  const productCostCents = quoteItems.reduce((total, item) => total + item.unitCostCents * item.quantity, 0);
-  const retailBeforeFees = quoteItems.reduce((total, item) => total + item.unitRetailCents * item.quantity, 0);
+  const productCostCents = quoteItems.reduce(
+    (total, item) => total + item.unitCostCents * item.quantity,
+    0
+  );
+  const retailBeforeFees = quoteItems.reduce(
+    (total, item) => total + item.unitRetailCents * item.quantity,
+    0
+  );
   const quantity = quoteItems.reduce((total, item) => total + item.quantity, 0);
   const shippingEstimateCents = shippingFor(quantity);
   const paymentFeeCents = paymentFeeFor(retailBeforeFees + shippingEstimateCents);
@@ -317,7 +396,8 @@ export function createLocalQuote(
     return total + marginFor(item.unitCostCents, product?.type) * item.quantity;
   }, 0);
   const subtotalBeforeCreditsCents = retailBeforeFees + shippingEstimateCents + paymentFeeCents;
-  const studioPassCreditCents = studioPassId || localPass ? Math.min(500, subtotalBeforeCreditsCents) : 0;
+  const studioPassCreditCents =
+    studioPassId || localPass ? Math.min(500, subtotalBeforeCreditsCents) : 0;
 
   return {
     id: localId('quote'),
@@ -333,11 +413,31 @@ export function createLocalQuote(
     totalCents: subtotalBeforeCreditsCents - studioPassCreditCents,
     estimateFlags: { shipping: true, tax: true, paymentFee: true },
     costLines: [
-      { code: 'product-cost', label: 'Product & printing', amountCents: productCostCents, kind: 'cost' },
+      {
+        code: 'product-cost',
+        label: 'Product & printing',
+        amountCents: productCostCents,
+        kind: 'cost',
+      },
       { code: 'design-allocation', label: 'Design work', amountCents: quantity * 300, kind: 'fee' },
-      { code: 'margin', label: 'Open Merch Studio margin', amountCents: targetMarginCents, kind: 'margin' },
-      { code: 'shipping-estimate', label: 'Estimated shipping', amountCents: shippingEstimateCents, kind: 'estimate' },
-      { code: 'payment-fee-estimate', label: 'Card processing estimate', amountCents: paymentFeeCents, kind: 'estimate' },
+      {
+        code: 'margin',
+        label: 'Open Merch Studio margin',
+        amountCents: targetMarginCents,
+        kind: 'margin',
+      },
+      {
+        code: 'shipping-estimate',
+        label: 'Estimated shipping',
+        amountCents: shippingEstimateCents,
+        kind: 'estimate',
+      },
+      {
+        code: 'payment-fee-estimate',
+        label: 'Card processing estimate',
+        amountCents: paymentFeeCents,
+        kind: 'estimate',
+      },
       ...(studioPassCreditCents
         ? [
             {
@@ -361,7 +461,7 @@ export function createLocalSession(sessionId?: string): StudioSession {
     id: sessionId || localId('sess'),
     status: 'guest',
     freeDraftsUsed: 0,
-    freeDraftLimit: 1,
+    freeDraftLimit: 3,
     createdAt: now,
     updatedAt: now,
   };
@@ -430,15 +530,21 @@ export function createLocalDesignDraft(prompt: string, sessionId?: string): Desi
     qualityTier: 'rough',
     allowance: {
       sessionId: sessionId ?? session.id,
-      studioPassStatus: localPass ? 'available' : localDraftCount >= 1 ? 'required' : 'not_required',
-      freeDraftsRemaining: Math.max(0, 1 - localDraftCount),
+      studioPassStatus: localPass
+        ? 'available'
+        : localDraftCount >= 3
+          ? 'required'
+          : 'not_required',
+      freeDraftsRemaining: Math.max(0, 3 - localDraftCount),
       roughDraftsRemaining: localPass ? Math.max(0, 8 - localPass.roughDraftsUsed) : 0,
       editsRemaining: localPass ? Math.max(0, 2 - localPass.editsUsed) : 0,
       finalsRemaining: localPass ? Math.max(0, 1 - localPass.finalsUsed) : 0,
-      nextAction: localPass ? 'continue_free' : 'buy_studio_pass',
+      nextAction: localPass ? 'continue_free' : localDraftCount >= 3 ? 'checkout' : 'continue_free',
       message: localPass
         ? 'You can keep designing within the current allowance.'
-        : 'A $5 Studio Pass unlocks more drafts and applies to purchase.',
+        : localDraftCount >= 3
+          ? 'You have used the three drafts included with this beta session.'
+          : `${Math.max(0, 3 - localDraftCount)} beta drafts remaining.`,
     },
     policy: {
       status: /nike|disney|marvel|pokemon/i.test(normalizedPrompt) ? 'blocked' : 'pass',
@@ -510,7 +616,11 @@ export function createLocalCheckout(quote: QuoteBreakdown, email?: string): Chec
       message: 'Fixture fulfillment submitted. No real charge or provider order was created.',
     },
     timeline: [
-      { at: new Date().toISOString(), status: 'checkout_pending', note: 'Fixture checkout opened.' },
+      {
+        at: new Date().toISOString(),
+        status: 'checkout_pending',
+        note: 'Fixture checkout opened.',
+      },
       { at: new Date().toISOString(), status: 'paid', note: 'Fixture checkout marked paid.' },
       { at: new Date().toISOString(), status: 'submitted', note: 'Fixture fulfillment submitted.' },
     ],
@@ -539,7 +649,8 @@ export const localLaunchReadiness: LaunchReadiness = {
       code: 'fixture-mode',
       label: 'Clean fixture mode',
       status: 'pass',
-      detail: 'Catalog, design, quote, checkout simulation, and fixture fulfillment run without credentials.',
+      detail:
+        'Catalog, design, quote, checkout simulation, and fixture fulfillment run without credentials.',
     },
     {
       code: 'openai-live',
@@ -565,7 +676,7 @@ export const localLaunchReadiness: LaunchReadiness = {
 export const localAdminReport: AdminReport = {
   settings: {
     studioPassPriceCents: 500,
-    freeDraftLimit: 1,
+    freeDraftLimit: 3,
     dailyAiBudgetCents: 2500,
     perSessionBudgetCents: 800,
     liveOpenAiEnabled: false,

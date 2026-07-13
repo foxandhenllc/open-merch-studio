@@ -256,7 +256,7 @@ export async function createDesignDraft(
   const provider = canUseLiveOpenAi() ? 'openai-ready' : 'mock';
   const policy = evaluatePolicy(normalizedPrompt);
   if (!authorization.allowed || policy.status === 'blocked') {
-    const blockedImage = createMockDesignImage('Studio Pass required');
+    const blockedImage = createMockDesignImage('Generation unavailable');
     const draft: DesignDraft = {
       id: null,
       sessionId: session.id,
@@ -487,7 +487,7 @@ export async function reviseDesignDraft(params: {
   );
   if (!authorization.allowed) {
     throw new HttpError(
-      authorization.message ?? 'A Studio Pass is required to create another variation.',
+      authorization.message ?? 'No more generated variations are available in this beta session.',
       409,
       'revision_allowance_required'
     );

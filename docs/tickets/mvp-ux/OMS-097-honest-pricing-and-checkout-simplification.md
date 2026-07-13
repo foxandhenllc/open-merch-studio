@@ -100,3 +100,5 @@ Customers understand the likely all-in price before investing in generation, see
 - Ready artwork triggers a debounced, cancellable automatic quote; variant changes invalidate stale requests without requiring a manual calculate action.
 - The visible ledger uses customer-language labels and explains the cost-plus estimate while preserving internal accounting codes.
 - Checkout derives one readiness gate from artwork, quote, email, payment availability, and manual fulfillment review, with one adjacent blocker.
+- The former Price step and ledger drawer are collapsed into one responsive checkout section containing the automatic estimate, breakdown, email, and Stripe action.
+- Studio Pass is hidden from the MVP customer journey while its backend support remains dormant. Beta guests receive three drafts within the existing per-session and daily AI spend caps.

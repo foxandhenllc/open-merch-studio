@@ -11,6 +11,7 @@ export function QuoteLedger({
   expired,
   onRefresh,
   onClose,
+  embedded = false,
 }: {
   quote: QuoteBreakdown | null;
   loading: boolean;
@@ -18,6 +19,7 @@ export function QuoteLedger({
   expired: boolean;
   onRefresh: () => void;
   onClose?: () => void;
+  embedded?: boolean;
 }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -35,14 +37,16 @@ export function QuoteLedger({
   }, [quote, expired]);
   return (
     <aside
-      className={`ledger ${stale || expired ? 'is-stale' : ''}`}
+      className={`ledger ${embedded ? 'ledger--embedded' : ''} ${stale || expired ? 'is-stale' : ''}`}
       aria-label="Price ledger"
       aria-busy={loading}
     >
       <div className="section-heading">
         <div>
           <span className="kicker">Transparent estimate</span>
-          <h2 id="price-ledger-title" tabIndex={-1}>Your price</h2>
+          <h2 id="price-ledger-title" tabIndex={-1}>
+            Your price
+          </h2>
         </div>
         {onClose && (
           <button
@@ -66,10 +70,7 @@ export function QuoteLedger({
       {!loading && !quote && (
         <div className="empty-block">
           <strong>No price yet.</strong>
-          <p>
-            Choose a product and variant, then calculate the full itemized total. Nothing is charged
-            here.
-          </p>
+          <p>Your itemized estimate is being prepared automatically. Nothing is charged here.</p>
         </div>
       )}
       {!loading && quote && (

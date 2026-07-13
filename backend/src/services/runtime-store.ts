@@ -43,7 +43,7 @@ const createId = (prefix: string): string =>
 
 const defaultSettings = (): AdminSettings => ({
   studioPassPriceCents: env.studioPassPriceCents,
-  freeDraftLimit: env.freeDraftLimit,
+  freeDraftLimit: env.studioPassEnabled ? env.freeDraftLimit : Math.max(env.freeDraftLimit, 3),
   dailyAiBudgetCents: env.dailyAiBudgetCents,
   perSessionBudgetCents: env.perSessionBudgetCents,
   liveOpenAiEnabled: Boolean(env.openaiApiKey && env.enableLiveOpenAi),
@@ -145,7 +145,7 @@ export async function getOrCreateDurableSession(sessionId?: string): Promise<Stu
           id: persisted.id,
           status: persisted.status as StudioSession['status'],
           freeDraftsUsed: persisted.freeDraftsUsed,
-          freeDraftLimit: persisted.freeDraftLimit,
+          freeDraftLimit: Math.max(persisted.freeDraftLimit, state.settings.freeDraftLimit),
           createdAt: persisted.createdAt.toISOString(),
           updatedAt: persisted.updatedAt.toISOString(),
         };
@@ -272,14 +272,20 @@ export function getAllowanceState(sessionId: string): AllowanceState {
     finalsRemaining,
     nextAction:
       studioPassStatus === 'required' || studioPassStatus === 'exhausted'
-        ? 'buy_studio_pass'
+        ? env.studioPassEnabled
+          ? 'buy_studio_pass'
+          : 'checkout'
         : 'continue_free',
     message:
       studioPassStatus === 'required'
-        ? 'A $5 Studio Pass unlocks deeper drafting and applies to an eligible purchase.'
+        ? env.studioPassEnabled
+          ? 'A $5 Studio Pass unlocks deeper drafting and applies to an eligible purchase.'
+          : 'You have used the three drafts included with this beta session.'
         : studioPassStatus === 'exhausted'
-          ? 'This Studio Pass allowance is used. Checkout or contact support for more design help.'
-          : 'You can keep designing within the current allowance.',
+          ? env.studioPassEnabled
+            ? 'This Studio Pass allowance is used. Checkout or contact support for more design help.'
+            : 'Continue with your current artwork or contact support for more design help.'
+          : `${freeDraftsRemaining} beta draft${freeDraftsRemaining === 1 ? '' : 's'} remaining.`,
   };
 }
 

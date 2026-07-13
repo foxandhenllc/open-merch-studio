@@ -88,3 +88,4 @@ Customers can understand where they are, what changed, and what to do next witho
 - Progress controls now open or focus their real destination, retain visible accessible labels, and avoid automatic smooth-scroll focus changes.
 - Primary actions advance with the journey—generate, review price, then checkout—while regeneration and revision remain allowance-aware secondary actions.
 - Passing readiness checks, refinement controls, and the support session reference use progressive disclosure.
+- The progress rail now follows the simplified conversion path: Product → Make → Checkout; price details live inside checkout rather than in a separate destination.
