@@ -6,9 +6,12 @@ import {
   getOrderByCheckoutSession,
   getOrderSummary,
   handleStripeCheckoutCompleted,
+  markStripeEventTracked,
   submitFixtureFulfillment,
+  wasStripeEventProcessed,
 } from '../services/order.service.js';
 import { constructStripeWebhookEvent } from '../services/stripe.service.js';
+import { trackServerEvent } from '../utils/analytics.js';
 
 export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Response) => {
   const sessionId = String(req.body?.sessionId ?? '').trim();
@@ -70,7 +73,16 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
     throw new HttpError('Invalid Stripe webhook signature.', 400);
   }
   if (event.type === 'checkout.session.completed') {
-    await handleStripeCheckoutCompleted(event.data.object, event.id);
+    const alreadyProcessed = await wasStripeEventProcessed(event.id);
+    const order = await handleStripeCheckoutCompleted(event.data.object, event.id);
+    if (order && !alreadyProcessed) {
+      await trackServerEvent(
+        'purchase_completed',
+        { currency: order.currency.toLowerCase(), value: order.totalCents / 100 },
+        req.headers
+      );
+      markStripeEventTracked(event.id);
+    }
   }
   res.json({ received: true });
 });

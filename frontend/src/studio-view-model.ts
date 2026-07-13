@@ -19,6 +19,7 @@ import type {
 } from '@app-types/catalog';
 import type { StepState, StudioStep } from '@components/StepRail.types';
 import { readStudioResumeState, writeStudioResumeState } from './studio-persistence';
+import { productType, revisionBand, totalBand, trackEvent } from './utils/analytics';
 
 export type FlowState =
   | 'booting'
@@ -497,7 +498,12 @@ export function useStudioViewModel() {
     setAction('catalog', true);
     clearError('catalog');
     try {
-      setProducts(consumeSource(await api.products(category || undefined)));
+      const result = await api.products(category || undefined);
+      setProducts(consumeSource(result));
+      trackEvent('catalog_opened', {
+        source: 'studio',
+        category: category || 'all',
+      });
     } catch (error) {
       fail('catalog', error);
     } finally {
@@ -530,6 +536,7 @@ export function useStudioViewModel() {
       clearError('mockup');
       setFlow(quote ? 'quote_stale' : 'drafted');
       setAnnouncement('Saved product mockup restored.');
+      trackEvent('mockup_completed', { result: 'success', source: 'fallback' });
       return;
     }
     if (mockup) setMockupStale(true);
@@ -538,34 +545,45 @@ export function useStudioViewModel() {
     setOperationStartedAt(Date.now());
     clearError('mockup');
     try {
-      const result = consumeSource(
-        await api.mockup({
-          sessionId: session?.id,
-          productId: params.product.id,
-          variantId: params.variant.id,
-          placementCodes: params.placements,
-          designAssetId: params.draft.id,
-          imageUrl: params.draft.imageUrl,
-          orientation: params.orientation,
-        })
-      );
+      const sourced = await api.mockup({
+        sessionId: session?.id,
+        productId: params.product.id,
+        variantId: params.variant.id,
+        placementCodes: params.placements,
+        designAssetId: params.draft.id,
+        imageUrl: params.draft.imageUrl,
+        orientation: params.orientation,
+      });
+      const result = consumeSource(sourced);
       if (requestId !== mockupRequestId.current) return;
       setMockup(result);
       setActiveMockupViewIndex(0);
       setMockupStale(false);
       if (result.status === 'failed') {
+        trackEvent('mockup_completed', {
+          result: 'failed',
+          source: sourced.source === 'live' ? 'printful' : 'fallback',
+        });
         fail(
           'mockup',
           new Error(result.errorMessage || 'The fulfillment provider could not build this mockup.')
         );
         setFlow(quote ? 'quote_stale' : 'drafted');
       } else {
+        trackEvent('mockup_completed', {
+          result: 'success',
+          source: result.provider === 'printful' ? 'printful' : 'fallback',
+        });
         mockupCache.current.set(key, result);
         setFlow(quote ? 'quote_stale' : 'drafted');
         setAnnouncement('Product mockup ready. Your price estimate is updating automatically.');
       }
     } catch (error) {
       if (requestId !== mockupRequestId.current) return;
+      trackEvent('mockup_completed', {
+        result: 'failed',
+        source: dataSource === 'live' ? 'printful' : 'fallback',
+      });
       fail('mockup', error);
       setFlow(quote ? 'quote_stale' : 'drafted');
     } finally {
@@ -614,6 +632,10 @@ export function useStudioViewModel() {
     setSelectedVariantIdState(variant?.id ?? '');
     setSelectedPlacements(placements);
     setSelectedOrientationState(orientation);
+    trackEvent('product_selected', {
+      category: product.categorySlug || 'other',
+      product_type: productType(product.categorySlug),
+    });
     if (variant) {
       productSelections.current.set(product.id, {
         variantId: variant.id,
@@ -631,6 +653,7 @@ export function useStudioViewModel() {
   };
   const setSelectedVariantId = (id: string) => {
     setSelectedVariantIdState(id);
+    trackEvent('configuration_changed', { field: 'variant', value: 'selected' });
     markStale();
     const variant = selectedProduct?.variants.find((candidate) => candidate.id === id);
     const derivedOrientation = selectedProduct
@@ -670,6 +693,10 @@ export function useStudioViewModel() {
       : [...selectedPlacements, code];
     if (next === selectedPlacements) return;
     setSelectedPlacements(next);
+    trackEvent('configuration_changed', {
+      field: 'placement',
+      value: next.length > 1 ? 'multiple' : 'single',
+    });
     if (selectedProduct && selectedVariant) {
       productSelections.current.set(selectedProduct.id, {
         variantId: selectedVariant.id,
@@ -691,6 +718,7 @@ export function useStudioViewModel() {
   const setSelectedOrientation = (orientation: PreviewOrientation) => {
     if (!selectedProduct || !selectedVariant || orientation === selectedOrientation) return;
     setSelectedOrientationState(orientation);
+    trackEvent('configuration_changed', { field: 'orientation', value: orientation });
     productSelections.current.set(selectedProduct.id, {
       variantId: selectedVariant.id,
       placements: selectedPlacements,
@@ -719,19 +747,24 @@ export function useStudioViewModel() {
     setAction('refining', true);
     clearError('generation');
     try {
-      setIdea(
-        consumeSource(
-          await api.designIdea({
-            prompt,
-            sessionId: session?.id,
-            productId: selectedProduct?.id,
-            placementCodes: selectedPlacements,
-          })
-        )
-      );
+      const result = await api.designIdea({
+        prompt,
+        sessionId: session?.id,
+        productId: selectedProduct?.id,
+        placementCodes: selectedPlacements,
+      });
+      setIdea(consumeSource(result));
+      trackEvent('design_idea_refined', {
+        result: result.source === 'live' ? 'success' : 'fixture',
+        source: result.source === 'live' ? 'api' : 'fallback',
+      });
       setFlow('configuring');
       setAnnouncement('Prompt refined. Review it, then generate your draft.');
     } catch (error) {
+      trackEvent('design_idea_refined', {
+        result: 'failed',
+        source: dataSource === 'live' ? 'api' : 'fallback',
+      });
       fail('generation', error);
       setFlow('configuring');
     } finally {
@@ -747,6 +780,10 @@ export function useStudioViewModel() {
     setGenerationPhase('Queued');
     setOperationStartedAt(Date.now());
     clearError('generation');
+    trackEvent('design_generation_started', {
+      quality: 'standard',
+      source: capabilities.ai === 'live' ? 'api' : 'fixture',
+    });
     const phaseOne = window.setTimeout(() => setGenerationPhase('Generating artwork'), 1000);
     const phaseTwo = window.setTimeout(() => setGenerationPhase('Preparing the print file'), 10000);
     try {
@@ -782,6 +819,10 @@ export function useStudioViewModel() {
       setQuoteStale(false);
       setFlow('drafted');
       setAnnouncement('Artwork ready. Building your product mockup now.');
+      trackEvent('design_generation_completed', {
+        result: 'success',
+        source: result.source === 'live' ? 'api' : 'fixture',
+      });
       setAction('generating', false);
       setOperationStartedAt(null);
       await requestMockup({
@@ -793,11 +834,19 @@ export function useStudioViewModel() {
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
+        trackEvent('design_generation_completed', {
+          result: 'cancelled',
+          source: dataSource === 'live' ? 'api' : 'fixture',
+        });
         setFlow('configuring');
         setAnnouncement(
           'Generation cancelled. Your prompt is unchanged and no draft credit was used.'
         );
       } else {
+        trackEvent('design_generation_completed', {
+          result: 'failed',
+          source: dataSource === 'live' ? 'api' : 'fixture',
+        });
         fail('generation', error);
         setFlow('configuring');
       }
@@ -829,13 +878,12 @@ export function useStudioViewModel() {
     setAction('revising', true);
     clearError('generation');
     try {
-      const revised = consumeSource(
-        await api.reviseDraft({
-          draftId: design.id,
-          instructions: revision,
-          sessionId: session?.id,
-        })
-      );
+      const result = await api.reviseDraft({
+        draftId: design.id,
+        instructions: revision,
+        sessionId: session?.id,
+      });
+      const revised = consumeSource(result);
       setDesignHistory((current) =>
         current.some((item) => item.id === design.id) ? current : [...current, design]
       );
@@ -845,6 +893,10 @@ export function useStudioViewModel() {
       setFlow('drafted');
       setRevision('');
       setAnnouncement('New variation ready. Rebuilding your product mockup.');
+      trackEvent('design_revision_completed', {
+        result: 'success',
+        remaining: revisionBand(revised.allowance.editsRemaining),
+      });
       if (selectedProduct && selectedVariant) {
         await requestMockup({
           product: selectedProduct,
@@ -855,6 +907,10 @@ export function useStudioViewModel() {
         });
       }
     } catch (error) {
+      trackEvent('design_revision_completed', {
+        result: 'failed',
+        remaining: revisionBand(design.allowance.editsRemaining),
+      });
       fail('generation', error);
     } finally {
       setAction('revising', false);
@@ -870,6 +926,10 @@ export function useStudioViewModel() {
     setCheckout(null);
     setOrder(null);
     setAnnouncement('Previous artwork restored. Rebuilding its product preview.');
+    trackEvent('design_revision_completed', {
+      result: 'undone',
+      remaining: revisionBand(previous.allowance.editsRemaining),
+    });
     if (selectedProduct && selectedVariant) {
       await requestMockup({
         product: selectedProduct,
@@ -899,29 +959,32 @@ export function useStudioViewModel() {
     setAction('quoting', true);
     clearError('quote');
     try {
-      const result = consumeSource(
-        await api.quote(
-          {
-            sessionId: session?.id,
-            studioPassId: studioPass?.id,
-            items: [
-              {
-                productId: selectedProduct.id,
-                variantId: selectedVariant.id,
-                quantity: 1,
-                placementCodes: selectedPlacements,
-                orientation: selectedOrientation,
-                designAssetId: design.id,
-              },
-            ],
-          },
-          controller.signal
-        )
+      const sourced = await api.quote(
+        {
+          sessionId: session?.id,
+          studioPassId: studioPass?.id,
+          items: [
+            {
+              productId: selectedProduct.id,
+              variantId: selectedVariant.id,
+              quantity: 1,
+              placementCodes: selectedPlacements,
+              orientation: selectedOrientation,
+              designAssetId: design.id,
+            },
+          ],
+        },
+        controller.signal
       );
+      const result = consumeSource(sourced);
       if (requestId !== quoteRequestId.current) return;
       setQuote(result);
       setQuoteStale(false);
       setFlow('quoted');
+      trackEvent('quote_created', {
+        source: sourced.source,
+        total_band: totalBand(result.totalCents),
+      });
       setAnnouncement(
         `${options.automatic ? 'Price estimate ready' : 'Price updated'}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: result.currency }).format(result.totalCents / 100)}.`
       );
@@ -985,6 +1048,10 @@ export function useStudioViewModel() {
       const result = consumeSource(await api.studioPassCheckout(session.id));
       setCheckout(result);
       if (result.status === 'open' && result.checkoutUrl) {
+        trackEvent('studio_pass_checkout_started', {
+          source: 'gate',
+          result: result.mode === 'stripe' ? 'live' : 'fallback',
+        });
         setAnnouncement('Opening secure checkout.');
         window.location.assign(result.checkoutUrl);
         return;
@@ -1055,6 +1122,10 @@ export function useStudioViewModel() {
       );
       setCheckout(result);
       if (result.status === 'open' && result.checkoutUrl) {
+        trackEvent('checkout_started', {
+          source: 'quote',
+          studio_pass: Boolean(studioPass),
+        });
         setFlow('redirecting');
         setAnnouncement('Checkout ready. Redirecting to secure payment.');
         window.location.assign(result.checkoutUrl);

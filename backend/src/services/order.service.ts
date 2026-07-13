@@ -38,6 +38,31 @@ type CheckoutInput = {
   designAssetId?: string;
 };
 
+const analyticsTrackedStripeEvents = new Set<string>();
+
+export async function wasStripeEventProcessed(providerEventId: string): Promise<boolean> {
+  if (analyticsTrackedStripeEvents.has(providerEventId)) return true;
+  if (!env.databaseUrl) return false;
+  try {
+    const existing = await prisma.paymentEvent.findUnique({
+      where: {
+        provider_providerEventId: {
+          provider: 'stripe',
+          providerEventId,
+        },
+      },
+      select: { id: true },
+    });
+    return Boolean(existing);
+  } catch {
+    return false;
+  }
+}
+
+export function markStripeEventTracked(providerEventId: string): void {
+  analyticsTrackedStripeEvents.add(providerEventId);
+}
+
 const orderNumber = () =>
   `OMS-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 

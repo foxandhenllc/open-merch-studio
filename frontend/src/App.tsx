@@ -13,6 +13,7 @@ import { publicConfig } from './config';
 import { api } from './services/api';
 import { useStudioViewModel, type SurfaceError } from './studio-view-model';
 import type { OrderSummary } from './types/catalog';
+import { trackEvent } from './utils/analytics';
 import type { PolicyRoute } from './App.types';
 
 const money = (cents: number, currency = 'USD') =>
@@ -202,6 +203,7 @@ function StudioApp() {
     const params = new URLSearchParams(window.location.search);
     const checkoutState = params.get('checkout');
     if (checkoutState === 'cancelled') {
+      trackEvent('checkout_returned', { result: 'cancelled', mode: 'live' });
       setCheckoutReturn({
         state: 'cancelled',
         message: 'No payment was made. You can return to the studio when you are ready.',
@@ -222,6 +224,11 @@ function StudioApp() {
           const result = await api.checkoutOrder(stripeSessionId);
           const order = result.data;
           if (order.status !== 'checkout_pending') {
+            trackEvent('checkout_returned', {
+              result:
+                order.status === 'failed' || order.status === 'cancelled' ? 'unknown' : 'success',
+              mode: 'live',
+            });
             setCheckoutReturn({
               state: 'paid',
               order,
@@ -235,6 +242,7 @@ function StudioApp() {
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
       }
       if (!cancelled) {
+        trackEvent('checkout_returned', { result: 'unknown', mode: 'live' });
         setCheckoutReturn({
           state: 'processing',
           message:
@@ -297,9 +305,16 @@ function StudioApp() {
       target?.focus({ preventScroll: true });
     });
   };
+  const openCatalog = () => {
+    trackEvent('catalog_opened', {
+      source: 'studio',
+      category: vm.selectedCategory || 'all',
+    });
+    setCatalogOpen(true);
+  };
   const navigateStep = (step: 'product' | 'make' | 'order') => {
     if (step === 'product') {
-      if (window.matchMedia('(max-width: 1439px)').matches) setCatalogOpen(true);
+      openCatalog();
       focusElement('catalog-title');
       return;
     }
@@ -466,7 +481,7 @@ function StudioApp() {
           tabIndex={-1}
         >
           {vm.selectedProduct && (
-            <button className="change-product" type="button" onClick={() => setCatalogOpen(true)}>
+            <button className="change-product" type="button" onClick={openCatalog}>
               <span>Product</span>
               <strong>{vm.selectedProduct.title}</strong>
               <small>Change</small>
@@ -501,11 +516,7 @@ function StudioApp() {
               >
                 Start with a tee
               </button>
-              <button
-                className="button button--secondary"
-                type="button"
-                onClick={() => setCatalogOpen(true)}
-              >
+              <button className="button button--secondary" type="button" onClick={openCatalog}>
                 Browse the catalog
               </button>
             </div>
