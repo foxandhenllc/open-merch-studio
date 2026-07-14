@@ -33,6 +33,11 @@ Launch readiness is implied by the feature list but not yet captured as a single
 - The checklist says what to do to pause checkout or fulfillment.
 - Private readiness items are referenced without exposing details publicly.
 - The final launch decision can be made from this checklist and the audit report.
+- `CHECKOUT_ACCESS_MODE=closed` is verified after every normal production deploy; the legacy `ENABLE_PUBLIC_CHECKOUT` value is not used for authorization.
+- The supervised smoke uses `allowlist` with one operator email and returns to `closed` immediately afterward.
+- The order migration for `taxCents`, `stripePaymentIntentId`, and `paidAt` is applied before a live charge.
+- The signed live webhook receives completed, expired, and refunded events; a duplicate replay produces no second Printful draft.
+- Exactly one editable Printful draft matches the OMS order, recipient, variant, artwork, placement, and technique, and is not auto-confirmed.
 
 ## Test Plan
 - Review checklist against critical path tickets.

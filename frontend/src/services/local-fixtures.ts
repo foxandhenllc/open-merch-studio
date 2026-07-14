@@ -374,6 +374,12 @@ export function createLocalQuote(
       variantName: variant.name,
       quantity,
       placementCodes,
+      placementTechniques: Object.fromEntries(
+        placementCodes.map((code) => [
+          code,
+          product.placements.find((placement) => placement.code === code)?.technique ?? 'default',
+        ])
+      ),
       orientation: item.orientation,
       designAssetId: item.designAssetId,
       unitCostCents: variant.costCents,
@@ -605,6 +611,7 @@ export function createLocalCheckout(quote: QuoteBreakdown, email?: string): Chec
   localOrder = {
     id: localId('order'),
     orderNumber: `OMS-${new Date().getFullYear()}-FIXTURE`,
+    taxCents: 0,
     status: 'submitted',
     customerEmail: email,
     totalCents: quote.totalCents,

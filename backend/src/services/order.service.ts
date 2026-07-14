@@ -1,5 +1,5 @@
 import { env } from '../config/env.js';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { getProductBySlug, listProducts } from './catalog.service.js';
 import {
   buildPrintfulOrderPayload,
@@ -20,12 +20,20 @@ import {
   runtimeNow,
   saveOrder,
 } from './runtime-store.js';
-import type { CheckoutSession, MoneyLine, OrderSummary, QuoteBreakdown } from '../types/catalog.js';
+import type {
+  CheckoutConfirmation,
+  CheckoutSession,
+  MoneyLine,
+  OrderSummary,
+  QuoteBreakdown,
+} from '../types/catalog.js';
 import {
   canCreateStripeCheckout,
   createMerchCheckoutSession,
   createStudioPassStripeSession,
   liveStripeBlocker,
+  retrieveStripeCheckoutSession,
+  retrieveStripePaymentIntent,
 } from './stripe.service.js';
 import type Stripe from 'stripe';
 import { prisma } from '../config/database.js';
@@ -138,6 +146,13 @@ function jsonArray<T>(value: Prisma.JsonValue | null | undefined, fallback: T[])
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
 
+function jsonObject<T extends Record<string, unknown>>(
+  value: Prisma.JsonValue | null | undefined,
+  fallback: T
+): T {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as T) : fallback;
+}
+
 function estimateFlags(
   value: Prisma.JsonValue | null | undefined
 ): QuoteBreakdown['estimateFlags'] {
@@ -166,6 +181,16 @@ function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
     costLines: jsonArray<MoneyLine>(quote.costLines, []),
     expiresAt: quote.expiresAt.toISOString(),
     items: quote.items.map((item) => ({
+      ...(() => {
+        const options = jsonObject<{
+          orientation?: QuoteBreakdown['items'][number]['orientation'];
+          placementTechniques?: Record<string, string>;
+        }>(item.options, {});
+        return {
+          orientation: options.orientation,
+          placementTechniques: options.placementTechniques ?? {},
+        };
+      })(),
       productId: item.productId,
       variantId: item.variantId,
       printfulVariantId: item.variant.printfulVariantId,
@@ -202,6 +227,9 @@ function mapPersistedOrder(order: PersistedOrder): OrderSummary {
     id: order.id,
     orderNumber: order.orderNumber,
     stripeSessionId: order.stripeSessionId ?? undefined,
+    stripePaymentIntentId: order.stripePaymentIntentId ?? undefined,
+    taxCents: order.taxCents,
+    paidAt: order.paidAt?.toISOString(),
     status: runtimeOrderStatus(order.status),
     customerEmail: order.email ?? undefined,
     totalCents: order.totalCents,
@@ -305,8 +333,8 @@ function transition(
   };
 }
 
-async function persistOrder(order: OrderSummary, stripeSessionId?: string): Promise<void> {
-  if (!env.databaseUrl || !order.quote?.id) return;
+async function persistOrder(order: OrderSummary, stripeSessionId?: string): Promise<boolean> {
+  if (!env.databaseUrl || !order.quote?.id) return false;
   try {
     await prisma.order.upsert({
       where: { id: order.id },
@@ -314,8 +342,11 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
         email: order.customerEmail,
         status: prismaOrderStatus(order.status),
         stripeSessionId,
+        stripePaymentIntentId: order.stripePaymentIntentId,
         fulfillmentStatus: order.fulfillment.status,
         totalCents: order.totalCents,
+        taxCents: order.taxCents,
+        paidAt: order.paidAt ? new Date(order.paidAt) : undefined,
         currency: order.currency,
       },
       create: {
@@ -325,8 +356,11 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
         email: order.customerEmail,
         status: prismaOrderStatus(order.status),
         stripeSessionId,
+        stripePaymentIntentId: order.stripePaymentIntentId,
         fulfillmentStatus: order.fulfillment.status,
         totalCents: order.totalCents,
+        taxCents: order.taxCents,
+        paidAt: order.paidAt ? new Date(order.paidAt) : undefined,
         currency: order.currency,
         items: {
           create: order.quote.items.map((item) => ({
@@ -347,8 +381,37 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
         },
       },
     });
+    return true;
   } catch {
-    // Runtime order state remains the fallback source if persistence is unavailable.
+    return false;
+  }
+}
+
+async function verifyDurableCheckoutState(
+  quote: QuoteBreakdown,
+  designAssetIds: string[]
+): Promise<string | null> {
+  if (!env.databaseUrl || !quote.id) {
+    return 'Provider checkout requires a durably stored quote and PostgreSQL connection.';
+  }
+  try {
+    const [savedQuote, designs] = await Promise.all([
+      prisma.quote.findUnique({ where: { id: quote.id }, select: { id: true } }),
+      prisma.designAsset.findMany({
+        where: { id: { in: designAssetIds } },
+        select: { id: true, transparentUrl: true, imageUrl: true },
+      }),
+    ]);
+    if (!savedQuote) return 'The saved quote could not be retrieved from PostgreSQL.';
+    if (
+      designs.length !== designAssetIds.length ||
+      designs.some((asset) => !asset.transparentUrl && !asset.imageUrl)
+    ) {
+      return 'The checkout artwork is not durably stored and retrievable.';
+    }
+    return null;
+  } catch {
+    return 'PostgreSQL could not verify the quote and artwork for checkout.';
   }
 }
 
@@ -394,6 +457,13 @@ async function recordPaymentCompletion(
       email: session.customer_details?.email ?? undefined,
       status: 'PAID',
       stripeSessionId: session.id,
+      stripePaymentIntentId:
+        typeof session.payment_intent === 'string'
+          ? session.payment_intent
+          : session.payment_intent?.id,
+      totalCents: session.amount_total ?? undefined,
+      taxCents: session.total_details?.amount_tax ?? 0,
+      paidAt: new Date(),
       fulfillmentStatus,
       transitions: {
         create: {
@@ -435,7 +505,10 @@ async function recordPaymentCompletion(
   });
 }
 
-export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<string[]> {
+export async function validateQuoteForCheckout(
+  quote: QuoteBreakdown,
+  requireProviderMetadata = false
+): Promise<string[]> {
   const issues: string[] = [];
   const products = await listProducts();
   for (const item of quote.items) {
@@ -443,6 +516,9 @@ export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<s
     const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
     if (!product) issues.push(`Product ${item.productId} is no longer sellable.`);
     if (!variant) issues.push(`Variant ${item.variantId} is no longer available.`);
+    if (requireProviderMetadata && !item.printfulVariantId) {
+      issues.push(`Provider variant metadata is missing for ${item.title}.`);
+    }
     const unavailablePlacement = item.placementCodes.find(
       (placementCode) => !product?.placements.some((placement) => placement.code === placementCode)
     );
@@ -450,6 +526,12 @@ export async function validateQuoteForCheckout(quote: QuoteBreakdown): Promise<s
       issues.push(
         `Placement ${unavailablePlacement} is unavailable for ${product?.title ?? 'item'}.`
       );
+    }
+    const missingTechnique = item.placementCodes.find(
+      (placementCode) => !item.placementTechniques[placementCode]
+    );
+    if (requireProviderMetadata && missingTechnique) {
+      issues.push(`Provider technique metadata is missing for ${item.title} ${missingTechnique}.`);
     }
   }
   return issues;
@@ -468,9 +550,9 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
       message: 'Create a fresh quote before checkout.',
     };
   }
-  const stripeBlocker = settings.liveStripeEnabled ? liveStripeBlocker() : null;
+  const stripeBlocker = settings.liveStripeEnabled ? liveStripeBlocker(input.email) : null;
 
-  const quoteIssues = await validateQuoteForCheckout(quote);
+  const quoteIssues = await validateQuoteForCheckout(quote, settings.liveStripeEnabled);
   if (Date.now() > new Date(quote.expiresAt).getTime()) {
     quoteIssues.push('Quote expired. Create a fresh quote before checkout.');
   }
@@ -485,6 +567,10 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
   for (const designAssetId of requiredDesignIds) {
     const issue = checkoutDesignIssue(await loadDesignForCheckout(designAssetId));
     if (issue) quoteIssues.push(issue);
+  }
+  if (settings.liveStripeEnabled && !quoteIssues.length) {
+    const durableIssue = await verifyDurableCheckoutState(quote, Array.from(requiredDesignIds));
+    if (durableIssue) quoteIssues.push(durableIssue);
   }
 
   if (!settings.checkoutEnabled || quoteIssues.length || stripeBlocker) {
@@ -505,6 +591,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     status: 'checkout_pending',
     customerEmail: input.email,
     totalCents: quote.totalCents,
+    taxCents: 0,
     currency: quote.currency,
     quote,
     designAssetId: input.designAssetId ?? Array.from(requiredDesignIds)[0],
@@ -525,7 +612,17 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     createdAt: runtimeNow(),
   };
   saveOrder(order);
-  await persistOrder(order);
+  const persisted = await persistOrder(order);
+  if (settings.liveStripeEnabled && !persisted) {
+    return {
+      id: runtimeId('checkout'),
+      mode: 'stripe-ready',
+      status: 'blocked',
+      checkoutUrl: null,
+      quoteId: quote.id,
+      message: 'Provider checkout was blocked because the order could not be stored durably.',
+    };
+  }
 
   const pass =
     getStudioPassById(input.studioPassId) ??
@@ -535,14 +632,16 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     pass.appliedOrderId = order.id;
   }
 
-  if (settings.liveStripeEnabled && canCreateStripeCheckout()) {
+  if (settings.liveStripeEnabled && canCreateStripeCheckout(input.email)) {
     const session = await createMerchCheckoutSession({
       orderId: order.id,
       quote,
       customerEmail: input.email,
     });
     saveOrder({ ...order, stripeSessionId: session.id });
-    await persistOrder(order, session.id);
+    if (!(await persistOrder({ ...order, stripeSessionId: session.id }, session.id))) {
+      throw new Error('Stripe session was created, but its durable order link could not be saved.');
+    }
     return {
       id: session.id,
       mode: 'stripe',
@@ -575,7 +674,7 @@ export async function createStudioPassCheckout(
   email?: string
 ): Promise<CheckoutSession> {
   const settings = getRuntimeSettings();
-  const stripeBlocker = settings.liveStripeEnabled ? liveStripeBlocker() : null;
+  const stripeBlocker = settings.liveStripeEnabled ? liveStripeBlocker(email) : null;
   if (settings.liveStripeEnabled && stripeBlocker) {
     return {
       id: runtimeId('checkout'),
@@ -586,7 +685,7 @@ export async function createStudioPassCheckout(
     };
   }
 
-  if (settings.liveStripeEnabled && canCreateStripeCheckout()) {
+  if (settings.liveStripeEnabled && canCreateStripeCheckout(email)) {
     const stripeSession = await createStudioPassStripeSession({
       sessionId,
       amountCents: settings.studioPassPriceCents,
@@ -612,7 +711,7 @@ export async function createStudioPassCheckout(
   };
 }
 
-function stripeRecipient(session: Stripe.Checkout.Session): {
+export function stripeRecipient(session: Stripe.Checkout.Session): {
   name: string;
   address1: string;
   city: string;
@@ -621,20 +720,7 @@ function stripeRecipient(session: Stripe.Checkout.Session): {
   zip: string;
   email?: string;
 } | null {
-  const shippingDetails = (
-    session as Stripe.Checkout.Session & {
-      shipping_details?: {
-        name?: string | null;
-        address?: {
-          line1?: string | null;
-          city?: string | null;
-          state?: string | null;
-          country?: string | null;
-          postal_code?: string | null;
-        } | null;
-      } | null;
-    }
-  ).shipping_details;
+  const shippingDetails = session.collected_information?.shipping_details;
   const customerAddress = session.customer_details?.address;
   const address = shippingDetails?.address ?? customerAddress;
   const address1 = address?.line1;
@@ -654,7 +740,22 @@ function stripeRecipient(session: Stripe.Checkout.Session): {
   };
 }
 
-function getArtworkUrl(order: OrderSummary): string | null {
+async function getArtworkUrl(order: OrderSummary): Promise<string | null> {
+  if (env.databaseUrl && order.designAssetId) {
+    try {
+      const asset = await prisma.designAsset.findUnique({
+        where: { id: order.designAssetId },
+        select: { id: true, transparentUrl: true, imageUrl: true },
+      });
+      const storedUrl = asset?.transparentUrl ?? asset?.imageUrl;
+      if (storedUrl && /^https?:\/\//.test(storedUrl)) return storedUrl;
+      if (asset?.id && storedUrl?.startsWith('data:')) {
+        return `${env.backendUrl}/api/design/assets/${encodeURIComponent(asset.id)}.png`;
+      }
+    } catch {
+      return null;
+    }
+  }
   const draft = getDraft(order.designAssetId);
   if (!draft?.id || !draft.imageUrl) return null;
   if (/^https?:\/\//.test(draft.imageUrl)) return draft.imageUrl;
@@ -664,10 +765,50 @@ function getArtworkUrl(order: OrderSummary): string | null {
   return null;
 }
 
+async function claimStripeEvent(
+  orderId: string,
+  providerEventId: string,
+  eventType: string,
+  payload: Prisma.InputJsonValue
+): Promise<boolean> {
+  if (!env.databaseUrl) return true;
+  try {
+    await prisma.paymentEvent.create({
+      data: {
+        orderId,
+        provider: 'stripe',
+        providerEventId,
+        eventType,
+        status: 'processing',
+        payload,
+      },
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
+      return false;
+    throw error;
+  }
+}
+
+async function finishStripeEvent(providerEventId: string, status: string): Promise<void> {
+  if (!env.databaseUrl) return;
+  await prisma.paymentEvent.update({
+    where: {
+      provider_providerEventId: {
+        provider: 'stripe',
+        providerEventId,
+      },
+    },
+    data: { status },
+  });
+}
+
 export async function handleStripeCheckoutCompleted(
   session: Stripe.Checkout.Session,
   providerEventId = session.id
 ): Promise<OrderSummary | undefined> {
+  if (session.payment_status !== 'paid') return undefined;
   const kind = session.metadata?.kind;
   if (kind === 'studio_pass') {
     const sessionId = session.metadata?.sessionId;
@@ -688,11 +829,27 @@ export async function handleStripeCheckoutCompleted(
     );
     return undefined;
   }
+  const claimed = await claimStripeEvent(orderId, providerEventId, 'checkout.session.completed', {
+    id: session.id,
+    payment_status: session.payment_status,
+    metadata: session.metadata,
+  });
+  if (!claimed || (order.status !== 'checkout_pending' && order.stripeSessionId === session.id)) {
+    return order;
+  }
 
   let next = transition(order, 'paid', 'Stripe checkout completed.');
   next = {
     ...next,
     customerEmail: session.customer_details?.email ?? order.customerEmail,
+    stripeSessionId: session.id,
+    stripePaymentIntentId:
+      typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id,
+    totalCents: session.amount_total ?? order.totalCents,
+    taxCents: session.total_details?.amount_tax ?? 0,
+    paidAt: new Date().toISOString(),
   };
 
   if (!env.fulfillmentEnabled || !env.enableLivePrintful || !env.allowLiveFulfillment) {
@@ -709,7 +866,7 @@ export async function handleStripeCheckoutCompleted(
   }
 
   const recipient = stripeRecipient(session);
-  const artworkUrl = getArtworkUrl(next);
+  const artworkUrl = await getArtworkUrl(next);
   const quote = next.quote;
   if (!recipient || !artworkUrl || !quote) {
     next = {
@@ -783,6 +940,63 @@ export async function handleStripeCheckoutCompleted(
   }
 }
 
+export async function handleStripeCheckoutExpired(
+  session: Stripe.Checkout.Session,
+  providerEventId = session.id
+): Promise<OrderSummary | undefined> {
+  const orderId = session.metadata?.orderId;
+  if (!orderId) return undefined;
+  const order = await loadOrder(orderId);
+  if (!order || order.status !== 'checkout_pending') return order;
+  if (
+    !(await claimStripeEvent(orderId, providerEventId, 'checkout.session.expired', {
+      id: session.id,
+      metadata: session.metadata,
+    }))
+  ) {
+    return order;
+  }
+  const next = transition(order, 'cancelled', 'Stripe Checkout expired before payment.');
+  saveOrder(next);
+  await persistOrder(next, session.id);
+  await finishStripeEvent(providerEventId, 'expired');
+  return next;
+}
+
+export async function handleStripeChargeRefunded(
+  charge: Stripe.Charge,
+  providerEventId = charge.id
+): Promise<OrderSummary | undefined> {
+  const paymentIntentId =
+    typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+  if (!paymentIntentId) return undefined;
+  const paymentIntent = await retrieveStripePaymentIntent(paymentIntentId);
+  const orderId = paymentIntent?.metadata?.orderId;
+  let order = orderId ? await loadOrder(orderId) : undefined;
+  if (!order && env.databaseUrl) {
+    const persisted = await prisma.order.findUnique({
+      where: { stripePaymentIntentId: paymentIntentId },
+      include: orderInclude,
+    });
+    if (persisted) order = saveOrder(mapPersistedOrder(persisted));
+  }
+  if (!order || order.status === 'refunded') return order;
+  if (
+    !(await claimStripeEvent(order.id, providerEventId, 'charge.refunded', {
+      id: charge.id,
+      payment_intent: paymentIntentId,
+      amount_refunded: charge.amount_refunded,
+    }))
+  ) {
+    return order;
+  }
+  const next = transition(order, 'refunded', 'Stripe reported the charge as refunded.');
+  saveOrder(next);
+  await persistOrder(next, order.stripeSessionId);
+  await finishStripeEvent(providerEventId, 'refunded');
+  return next;
+}
+
 export async function submitFixtureFulfillment(orderId: string): Promise<OrderSummary> {
   const order = getOrder(orderId);
   if (!order) throw new Error('Order not found.');
@@ -815,22 +1029,50 @@ export async function getOrderSummary(orderId: string): Promise<OrderSummary | u
 
 export async function getOrderByCheckoutSession(
   stripeSessionId: string
-): Promise<OrderSummary | undefined> {
+): Promise<CheckoutConfirmation> {
   const runtimeOrder = listOrders().find(
     (candidate) => candidate.stripeSessionId === stripeSessionId
   );
-  if (runtimeOrder || !env.databaseUrl) return runtimeOrder;
+  let order = runtimeOrder;
 
-  try {
-    const persisted = await prisma.order.findFirst({
-      where: { stripeSessionId },
-      include: orderInclude,
-    });
-    if (!persisted) return undefined;
-    return saveOrder(mapPersistedOrder(persisted));
-  } catch {
-    return undefined;
+  if (!order && env.databaseUrl)
+    try {
+      const persisted = await prisma.order.findFirst({
+        where: { stripeSessionId },
+        include: orderInclude,
+      });
+      if (persisted) order = saveOrder(mapPersistedOrder(persisted));
+    } catch {
+      order = undefined;
+    }
+  if (order && order.status !== 'checkout_pending') {
+    return {
+      state:
+        order.status === 'paid'
+          ? 'paid'
+          : order.status === 'needs_review'
+            ? 'needs_review'
+            : 'failed',
+      message: order.status === 'paid' ? 'Payment received.' : order.fulfillment.message,
+      order,
+    };
   }
+  const session = await retrieveStripeCheckoutSession(stripeSessionId);
+  if (session?.payment_status === 'paid') {
+    const recovered = await handleStripeCheckoutCompleted(session, `recovery:${session.id}`);
+    if (recovered) {
+      return {
+        state: recovered.status === 'paid' ? 'paid' : 'needs_review',
+        message: 'Payment was recovered from Stripe while webhook reconciliation completed.',
+        order: recovered,
+      };
+    }
+  }
+  return {
+    state: 'processing',
+    message: 'Payment confirmation is still processing. Do not submit another payment.',
+    order,
+  };
 }
 
 export async function listOrderSummaries(limit = 50): Promise<OrderSummary[]> {

@@ -1,0 +1,490 @@
+import { useEffect, useRef, useState } from 'react';
+import { CatalogPanel } from '@components/CatalogPanel';
+import { GenerationStage } from '@components/GenerationStage';
+import { OrderTimeline } from '@components/OrderTimeline';
+import { QuoteLedger } from '@components/QuoteLedger';
+import { ReadinessChecks } from '@components/ReadinessChecks';
+import { StatusNote } from '@components/StatusNote';
+import { StepRail } from '@components/StepRail';
+import { VariantSelector } from '@components/VariantSelector';
+import { publicConfig } from './config';
+import { api } from './services/api';
+import { useStudioViewModel, type SurfaceError } from './studio-view-model';
+import type { CheckoutConfirmation } from './types/catalog';
+import { trackEvent } from './utils/analytics';
+
+const money = (cents: number, currency = 'USD') =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+
+function ErrorNote({ error, onRetry }: { error?: SurfaceError; onRetry: () => void }) {
+  if (!error) return null;
+  return (
+    <StatusNote
+      tone="error"
+      title={error.title}
+      primaryAction={error.retryable ? { label: 'Try again', onClick: onRetry } : undefined}
+    >
+      <p>{error.message}</p>
+      <p>{error.recovery}</p>
+    </StatusNote>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="site-footer compact-footer">
+      <nav aria-label="Footer links">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/returns">Returns</a>
+        <a href="/content-policy">Content policy</a>
+        <a href="/support">Support</a>
+      </nav>
+      <span>Open Merch Studio</span>
+    </footer>
+  );
+}
+
+export function WorkbenchStudioApp() {
+  const vm = useStudioViewModel();
+  const panelHeading = useRef<HTMLHeadingElement>(null);
+  const [checkoutReturn, setCheckoutReturn] = useState<CheckoutConfirmation | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'cancelled') {
+      trackEvent('checkout_returned', { result: 'cancelled', mode: 'live' });
+      setCheckoutReturn({
+        state: 'failed',
+        message: 'Checkout was cancelled. No payment was made.',
+      });
+      return undefined;
+    }
+    const stripeSessionId = params.get('session_id');
+    if (params.get('checkout') !== 'success' || !stripeSessionId) return undefined;
+    let cancelled = false;
+    setCheckoutReturn({
+      state: 'processing',
+      message: 'Stripe returned successfully. Confirming your payment now.',
+    });
+    const confirm = async () => {
+      for (let attempt = 0; attempt < 30 && !cancelled; attempt += 1) {
+        try {
+          const result = await api.checkoutOrder(stripeSessionId);
+          const confirmation = result.data;
+          setCheckoutReturn(confirmation);
+          if (confirmation.state !== 'processing') {
+            trackEvent('checkout_returned', {
+              result: confirmation.state === 'failed' ? 'unknown' : 'success',
+              mode: 'live',
+            });
+            return;
+          }
+        } catch {
+          // Stripe may redirect before the signed webhook is reconciled.
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+      if (!cancelled) {
+        trackEvent('checkout_returned', { result: 'unknown', mode: 'live' });
+        setCheckoutReturn({
+          state: 'processing',
+          message: 'Confirmation is still processing. Do not submit another payment.',
+        });
+      }
+    };
+    void confirm();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (vm.flow === 'booting' || vm.flow === 'boot_failed') return;
+    panelHeading.current?.focus({ preventScroll: true });
+  }, [vm.workbenchMode, vm.flow]);
+
+  if (vm.flow === 'booting') {
+    return (
+      <main className="loading-shell" aria-busy="true">
+        <div className="loading-card">
+          <span className="brand-symbol" aria-hidden="true">
+            OM
+          </span>
+          <h1>Open Merch Studio</h1>
+          <p>Getting the studio ready…</p>
+        </div>
+      </main>
+    );
+  }
+  if (vm.flow === 'boot_failed') {
+    return (
+      <main className="loading-shell">
+        <div className="loading-card">
+          <ErrorNote error={vm.errors.boot} onRetry={vm.boot} />
+        </div>
+      </main>
+    );
+  }
+
+  const selected = vm.selectedProduct && vm.selectedVariant;
+  const promptBlocked = !selected || !vm.prompt.trim();
+  const panelTitle = {
+    product: 'Choose a product',
+    configure: 'Choose color and size',
+    describe: 'Describe your design',
+    generating: 'Making your artwork',
+    review: 'Your design is ready',
+    checkout: 'Review and checkout',
+    order: 'Your order',
+  }[vm.workbenchMode];
+
+  return (
+    <main className={`app-shell streamlined-app mode-${vm.workbenchMode}`}>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {vm.announcement}
+      </div>
+      <header className="app-header compact-header">
+        <a className="brand" href="/" aria-label="Open Merch Studio home">
+          <span className="brand-symbol" aria-hidden="true">
+            OM
+          </span>
+          <b>Open Merch Studio</b>
+        </a>
+        <a href="/support">Support</a>
+      </header>
+
+      {!vm.online && (
+        <div className="connection-banner" role="status">
+          <strong>Offline — your work is safe in this browser.</strong>
+        </div>
+      )}
+      {checkoutReturn && (
+        <div className="checkout-return compact-return">
+          <StatusNote
+            tone={
+              checkoutReturn.state === 'paid'
+                ? 'success'
+                : checkoutReturn.state === 'failed'
+                  ? 'warning'
+                  : 'info'
+            }
+            title={checkoutReturn.state === 'paid' ? 'Payment received' : 'Checkout update'}
+          >
+            <p>{checkoutReturn.message}</p>
+            {checkoutReturn.order && (
+              <p>
+                {checkoutReturn.order.orderNumber} ·{' '}
+                {money(checkoutReturn.order.totalCents, checkoutReturn.order.currency)} including{' '}
+                {money(checkoutReturn.order.taxCents, checkoutReturn.order.currency)} tax
+              </p>
+            )}
+          </StatusNote>
+        </div>
+      )}
+      {vm.recoveryMessage && (
+        <div className="checkout-return compact-return">
+          <StatusNote tone="info" title="Your previous work was restored">
+            <p>{vm.recoveryMessage}</p>
+          </StatusNote>
+        </div>
+      )}
+
+      <StepRail states={vm.stepStates} onNavigate={vm.navigate} />
+
+      <section className="focused-workbench">
+        <section className="focused-workbench__canvas" aria-label="Product canvas">
+          {selected && vm.workbenchMode !== 'product' && (
+            <button className="canvas-product-summary" type="button" onClick={vm.showProduct}>
+              <span>{vm.selectedProduct?.title}</span>
+              <b>{vm.selectedVariant?.name}</b>
+              <small>Change product</small>
+            </button>
+          )}
+          <GenerationStage
+            product={vm.selectedProduct}
+            variant={vm.selectedVariant}
+            draft={vm.design}
+            mockup={vm.mockup}
+            generating={vm.busy.generating || vm.busy.revising}
+            mockupBusy={vm.busy.mockup}
+            phase={vm.busy.revising ? 'Creating your variation' : vm.generationPhase}
+            startedAt={vm.operationStartedAt}
+            stale={false}
+            onCancel={vm.cancelGeneration}
+            onRetryMockup={vm.createMockup}
+            onContinueWithoutMockup={vm.createQuote}
+            error={vm.errors.mockup}
+            orientation={vm.selectedOrientation}
+            activeViewIndex={vm.activeMockupViewIndex}
+            onViewIndexChange={vm.setActiveMockupViewIndex}
+          />
+        </section>
+
+        <aside className="task-panel" aria-labelledby="task-panel-title">
+          <div className="task-panel__scroll">
+            {vm.workbenchMode !== 'product' && (
+              <div className="task-panel__heading">
+                <span className="kicker">
+                  {vm.workbenchMode === 'checkout' ? 'Secure checkout' : 'Make it yours'}
+                </span>
+                <h1 id="task-panel-title" tabIndex={-1} ref={panelHeading}>
+                  {panelTitle}
+                </h1>
+              </div>
+            )}
+
+            {vm.workbenchMode === 'product' && (
+              <CatalogPanel
+                categories={vm.categories}
+                products={vm.products}
+                category={vm.selectedCategory}
+                loading={vm.busy.catalog}
+                selectedProductId={vm.selectedProductId}
+                onCategory={vm.setSelectedCategory}
+                onSelect={vm.selectProduct}
+              />
+            )}
+
+            {vm.workbenchMode === 'configure' && selected && (
+              <div className="panel-stack">
+                <VariantSelector
+                  product={vm.selectedProduct!}
+                  selectedVariant={vm.selectedVariant!}
+                  onChange={vm.setSelectedVariantId}
+                />
+                {vm.selectedProduct!.placements.length > 1 && (
+                  <fieldset>
+                    <legend>Print placement</legend>
+                    <div className="placement-options compact-options">
+                      {vm.selectedProduct!.placements.map((placement) => (
+                        <button
+                          key={placement.code}
+                          type="button"
+                          aria-pressed={vm.selectedPlacements.includes(placement.code)}
+                          onClick={() => vm.togglePlacement(placement.code)}
+                        >
+                          {placement.displayName}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+                {vm.selectedProduct!.categorySlug === 'wall-art' && (
+                  <fieldset>
+                    <legend>Orientation</legend>
+                    <div className="placement-options compact-options">
+                      {vm.selectedOrientation === 'square' ? (
+                        <button type="button" aria-pressed="true">
+                          Square
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            aria-pressed={vm.selectedOrientation === 'landscape'}
+                            onClick={() => vm.setSelectedOrientation('landscape')}
+                          >
+                            Landscape
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={vm.selectedOrientation === 'portrait'}
+                            onClick={() => vm.setSelectedOrientation('portrait')}
+                          >
+                            Portrait
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </fieldset>
+                )}
+                <button
+                  className="button button--primary button--wide"
+                  type="button"
+                  onClick={vm.continueFromConfigure}
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+
+            {vm.workbenchMode === 'describe' && selected && (
+              <div className="panel-stack">
+                <button className="selection-summary" type="button" onClick={vm.showConfigure}>
+                  <span>{vm.selectedProduct!.title}</span>
+                  <b>{vm.selectedVariant!.name}</b>
+                  <small>Edit</small>
+                </button>
+                <label className="prompt-field streamlined-prompt">
+                  <span>What should we make?</span>
+                  <textarea
+                    autoFocus
+                    value={vm.prompt}
+                    onChange={(event) => vm.setPrompt(event.target.value)}
+                    rows={6}
+                    maxLength={600}
+                    placeholder="A cheerful red panda tending a tiny garden, bold screen-print style, no words…"
+                  />
+                  <small className="prompt-help">
+                    Describe the subject, style, colors, and any essential words.
+                  </small>
+                  {vm.prompt.length >= 450 && <b>{vm.prompt.length}/600</b>}
+                </label>
+                <ErrorNote error={vm.errors.generation} onRetry={vm.generate} />
+                <button
+                  className="button button--primary button--wide"
+                  type="button"
+                  onClick={vm.generate}
+                  disabled={promptBlocked || vm.busy.generating}
+                >
+                  Generate my design
+                </button>
+              </div>
+            )}
+
+            {vm.workbenchMode === 'generating' && (
+              <div className="panel-stack generation-panel" role="status" aria-live="polite">
+                <span className="progress-orbit" aria-hidden="true" />
+                <p>We’ll move from artwork to a product-ready mockup automatically.</p>
+                {vm.busy.generating && (
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    onClick={vm.cancelGeneration}
+                  >
+                    Cancel generation
+                  </button>
+                )}
+              </div>
+            )}
+
+            {vm.workbenchMode === 'review' && vm.design && (
+              <div className="panel-stack review-panel">
+                <div className={`ready-confirmation is-${vm.design.readiness.status}`}>
+                  <span aria-hidden="true">{vm.artworkReady ? '✓' : '!'}</span>
+                  <div>
+                    <b>{vm.artworkReady ? 'Print ready' : 'Needs a quick review'}</b>
+                    <p>
+                      {vm.busy.mockup
+                        ? 'Building your product view…'
+                        : 'Your artwork is saved and ready to order.'}
+                    </p>
+                  </div>
+                </div>
+                {vm.quote ? (
+                  <div className="review-total">
+                    <span>Estimated total before tax</span>
+                    <strong>{money(vm.quote.totalCents, vm.quote.currency)}</strong>
+                  </div>
+                ) : (
+                  <p className="muted-copy">Preparing your price…</p>
+                )}
+                <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
+                <button
+                  className="button button--primary button--wide"
+                  type="button"
+                  onClick={vm.showCheckout}
+                  disabled={
+                    !vm.quote ||
+                    vm.quoteStale ||
+                    vm.quoteExpired ||
+                    vm.busy.quoting ||
+                    vm.busy.mockup ||
+                    (vm.mockup?.status !== 'complete' && !vm.errors.mockup) ||
+                    !vm.artworkReady
+                  }
+                >
+                  {vm.busy.quoting ? 'Preparing price…' : 'Review and checkout'}
+                </button>
+                <button
+                  className="button button--secondary button--wide"
+                  type="button"
+                  onClick={vm.showDescribe}
+                >
+                  Make changes
+                </button>
+                <button className="text-action" type="button" onClick={vm.showProduct}>
+                  Try it on another product
+                </button>
+                <ReadinessChecks draft={vm.design} />
+                {(vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother) && (
+                  <details className="refine-panel">
+                    <summary>More design options</summary>
+                    {vm.canRevise && (
+                      <label className="revision-field">
+                        <span>Create a variation</span>
+                        <textarea
+                          rows={3}
+                          value={vm.revision}
+                          onChange={(event) => vm.setRevision(event.target.value)}
+                          placeholder="Make the main subject larger…"
+                        />
+                        <button
+                          className="button button--secondary"
+                          type="button"
+                          onClick={vm.reviseDraft}
+                          disabled={!vm.revision.trim() || vm.busy.revising}
+                        >
+                          Create variation
+                        </button>
+                      </label>
+                    )}
+                    {vm.designHistory.length > 0 && (
+                      <button className="text-action" type="button" onClick={vm.undoDraft}>
+                        Restore previous artwork
+                      </button>
+                    )}
+                  </details>
+                )}
+              </div>
+            )}
+
+            {vm.workbenchMode === 'checkout' && (
+              <div className="panel-stack checkout-panel">
+                <QuoteLedger
+                  quote={vm.quote}
+                  loading={vm.busy.quoting}
+                  stale={vm.quoteStale}
+                  expired={vm.quoteExpired}
+                  onRefresh={vm.createQuote}
+                  embedded
+                />
+                <label className="email-field">
+                  <span>Email for receipt</span>
+                  <input
+                    type="email"
+                    value={vm.email}
+                    onChange={(event) => vm.setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                  />
+                </label>
+                <button
+                  className="button button--primary button--wide"
+                  type="button"
+                  onClick={vm.createCheckout}
+                  disabled={!vm.checkoutReadiness.ready || vm.busy.checkout}
+                >
+                  {vm.busy.checkout ? 'Opening checkout…' : 'Continue to secure checkout'}
+                </button>
+                {!publicConfig.enablePublicCheckout && (
+                  <p className="disabled-reason">
+                    Checkout is currently closed. Your design and price stay saved.
+                  </p>
+                )}
+                <ErrorNote error={vm.errors.checkout} onRetry={vm.createCheckout} />
+                <button className="text-action" type="button" onClick={vm.showReview}>
+                  Back to design
+                </button>
+              </div>
+            )}
+
+            {vm.workbenchMode === 'order' && vm.order && <OrderTimeline order={vm.order} />}
+          </div>
+        </aside>
+      </section>
+      <Footer />
+    </main>
+  );
+}

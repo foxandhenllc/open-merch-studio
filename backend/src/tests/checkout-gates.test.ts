@@ -114,6 +114,7 @@ test('checkout return lookup restores the order from its Stripe session ID', asy
     orderNumber: 'OMS-TEST-RETURN',
     stripeSessionId,
     status: 'paid',
+    taxCents: 0,
     totalCents: 2595,
     currency: 'USD',
     fulfillment: {
@@ -133,6 +134,7 @@ test('checkout return lookup restores the order from its Stripe session ID', asy
 
   const restored = await getOrderByCheckoutSession(stripeSessionId);
 
-  assert.equal(restored?.id, 'order-return-lookup');
-  assert.equal(restored?.status, 'paid');
+  assert.equal(restored.state, 'paid');
+  assert.equal(restored.order?.id, 'order-return-lookup');
+  assert.equal(restored.order?.status, 'paid');
 });

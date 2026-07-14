@@ -149,6 +149,7 @@ frontend/scripts/capture-utils/*
 
 # Playwright auth state
 .auth
+output/playwright/
 
 # Local provider exports and private artifacts
 *.sqlite

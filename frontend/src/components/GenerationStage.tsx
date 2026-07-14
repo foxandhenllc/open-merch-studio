@@ -68,8 +68,8 @@ export function GenerationStage({
     );
   }
 
-  const hasProviderMockup = mockup?.status === 'complete' && mockup.provider === 'printful';
-  const artworkUrl = draft?.imageUrl;
+  const hasProviderMockup = !generating && !mockupBusy && mockup?.status === 'complete';
+  const artworkUrl = generating ? undefined : draft?.imageUrl;
   const mockupViews =
     mockup?.views?.length && hasProviderMockup
       ? mockup.views
@@ -101,7 +101,7 @@ export function GenerationStage({
           />
           {mockupViews.length > 1 && (
             <div className="mockup-viewer__rail" aria-label="Product mockup views">
-              {mockupViews.map((view, index) => (
+              {mockupViews.slice(0, 3).map((view, index) => (
                 <button
                   key={view.imageUrl}
                   type="button"
@@ -117,6 +117,24 @@ export function GenerationStage({
                   <span>{view.label}</span>
                 </button>
               ))}
+              {mockupViews.length > 3 && (
+                <details className="more-views">
+                  <summary>More views</summary>
+                  <div>
+                    {mockupViews.slice(3).map((view, index) => (
+                      <button
+                        key={view.imageUrl}
+                        type="button"
+                        aria-label={`Show ${view.label}`}
+                        onClick={() => onViewIndexChange(index + 3)}
+                      >
+                        <img src={view.imageUrl} alt="" />
+                        <span>{view.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
         </div>
@@ -174,7 +192,9 @@ export function GenerationStage({
       {(mockup?.status === 'failed' || error) && (
         <div className="stage__status">
           <StatusNote tone="error" title={error?.title ?? 'The product preview failed'}>
-            <p>{error?.message ?? mockup?.errorMessage ?? 'Printful could not build this mockup.'}</p>
+            <p>
+              {error?.message ?? mockup?.errorMessage ?? 'Printful could not build this mockup.'}
+            </p>
             <p>
               {error?.recovery ??
                 'Your artwork is unchanged. Retry the mockup, or continue to price without it.'}

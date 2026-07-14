@@ -109,6 +109,15 @@ export function buildQuoteBreakdown(
     if (unavailablePlacement) {
       throw new Error(`Placement ${unavailablePlacement} is unavailable for ${product.title}`);
     }
+    const placementTechniques = Object.fromEntries(
+      placementCodes.map((placementCode) => {
+        const placement = product.placements.find((candidate) => candidate.code === placementCode);
+        if (!placement?.technique) {
+          throw new Error(`Technique for ${placementCode} is unavailable for ${product.title}`);
+        }
+        return [placementCode, placement.technique];
+      })
+    );
 
     const unitMarginCents = calculateTargetMarginCents(unitCostCents, product.type, settings);
     const unitRetailCents = unitCostCents + unitMarginCents + settings.aiDesignFeeCents;
@@ -121,6 +130,7 @@ export function buildQuoteBreakdown(
       variantName: variant.name,
       quantity,
       placementCodes,
+      placementTechniques,
       orientation: input.orientation,
       designAssetId: input.designAssetId,
       unitCostCents,

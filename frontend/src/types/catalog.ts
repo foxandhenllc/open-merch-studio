@@ -30,9 +30,9 @@ export type CatalogVariant = {
 };
 
 export type StudioCapabilities = {
-  ai: 'live' | 'available' | 'demo' | 'offline';
-  checkout: 'live' | 'available' | 'demo' | 'offline';
-  fulfillment: 'live' | 'available' | 'demo' | 'offline';
+  ai: 'live' | 'available' | 'test' | 'demo' | 'offline';
+  checkout: 'live' | 'available' | 'test' | 'demo' | 'offline';
+  fulfillment: 'live' | 'available' | 'test' | 'demo' | 'offline';
 };
 
 export type CatalogProduct = {
@@ -83,6 +83,7 @@ export type QuoteBreakdown = {
     variantName: string;
     quantity: number;
     placementCodes: string[];
+    placementTechniques: Record<string, string>;
     orientation?: 'portrait' | 'landscape' | 'square';
     designAssetId?: string;
     unitCostCents: number;
@@ -196,6 +197,9 @@ export type OrderSummary = {
   id: string;
   orderNumber: string;
   stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  taxCents: number;
+  paidAt?: string;
   status:
     | 'draft'
     | 'quoted'
@@ -222,6 +226,12 @@ export type OrderSummary = {
   };
   timeline: Array<{ at: string; status: string; note: string }>;
   createdAt: string;
+};
+
+export type CheckoutConfirmation = {
+  state: 'processing' | 'paid' | 'needs_review' | 'failed';
+  message: string;
+  order?: OrderSummary;
 };
 
 export type AdminSettings = {

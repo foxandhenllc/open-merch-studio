@@ -25,13 +25,22 @@ export const getCatalogHealth = asyncHandler(async (_req: Request, res: Response
               ? 'available'
               : 'demo',
         checkout:
-          env.stripeSecretKey && env.enableLiveStripe && env.checkoutEnabled
-            ? 'live'
-            : env.stripeSecretKey
-              ? 'available'
-              : 'demo',
+          env.stripeSecretKey?.startsWith('sk_test_') && env.enableLiveStripe
+            ? 'test'
+            : env.stripeSecretKey &&
+                env.enableLiveStripe &&
+                env.checkoutEnabled &&
+                env.allowLivePayments &&
+                env.checkoutAccessMode !== 'closed'
+              ? 'live'
+              : env.stripeSecretKey
+                ? 'available'
+                : 'demo',
         fulfillment:
-          env.printfulApiKey && env.enableLivePrintful
+          env.printfulApiKey &&
+          env.enableLivePrintful &&
+          env.fulfillmentEnabled &&
+          env.allowLiveFulfillment
             ? 'live'
             : env.printfulApiKey
               ? 'available'

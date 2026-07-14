@@ -324,6 +324,10 @@ export async function createQuote(
             designAssetId: item.designAssetId,
             quantity: item.quantity,
             placementCodes: item.placementCodes,
+            options: {
+              orientation: item.orientation,
+              placementTechniques: item.placementTechniques,
+            },
             unitCostCents: item.unitCostCents,
             unitRetailCents: item.unitRetailCents,
           })),

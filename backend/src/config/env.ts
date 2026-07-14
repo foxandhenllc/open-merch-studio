@@ -13,6 +13,19 @@ const booleanFromEnv = (name: string, fallback = false): boolean => {
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 };
 
+export type CheckoutAccessMode = 'closed' | 'allowlist' | 'public';
+
+export const checkoutAccessModeFromEnv = (value?: string): CheckoutAccessMode => {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === 'allowlist' || normalized === 'public' ? normalized : 'closed';
+};
+
+export const checkoutAllowedEmailsFromEnv = (value?: string): string[] =>
+  (value || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
 export const backendUrlFromEnv = (source: NodeJS.ProcessEnv): string => {
   if (source.BACKEND_URL) return source.BACKEND_URL;
   const vercelHost = source.VERCEL_PROJECT_PRODUCTION_URL || source.VERCEL_URL;
@@ -42,6 +55,8 @@ export const env = {
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   adminAccessCode: process.env.ADMIN_ACCESS_CODE,
   allowLivePayments: booleanFromEnv('ALLOW_LIVE_PAYMENTS', false),
+  checkoutAccessMode: checkoutAccessModeFromEnv(process.env.CHECKOUT_ACCESS_MODE),
+  checkoutAllowedEmails: checkoutAllowedEmailsFromEnv(process.env.CHECKOUT_ALLOWED_EMAILS),
   allowLiveFulfillment: booleanFromEnv('ALLOW_LIVE_FULFILLMENT', false),
   printfulAutoConfirmOrders: booleanFromEnv('PRINTFUL_AUTO_CONFIRM_ORDERS', false),
   defaultCurrency: process.env.DEFAULT_CURRENCY || 'USD',

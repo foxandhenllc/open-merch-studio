@@ -35,6 +35,14 @@ export type FlowState =
   | 'ordering'
   | 'redirecting'
   | 'confirmed';
+export type WorkbenchMode =
+  | 'product'
+  | 'configure'
+  | 'describe'
+  | 'generating'
+  | 'review'
+  | 'checkout'
+  | 'order';
 export type ActionKey =
   | 'catalog'
   | 'refining'
@@ -177,6 +185,7 @@ const delay = (milliseconds: number, signal?: AbortSignal) =>
 
 export function useStudioViewModel() {
   const [flow, setFlow] = useState<FlowState>('booting');
+  const [workbenchMode, setWorkbenchMode] = useState<WorkbenchMode>('product');
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [session, setSession] = useState<StudioSession | null>(null);
@@ -309,6 +318,7 @@ export function useStudioViewModel() {
 
       if (!saved) {
         setFlow('configuring');
+        setWorkbenchMode('product');
         return;
       }
 
@@ -323,6 +333,7 @@ export function useStudioViewModel() {
           'Your previous product selection is no longer available. Your guest session was restored so you can choose another product.'
         );
         setFlow('configuring');
+        setWorkbenchMode('product');
         return;
       }
 
@@ -435,6 +446,7 @@ export function useStudioViewModel() {
       }
 
       setFlow(restoredQuote ? 'quoted' : restoredDraft ? 'drafted' : 'configuring');
+      setWorkbenchMode(restoredDraft ? 'review' : saved.prompt.trim() ? 'describe' : 'configure');
       setAnnouncement('Your previous guest session was restored.');
     } catch (error) {
       fail('boot', error);
@@ -516,6 +528,7 @@ export function useStudioViewModel() {
     placements: string[];
     draft: DesignDraft;
     orientation?: PreviewOrientation;
+    revealReview?: boolean;
   }) => {
     if (!params.draft.id || params.draft.readiness.status === 'blocked') return;
     const requestId = ++mockupRequestId.current;
@@ -537,6 +550,7 @@ export function useStudioViewModel() {
       setFlow(quote ? 'quote_stale' : 'drafted');
       setAnnouncement('Saved product mockup restored.');
       trackEvent('mockup_completed', { result: 'success', source: 'fallback' });
+      if (params.revealReview !== false) setWorkbenchMode('review');
       return;
     }
     if (mockup) setMockupStale(true);
@@ -577,6 +591,7 @@ export function useStudioViewModel() {
         mockupCache.current.set(key, result);
         setFlow(quote ? 'quote_stale' : 'drafted');
         setAnnouncement('Product mockup ready. Your price estimate is updating automatically.');
+        if (params.revealReview !== false) setWorkbenchMode('review');
       }
     } catch (error) {
       if (requestId !== mockupRequestId.current) return;
@@ -644,9 +659,18 @@ export function useStudioViewModel() {
       });
     }
     markStale();
+    setWorkbenchMode('configure');
+    setMockup(null);
     if (design && variant && placements.length) {
       setAnnouncement(`${product.title} selected. Updating the product mockup.`);
-      void requestMockup({ product, variant, placements, draft: design, orientation });
+      void requestMockup({
+        product,
+        variant,
+        placements,
+        draft: design,
+        orientation,
+        revealReview: false,
+      });
     } else {
       setAnnouncement(`${product.title} selected. Next: describe your design.`);
     }
@@ -676,12 +700,14 @@ export function useStudioViewModel() {
       });
     }
     if (design && selectedProduct && variant) {
+      setMockup(null);
       void requestMockup({
         product: selectedProduct,
         variant,
         placements: selectedPlacements,
         draft: design,
         orientation,
+        revealReview: false,
       });
     }
   };
@@ -706,12 +732,14 @@ export function useStudioViewModel() {
     }
     markStale();
     if (design && selectedProduct && selectedVariant) {
+      setMockup(null);
       void requestMockup({
         product: selectedProduct,
         variant: selectedVariant,
         placements: next,
         draft: design,
         orientation: selectedOrientation,
+        revealReview: false,
       });
     }
   };
@@ -726,12 +754,14 @@ export function useStudioViewModel() {
     });
     markStale();
     if (design) {
+      setMockup(null);
       void requestMockup({
         product: selectedProduct,
         variant: selectedVariant,
         placements: selectedPlacements,
         draft: design,
         orientation,
+        revealReview: false,
       });
     }
   };
@@ -777,6 +807,7 @@ export function useStudioViewModel() {
     generationController.current = controller;
     setAction('generating', true);
     setFlow('generating');
+    setWorkbenchMode('generating');
     setGenerationPhase('Queued');
     setOperationStartedAt(Date.now());
     clearError('generation');
@@ -813,7 +844,7 @@ export function useStudioViewModel() {
         );
       }
       setDesign(draft);
-      if (mockup) setMockupStale(true);
+      setMockup(null);
       setQuote(null);
       setMockupStale(false);
       setQuoteStale(false);
@@ -839,6 +870,7 @@ export function useStudioViewModel() {
           source: dataSource === 'live' ? 'api' : 'fixture',
         });
         setFlow('configuring');
+        setWorkbenchMode('describe');
         setAnnouncement(
           'Generation cancelled. Your prompt is unchanged and no draft credit was used.'
         );
@@ -849,6 +881,7 @@ export function useStudioViewModel() {
         });
         fail('generation', error);
         setFlow('configuring');
+        setWorkbenchMode('describe');
       }
     } finally {
       window.clearTimeout(phaseOne);
@@ -876,6 +909,7 @@ export function useStudioViewModel() {
       return;
     }
     setAction('revising', true);
+    setWorkbenchMode('generating');
     clearError('generation');
     try {
       const result = await api.reviseDraft({
@@ -888,7 +922,7 @@ export function useStudioViewModel() {
         current.some((item) => item.id === design.id) ? current : [...current, design]
       );
       setDesign(revised);
-      if (mockup) setMockupStale(true);
+      setMockup(null);
       setQuoteStale(Boolean(quote));
       setFlow('drafted');
       setRevision('');
@@ -906,12 +940,14 @@ export function useStudioViewModel() {
           orientation: selectedOrientation,
         });
       }
+      setWorkbenchMode('review');
     } catch (error) {
       trackEvent('design_revision_completed', {
         result: 'failed',
         remaining: revisionBand(design.allowance.editsRemaining),
       });
       fail('generation', error);
+      setWorkbenchMode('review');
     } finally {
       setAction('revising', false);
     }
@@ -1136,12 +1172,14 @@ export function useStudioViewModel() {
         setOrder(inlineOrder);
         setFlow('confirmed');
         setAnnouncement(`Order ${inlineOrder.orderNumber} confirmed.`);
+        setWorkbenchMode('order');
       } else if (result.orderId) {
         try {
           const nextOrder = consumeSource(await api.order(result.orderId));
           setOrder(nextOrder);
           setFlow('confirmed');
           setAnnouncement(`Order ${nextOrder.orderNumber} confirmed.`);
+          setWorkbenchMode('order');
         } catch (error) {
           setFlow('confirmed');
           setErrors((current) => ({
@@ -1166,36 +1204,29 @@ export function useStudioViewModel() {
 
   const stepStates = useMemo<Record<StudioStep, StepState>>(
     () => ({
-      product: selectedProduct ? 'done' : 'active',
+      product: workbenchMode === 'product' ? 'active' : selectedProduct ? 'done' : 'todo',
       make:
-        flow === 'generating' ||
-        flow === 'refining' ||
-        flow === 'previewing' ||
-        mockup?.status === 'failed' ||
-        (!design && selectedProduct)
+        workbenchMode === 'configure' ||
+        workbenchMode === 'describe' ||
+        workbenchMode === 'generating' ||
+        workbenchMode === 'review'
           ? 'active'
-          : design && mockup?.status === 'complete' && !mockupStale
+          : design
             ? 'done'
-            : design
-              ? 'active'
-              : 'todo',
-      order:
-        quoteStale || flow === 'quote_stale' || flow === 'quote_expired'
-          ? 'stale'
-          : order || flow === 'confirmed' || artworkReady
-            ? 'active'
             : 'todo',
+      order: workbenchMode === 'checkout' || workbenchMode === 'order' ? 'active' : 'todo',
     }),
-    [selectedProduct, design, mockup, quote, order, flow, mockupStale, quoteStale, artworkReady]
+    [selectedProduct, design, workbenchMode]
   );
   const navigate = (step: StudioStep) => {
-    const target = document.getElementById(`step-${step}`);
-    target?.scrollIntoView({ behavior: 'auto', block: 'start' });
-    target?.focus({ preventScroll: true });
+    if (step === 'product') setWorkbenchMode('product');
+    if (step === 'make' && selectedProduct) setWorkbenchMode(design ? 'review' : 'configure');
+    if (step === 'order' && artworkReady) setWorkbenchMode('checkout');
   };
 
   return {
     flow,
+    workbenchMode,
     categories,
     products,
     session,
@@ -1257,6 +1288,12 @@ export function useStudioViewModel() {
     createCheckout,
     boot,
     navigate,
+    continueFromConfigure: () => setWorkbenchMode(design ? 'review' : 'describe'),
+    showProduct: () => setWorkbenchMode('product'),
+    showConfigure: () => setWorkbenchMode('configure'),
+    showDescribe: () => setWorkbenchMode('describe'),
+    showReview: () => setWorkbenchMode('review'),
+    showCheckout: () => setWorkbenchMode('checkout'),
     dismissFallback: () => setFallback(null),
     clearError,
   };

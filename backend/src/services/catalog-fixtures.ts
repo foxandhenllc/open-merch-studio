@@ -4,11 +4,11 @@ type FixtureProduct = CatalogProductDto & {
   categorySlug: string;
 };
 
-const defaultPlacements = (code = 'default') => [
+const defaultPlacements = (code = 'default', technique = 'digital') => [
   {
     code,
     displayName: code === 'front' ? 'Front print' : 'Default print area',
-    technique: 'dtg',
+    technique,
     isDefault: true,
   },
 ];
@@ -184,7 +184,7 @@ export const sampleCatalog: {
           costCents: 830,
         },
       ],
-      placements: defaultPlacements(),
+      placements: defaultPlacements('default', 'sublimation'),
     },
     {
       id: 'fixture-product-matte-poster',
@@ -207,7 +207,7 @@ export const sampleCatalog: {
           costCents: 700,
         },
       ],
-      placements: defaultPlacements(),
+      placements: defaultPlacements('default', 'digital'),
     },
     {
       id: 'fixture-product-tote',
@@ -231,7 +231,7 @@ export const sampleCatalog: {
           costCents: 1125,
         },
       ],
-      placements: defaultPlacements('front'),
+      placements: defaultPlacements('front', 'dtg'),
     },
     {
       id: 'fixture-product-vinyl-sticker',
@@ -254,7 +254,7 @@ export const sampleCatalog: {
           costCents: 250,
         },
       ],
-      placements: defaultPlacements(),
+      placements: defaultPlacements('default', 'digital'),
     },
     {
       id: 'fixture-product-phone-case',
@@ -276,7 +276,7 @@ export const sampleCatalog: {
           costCents: 1025,
         },
       ],
-      placements: defaultPlacements(),
+      placements: defaultPlacements('default', 'sublimation'),
     },
     {
       id: 'fixture-product-notebook',
@@ -298,7 +298,7 @@ export const sampleCatalog: {
           costCents: 900,
         },
       ],
-      placements: defaultPlacements(),
+      placements: defaultPlacements('default', 'digital'),
     },
   ],
 };

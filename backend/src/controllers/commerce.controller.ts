@@ -5,8 +5,10 @@ import {
   createStudioPassCheckout,
   getOrderByCheckoutSession,
   getOrderSummary,
+  handleStripeChargeRefunded,
   handleStripeCheckoutCompleted,
   markStripeEventTracked,
+  handleStripeCheckoutExpired,
   submitFixtureFulfillment,
   wasStripeEventProcessed,
 } from '../services/order.service.js';
@@ -55,11 +57,11 @@ export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response)
   if (!sessionId.startsWith('cs_')) {
     throw new HttpError('A valid Stripe Checkout Session ID is required.', 400);
   }
-  const order = await getOrderByCheckoutSession(sessionId);
-  if (!order) {
-    throw new HttpError('Checkout confirmation is still processing.', 404);
-  }
-  res.json({ success: true, data: order });
+  const confirmation = await getOrderByCheckoutSession(sessionId);
+  res.status(confirmation.state === 'processing' ? 202 : 200).json({
+    success: true,
+    data: confirmation,
+  });
 });
 
 export const postStripeWebhook = asyncHandler(async (req: Request, res: Response) => {
@@ -83,6 +85,10 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
       );
       markStripeEventTracked(event.id);
     }
+  } else if (event.type === 'checkout.session.expired') {
+    await handleStripeCheckoutExpired(event.data.object, event.id);
+  } else if (event.type === 'charge.refunded') {
+    await handleStripeChargeRefunded(event.data.object, event.id);
   }
   res.json({ received: true });
 });

@@ -11,9 +11,10 @@ Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea r
 Live provider behavior must stay behind explicit environment gates.
 
 - `PUBLIC_APP_MODE=production` switches the public app into customer-facing mode and hides OSS/operator-only surfaces.
-- `ENABLE_PUBLIC_CHECKOUT=false` blocks Studio Pass purchase and merchandise checkout until launch approval.
+- `CHECKOUT_ACCESS_MODE=closed` blocks every Stripe Session until an explicit supervised window.
+- `CHECKOUT_ALLOWED_EMAILS=` is read only in `allowlist` mode. Use normalized operator emails and remove them after the smoke.
 - `VITE_PUBLIC_APP_MODE=production` should be set for the production frontend build.
-- `VITE_ENABLE_PUBLIC_CHECKOUT=false` keeps checkout controls disabled for public visitors.
+- `VITE_ENABLE_PUBLIC_CHECKOUT=false` keeps checkout controls disabled for public visitors; it is not a payment authorization gate.
 - `VITE_ENABLE_LOCAL_FALLBACKS=false` prevents browser-only fixture fallbacks from masking production API failures.
 - `ENABLE_LIVE_OPENAI=false` keeps design generation in mock mode.
 - `ENABLE_LIVE_STRIPE=false` keeps Studio Pass and merchandise checkout in fixture mode.
@@ -24,7 +25,7 @@ Live provider behavior must stay behind explicit environment gates.
 - `PRINTFUL_MOCKUP_TIMEOUT_MS=180000` caps live Printful mockup task polling.
 - `FULFILLMENT_ENABLED=false` prevents real fulfillment activation.
 
-Do not enable these gates until the matching private OPS tickets are reviewed, the database migration has been applied, Stripe webhooks are verified, and provider test runs are captured. Public production deployments can safely allow browsing, design exploration, mockup preview, and quoting while checkout remains closed.
+Do not enable these gates until the matching private OPS tickets are reviewed, the checkout reconciliation migration has been applied, Stripe webhooks are verified, and provider test runs are captured. Public production deployments can safely allow browsing, design exploration, mockup preview, and quoting while checkout remains closed. Ignore any legacy `ENABLE_PUBLIC_CHECKOUT` value; it no longer authorizes the server.
 
 ## Fixture Smoke Test
 
@@ -52,10 +53,10 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 - `backend/prisma/migrations/20260529180000_paid_beta_foundation/migration.sql` and `backend/prisma/migrations/20260530122000_paid_beta_provider_hardening/migration.sql` have been applied to the dedicated Open Merch Studio database.
 - Preview and production environments are separated.
 - Vercel uses the full-stack Express backend through `api/[...path].js`; production API testing must hit real `/api/*` routes, not the archived fixture handlers under `api-fixtures/`.
-- Production has `PUBLIC_APP_MODE=production`, `VITE_PUBLIC_APP_MODE=production`, `ENABLE_PUBLIC_CHECKOUT=false`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
-- Stripe Checkout Sessions and webhooks are implemented in the backend with idempotent session creation and event-ID persistence. They must be verified with Stripe test mode before live checkout. Refunds, tax/accounting handling, and support paths still require private operator sign-off.
+- Production has `PUBLIC_APP_MODE=production`, `VITE_PUBLIC_APP_MODE=production`, `CHECKOUT_ACCESS_MODE=closed`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
+- Stripe Checkout Sessions are card-only and US-only with Stripe Tax enabled. Webhook reconciliation stores final total, tax, payment intent, and paid timestamp; signed subscriptions must include completed, expired, and refunded events. Tax registrations and accounting remain operator responsibilities.
 - OpenAI provider calls are implemented behind a gate with prompt moderation, product-neutral print prompt shaping, durable spend events when `DATABASE_URL` is configured, and checkout blocks for failed, warning, or policy-review designs. Spend alerts and pause steps must still be verified before live generation.
-- Printful catalog sync, curated product allowlisting, mockup task polling, duplicate draft-order recovery, payload validation, and draft-order creation are implemented behind gates. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.
+- Printful catalog sync, curated product allowlisting, mockup task polling, duplicate draft-order recovery, technique-preserving payload validation, and draft-order creation are implemented behind gates. Drafts are never auto-confirmed. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.
 - Tax, shipping, and Studio Pass accounting assumptions are reviewed before real-money launch.
 - `OMS-094` is reviewed with the private OPS checklist before inviting paid beta customers.
 

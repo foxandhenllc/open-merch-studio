@@ -3,6 +3,7 @@ import type {
   CatalogCategory,
   CatalogProduct,
   CheckoutSession,
+  CheckoutConfirmation,
   DesignDraft,
   DesignIdea,
   DesignMockup,
@@ -109,23 +110,30 @@ export const api = {
       localProductsForCategory(category)
     );
   },
-  quote: (body: {
-    sessionId?: string;
-    studioPassId?: string;
-    items: Array<{
-      productId: string;
-      variantId: string;
-      quantity: number;
-      placementCodes: string[];
-      orientation?: 'portrait' | 'landscape' | 'square';
-      designAssetId?: string;
-    }>;
-  }, signal?: AbortSignal) =>
+  quote: (
+    body: {
+      sessionId?: string;
+      studioPassId?: string;
+      items: Array<{
+        productId: string;
+        variantId: string;
+        quantity: number;
+        placementCodes: string[];
+        orientation?: 'portrait' | 'landscape' | 'square';
+        designAssetId?: string;
+      }>;
+    },
+    signal?: AbortSignal
+  ) =>
     withFallback(
-      request<QuoteBreakdown>('/api/catalog/quotes', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }, signal),
+      request<QuoteBreakdown>(
+        '/api/catalog/quotes',
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        },
+        signal
+      ),
       () => createLocalQuote(body.items, body.studioPassId)
     ),
   quoteById: (quoteId: string) =>
@@ -233,13 +241,14 @@ export const api = {
     ),
   checkoutOrder: (sessionId: string) =>
     withFallback(
-      request<OrderSummary>(
+      request<CheckoutConfirmation>(
         `/api/checkout/sessions/${encodeURIComponent(sessionId)}/order`
       ),
       () => {
         const order = getLocalOrder();
-        if (!order) throw new Error('Checkout confirmation is still processing.');
-        return order;
+        return order
+          ? { state: 'paid' as const, message: 'Fixture payment received.', order }
+          : { state: 'processing' as const, message: 'Checkout confirmation is still processing.' };
       }
     ),
   order: (orderId: string) =>

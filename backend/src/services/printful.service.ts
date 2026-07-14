@@ -39,6 +39,9 @@ type PrintfulVariant = {
     height?: number;
     orientation?: string;
   }>;
+  techniques?: Array<
+    string | { key?: string; technique?: string; id?: string; is_default?: boolean }
+  >;
 };
 
 type PrintfulListResponse<T> = {
@@ -392,13 +395,21 @@ export async function syncPrintfulCatalog(): Promise<{
         });
 
         const placementDimensions = variant.placement_dimensions ?? [];
+        const techniqueEntry =
+          variant.techniques?.find((entry) => typeof entry === 'object' && entry.is_default) ??
+          variant.techniques?.[0];
+        const technique =
+          typeof techniqueEntry === 'string'
+            ? techniqueEntry
+            : (techniqueEntry?.key ?? techniqueEntry?.technique ?? techniqueEntry?.id);
         for (const dimension of placementDimensions) {
+          if (!technique) continue;
           await prisma.printPlacement.upsert({
             where: {
               productId_code_technique: {
                 productId: createdProduct.id,
                 code: dimension.placement,
-                technique: 'dtg',
+                technique,
               },
             },
             update: {
@@ -412,7 +423,7 @@ export async function syncPrintfulCatalog(): Promise<{
               productId: createdProduct.id,
               code: dimension.placement,
               displayName: dimension.placement.replace(/_/g, ' '),
-              technique: 'dtg',
+              technique,
               width: dimension.width,
               height: dimension.height,
               orientation: dimension.orientation,
@@ -668,6 +679,11 @@ export function buildPrintfulOrderPayload(params: {
     if (!item.placementCodes.length) {
       throw new Error(`Printful placement is missing for ${item.title}.`);
     }
+    for (const placementCode of item.placementCodes) {
+      if (!item.placementTechniques[placementCode]) {
+        throw new Error(`Printful technique is missing for ${item.title} ${placementCode}.`);
+      }
+    }
     if (item.quantity <= 0 || item.unitRetailCents <= 0) {
       throw new Error(`Printful order item ${item.title} has invalid quantity or price.`);
     }
@@ -691,7 +707,7 @@ export function buildPrintfulOrderPayload(params: {
       retail_price: (item.unitRetailCents / 100).toFixed(2),
       placements: item.placementCodes.map((placementCode) => ({
         placement: placementCode,
-        technique: placementCode.includes('embroidery') ? 'embroidery' : 'dtg',
+        technique: item.placementTechniques[placementCode],
         layers: [
           {
             type: 'file',

@@ -35,6 +35,9 @@ export function QuoteLedger({
     );
     return minutes > 60 ? `${Math.ceil(minutes / 60)}h` : `${minutes}m`;
   }, [quote, expired]);
+  const showExpiry = Boolean(
+    quote && (expired || new Date(quote.expiresAt).getTime() - Date.now() <= 60 * 60 * 1000)
+  );
   return (
     <aside
       className={`ledger ${embedded ? 'ledger--embedded' : ''} ${stale || expired ? 'is-stale' : ''}`}
@@ -43,9 +46,9 @@ export function QuoteLedger({
     >
       <div className="section-heading">
         <div>
-          <span className="kicker">Transparent estimate</span>
+          <span className="kicker">Secure checkout</span>
           <h2 id="price-ledger-title" tabIndex={-1}>
-            Your price
+            Estimated total before tax
           </h2>
         </div>
         {onClose && (
@@ -88,37 +91,27 @@ export function QuoteLedger({
               </button>
             </div>
           )}
-          <div className="ledger-lines">
-            {quote.costLines.map((line) => {
-              const estimated =
-                line.kind === 'estimate' ||
-                (line.code.includes('shipping') && quote.estimateFlags.shipping) ||
-                (line.code.includes('payment') && quote.estimateFlags.paymentFee);
-              return (
-                <div key={line.code} className={`ledger-line is-${line.kind}`}>
-                  <span>
-                    {line.label}
-                    {estimated && !line.label.toLowerCase().includes('estimate') && (
-                      <small>estimate</small>
-                    )}
-                  </span>
-                  <b>{money(line.amountCents, quote.currency)}</b>
-                </div>
-              );
-            })}
-          </div>
           <div className="ledger-total">
-            <span>Estimated total</span>
+            <span>Estimated subtotal</span>
             <strong>{money(quote.totalCents, quote.currency)}</strong>
           </div>
+          <details className="price-details">
+            <summary>See price details</summary>
+            <div className="ledger-lines">
+              {quote.costLines.map((line) => (
+                <div key={line.code} className={`ledger-line is-${line.kind}`}>
+                  <span>{line.label}</span>
+                  <b>{money(line.amountCents, quote.currency)}</b>
+                </div>
+              ))}
+            </div>
+          </details>
           <p className="ledger-promise">
-            We show product, printing, design, and operating costs plainly. Shipping, tax, and card
-            processing can change when Stripe confirms the final address and payment method.
+            Stripe calculates final tax securely from your US shipping address.
           </p>
-          <p className="ledger-expiry">
-            Quote {expired ? 'expired' : `held for ${expiry}`} · taxes remain estimated until
-            checkout.
-          </p>
+          {showExpiry && (
+            <p className="ledger-expiry">Quote {expired ? 'expired' : `held for ${expiry}`}.</p>
+          )}
         </>
       )}
     </aside>

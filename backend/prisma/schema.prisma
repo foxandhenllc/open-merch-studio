@@ -309,10 +309,13 @@ model Order {
   email           String?
   status          OrderStatus @default(DRAFT)
   stripeSessionId String?
+  stripePaymentIntentId String? @unique
   printfulOrderId String?
   fulfillmentStatus String      @default("not_submitted")
   failureReason     String?
   totalCents      Int
+  taxCents        Int         @default(0)
+  paidAt          DateTime?
   currency        String      @default("USD")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -323,6 +326,7 @@ model Order {
   fulfillmentAttempts FulfillmentAttempt[]
 
   @@index([status, createdAt])
+  @@index([stripeSessionId])
   @@map("orders")
 }
 

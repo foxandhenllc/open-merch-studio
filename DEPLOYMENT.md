@@ -22,7 +22,8 @@ Store all provider values in deployment-managed storage. Do not commit provider 
 Keep live behavior disabled until the private OPS checklist is complete.
 
 - `PUBLIC_APP_MODE=production`
-- `ENABLE_PUBLIC_CHECKOUT=false`
+- `CHECKOUT_ACCESS_MODE=closed`
+- `CHECKOUT_ALLOWED_EMAILS=`
 - `VITE_PUBLIC_APP_MODE=production`
 - `VITE_ENABLE_PUBLIC_CHECKOUT=false`
 - `VITE_ENABLE_LOCAL_FALLBACKS=false`
@@ -37,9 +38,11 @@ Keep live behavior disabled until the private OPS checklist is complete.
 
 Preview deployments should not use production provider settings. Production checkout, live generation, and real fulfillment must remain separate switches. The backend contains guarded live adapters, but the Vercel fixture API remains public-safe and does not create live provider sessions.
 
-The current Vercel deployment shape is a static frontend plus lightweight `/api/*` functions. In production mode, those functions block simulated checkout unless `ENABLE_PUBLIC_CHECKOUT=true`. Do not turn that flag on until the full backend, Stripe webhooks, Printful fulfillment path, support policies, and launch smoke tests are approved.
+The current Vercel deployment shape is a static frontend plus lightweight `/api/*` functions. `CHECKOUT_ACCESS_MODE` is the authoritative server gate: `closed` blocks all Stripe Session creation, `allowlist` accepts only normalized emails in `CHECKOUT_ALLOWED_EMAILS`, and `public` opens the server path. The old `ENABLE_PUBLIC_CHECKOUT` value is ignored. `VITE_ENABLE_PUBLIC_CHECKOUT` controls presentation only and never authorizes payment.
 
-Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Keep it conservative in serverless environments and prefer long-running backend workers for production mockup generation.
+Provider Checkout requires the quote, artwork, selected variants, and order to be retrievable from PostgreSQL. Stripe Checkout is card-only, US-only, and uses automatic tax. Subscribe the signed webhook endpoint to `checkout.session.completed`, `checkout.session.expired`, and `charge.refunded`.
+
+Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Paid orders create an editable draft with the OMS order number as the external ID; `PRINTFUL_AUTO_CONFIRM_ORDERS` must remain false for the supervised launch.
 
 `gpt-image-2` is the default design model. Because that model does not emit transparent backgrounds, set `REMOVE_BG_API_KEY` to enable the automatic post-generation background-removal stage. Without it, generation and mockups still work, but print readiness shows a warning until a transparent file is prepared.
 
