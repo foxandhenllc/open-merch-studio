@@ -46,11 +46,16 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
         ? libraryStatus
         : 500;
   const requestId = String(res.locals.requestId ?? '');
+  const operationalError = classifyOperationalError(error);
   logOperationalEvent(statusCode >= 500 ? 'error' : 'warning', 'request_failed', {
     requestId,
     route: req.path,
     method: req.method,
-    ...classifyOperationalError(error),
+    ...operationalError,
+    failureCode:
+      error instanceof HttpError && error.errorCode
+        ? error.errorCode
+        : operationalError.failureCode,
     statusCode,
   });
   const exposeMessage = error instanceof HttpError || env.nodeEnv !== 'production';

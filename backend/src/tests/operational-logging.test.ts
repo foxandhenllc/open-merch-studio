@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { NextFunction, Request, Response } from 'express';
 import { env } from '../config/env.js';
-import { errorHandler, requestContext } from '../middleware.js';
+import { errorHandler, HttpError, requestContext } from '../middleware.js';
 import {
   buildOperationalRecord,
   redactRequestUrl,
@@ -118,6 +118,42 @@ test('production parser errors preserve client status without exposing internals
     assert.equal(responseBody.error, 'Request could not be processed.');
   } finally {
     env.nodeEnv = originalNodeEnv;
+    setOperationalSink();
+  }
+});
+
+test('known operational failures retain their safe recovery code', () => {
+  const records: OperationalRecord[] = [];
+  setOperationalSink((record) => records.push(record));
+  const response = {
+    locals: { requestId: 'request-gate-test' },
+    status() {
+      return this;
+    },
+    json() {
+      return this;
+    },
+  } as unknown as Response;
+  const request = {
+    path: '/api/admin/orders/order-1/fulfillment/retry',
+    method: 'POST',
+  } as Request;
+  const next = (() => undefined) as NextFunction;
+
+  try {
+    errorHandler(
+      new HttpError(
+        'Printful draft retry is blocked by the production fulfillment gates.',
+        409,
+        'fulfillment_gate_closed'
+      ),
+      request,
+      response,
+      next
+    );
+    assert.equal(records.at(-1)?.failureCode, 'fulfillment_gate_closed');
+    assert.equal(records.at(-1)?.statusCode, 409);
+  } finally {
     setOperationalSink();
   }
 });
