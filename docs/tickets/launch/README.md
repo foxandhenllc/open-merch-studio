@@ -1,33 +1,37 @@
 # Open Merch Studio Paid Beta Launch Tickets
 
-**Status:** Ready for implementation planning and issue creation  
+**Status:** Historical launch plan with an active implementation ledger
 **Visibility:** Public  
 **Launch bar:** Paid beta  
 **Repo:** FoxAndHenLLC/open-merch-studio
 
-This folder is the public implementation ticket set for turning Open Merch Studio from its current scaffold into a real paid beta storefront. The target is a polished customer shop with a curated Printful-backed catalog, controlled OpenAI-assisted design workflow, transparent Studio Pass pricing, Stripe checkout, fulfillment operations, and OSS-friendly fixture mode.
+This folder preserves the public implementation ticket set used to turn Open Merch Studio from its original scaffold into a guarded paid-beta storefront. Individual tickets retain useful acceptance criteria, while [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) is the authoritative summary of what is implemented, partial, deferred, or blocked.
 
-Private provider setup, account operations, and business review notes are tracked outside the public repo in "/Users/chrisfox/git/staging/private/open-merch-studio-launch/".
+Private provider setup, account operations, and business review notes are maintained outside this public repository.
 
 ## Current Implementation Status
+
 - Fixture-mode implementation ledger: [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md)
 - Paid beta runbook: [../../launch/paid-beta-runbook.md](../../launch/paid-beta-runbook.md)
 - Launch audit template: [../../launch/launch-audit-template.md](../../launch/launch-audit-template.md)
 
 ## Pricing Direction
-- Consumer-facing model: $5 Studio Pass, applied to the eligible merchandise purchase.
-- Free start: low-cost ideation and optionally one rough or watermarked preview.
-- Studio Pass allowance: 8 rough drafts, or 4 rough drafts plus 2 edits, or 1 high-quality print-ready final.
+
+- Consumer-facing MVP: direct design-to-checkout pricing with Studio Pass hidden and server-disabled.
+- Free start: a limited design allowance with customer-safe messaging.
+- Studio Pass: historical experiment retained behind a disabled feature flag for later evaluation.
 - Internal accounting: model usage is tracked in an operator-only ledger with session and daily caps.
-- Product quote model: Printful product cost, shipping/tax estimate where available, payment fee estimate, design allocation, category margin, Studio Pass credit where eligible, and final customer price.
+- Product quote model: Printful product cost, shipping/tax estimate where available, payment fee estimate, design allocation, category margin, and final customer price. Historical Studio Pass credit logic remains disabled with the feature.
 
 ## Source Anchors
+
 - [OpenAI pricing](https://developers.openai.com/api/docs/pricing)
 - [OpenAI image model docs](https://developers.openai.com/api/docs/models/gpt-image-1-mini)
 - [Printful v2 catalog and mockup docs](https://developers.printful.com/docs/v2-beta/)
 - [Printful order and catalog flow docs](https://developers.printful.com/docs/)
 
 ## Critical Path To Paid Beta
+
 - [OMS-001: Paid Beta Launch Scope](./OMS-001-paid-beta-launch-scope.md)
 - [OMS-010: Shop Home And Category Experience](./OMS-010-shop-home-and-category-experience.md)
 - [OMS-011: Product Detail And Variant Selection](./OMS-011-product-detail-and-variant-selection.md)
@@ -69,6 +73,7 @@ Private provider setup, account operations, and business review notes are tracke
 - [OMS-094: Paid Beta Launch Checklist](./OMS-094-paid-beta-launch-checklist.md)
 
 ## All Tickets By Epic
+
 - [EPIC-01: Product And Launch Definition](./EPIC-01-product-and-launch-definition.md) - critical path epic
   - [OMS-001: Paid Beta Launch Scope](./OMS-001-paid-beta-launch-scope.md) - critical path
   - [OMS-002: Public Roadmap And Contribution Positioning](./OMS-002-public-roadmap-and-contribution-positioning.md)
@@ -124,12 +129,14 @@ Private provider setup, account operations, and business review notes are tracke
   - [OMS-094: Paid Beta Launch Checklist](./OMS-094-paid-beta-launch-checklist.md) - critical path
 
 ## Public Safety Rules
+
 - Use synthetic or public-safe fixtures only.
 - Keep provider account values and customer private data out of public docs, issues, fixtures, screenshots, and test artifacts.
 - Do not claim adoption, revenue, active users, or customer traction unless there is public evidence approved for release.
 - Default local development must work with mock or fixture providers.
 
 ## Done Criteria For This Ticket Set
+
 - Every ticket has concrete requirements, acceptance criteria, dependencies, and a test plan.
 - The critical path covers storefront, pricing, catalog, AI design, checkout, fulfillment, admin, deployment, and launch review.
 - Private operator work is referenced but not copied into public GitHub docs.

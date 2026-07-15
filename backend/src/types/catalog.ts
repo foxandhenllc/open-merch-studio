@@ -236,10 +236,52 @@ export type OrderSummary = {
   createdAt: string;
 };
 
+export type CustomerOrderStatus =
+  | 'preparing'
+  | 'awaiting_payment'
+  | 'received'
+  | 'under_review'
+  | 'action_needed'
+  | 'in_production'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
+
+export type CustomerOrderConfirmation = {
+  orderNumber: string;
+  status: CustomerOrderStatus;
+  message: string;
+  totalCents: number;
+  taxCents: number;
+  refundedCents?: number;
+  paidAt?: string;
+  currency: string;
+  items: Array<{
+    title: string;
+    variantName: string;
+    quantity: number;
+  }>;
+  fulfillment: {
+    provider: 'fixture' | 'production';
+    status: CustomerOrderStatus;
+    message: string;
+  };
+  timeline: Array<{
+    at: string;
+    status: CustomerOrderStatus;
+    note: string;
+  }>;
+  support: {
+    email: string;
+  };
+  createdAt: string;
+};
+
 export type CheckoutConfirmation = {
   state: 'processing' | 'paid' | 'needs_review' | 'failed';
   message: string;
-  order?: OrderSummary;
+  order?: CustomerOrderConfirmation;
 };
 
 export type OperatorReviewStatus = 'unreviewed' | 'acknowledged' | 'resolved';

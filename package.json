@@ -25,6 +25,7 @@
     "lint": "node \"$npm_execpath\" --workspace open-merch-studio-backend run lint && node \"$npm_execpath\" --workspace open-merch-studio-frontend run lint",
     "type-check": "node \"$npm_execpath\" --workspace open-merch-studio-backend run type-check && node \"$npm_execpath\" --workspace open-merch-studio-frontend run type-check",
     "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test",
+    "test:browser": "node frontend/scripts/responsive-smoke.mjs",
     "smoke:fixture": "node --import tsx backend/src/tests/fixture-smoke.test.ts",
     "db:generate": "node \"$npm_execpath\" --workspace open-merch-studio-backend run db:generate"
   },

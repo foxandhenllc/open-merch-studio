@@ -1,13 +1,12 @@
 import type {
-  AdminReport,
   CatalogCategory,
   CatalogProduct,
   CheckoutSession,
   CheckoutConfirmation,
+  CustomerOrderConfirmation,
   DesignDraft,
   DesignIdea,
   DesignMockup,
-  OrderSummary,
   QuoteBreakdown,
   StudioCapabilities,
   StudioSession,
@@ -20,15 +19,13 @@ import {
   createLocalQuote,
   createLocalSession,
   createLocalStudioPass,
-  getLocalOrder,
-  localAdminReport,
+  getLocalCustomerOrder,
   localCategories,
   localProductsForCategory,
 } from './local-fixtures';
 import { publicConfig } from '../config';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
-const ADMIN_ACCESS_CODE = import.meta.env.VITE_ADMIN_ACCESS_CODE || '';
 
 type ApiResponse<T> = {
   success: boolean;
@@ -245,27 +242,19 @@ export const api = {
         `/api/checkout/sessions/${encodeURIComponent(sessionId)}/order`
       ),
       () => {
-        const order = getLocalOrder();
+        const order = getLocalCustomerOrder(publicConfig.supportEmail);
         return order
           ? { state: 'paid' as const, message: 'Fixture payment received.', order }
           : { state: 'processing' as const, message: 'Checkout confirmation is still processing.' };
       }
     ),
   order: (orderId: string) =>
-    withFallback(request<OrderSummary>(`/api/orders/${encodeURIComponent(orderId)}`), () => {
-      const order = getLocalOrder();
-      if (!order) throw new Error('Order details are still pending.');
-      return order;
-    }),
-  adminReport: (): Promise<Sourced<AdminReport>> => {
-    if (!ADMIN_ACCESS_CODE) {
-      return Promise.resolve({ data: localAdminReport, source: 'fixture' });
-    }
-    return withFallback(
-      request<AdminReport>('/api/admin/report', {
-        headers: { 'x-admin-access': ADMIN_ACCESS_CODE },
-      }),
-      () => localAdminReport
-    );
-  },
+    withFallback(
+      request<CustomerOrderConfirmation>(`/api/orders/${encodeURIComponent(orderId)}`),
+      () => {
+        const order = getLocalCustomerOrder(publicConfig.supportEmail);
+        if (!order) throw new Error('Order details are still pending.');
+        return order;
+      }
+    ),
 };

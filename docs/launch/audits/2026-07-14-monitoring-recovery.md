@@ -10,8 +10,8 @@
 
 - Release commit: `1d8e3c2` (monitoring/recovery implementation begins at `ef23bf4`).
 - Canonical production URL: [open-merch-studio-vercel-output.vercel.app](https://open-merch-studio-vercel-output.vercel.app)
-- Immutable deployment: [open-merch-studio-vercel-output-ayvy5wfqn-rat-benetar-team.vercel.app](https://open-merch-studio-vercel-output-ayvy5wfqn-rat-benetar-team.vercel.app)
-- Vercel inspection: [deployment 5p5nP19kqTVVNBo9GxrbkLRYuPSS](https://vercel.com/rat-benetar-team/open-merch-studio-vercel-output/5p5nP19kqTVVNBo9GxrbkLRYuPSS)
+- Immutable deployment and provider-account inspection details are retained in private operations
+  notes rather than this public audit.
 - Runtime: Node.js 22.x.
 - Vercel install and local full dependency audits: 0 vulnerabilities.
 
@@ -27,7 +27,7 @@
 
 ## Database Verification
 
-- The two recovery migrations were applied to Supabase project `evhhtsrfmjixlobajlib`.
+- The two recovery migrations were applied to the dedicated Supabase production project.
 - All eight local Prisma migration names and checksums match the durable `_prisma_migrations` ledger.
 - Recovery tables remain protected by RLS from public clients; the application uses its private PostgreSQL connection.
 - Post-migration Supabase security/performance advisors reported informational notices only, with no warning or error finding. The intentional no-public-policy notice is documented by Supabase's [RLS advisor reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).

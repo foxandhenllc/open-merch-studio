@@ -6,7 +6,7 @@ The `main` branch and active release branches receive security fixes.
 
 ## Reporting
 
-Open a private security advisory or contact the maintainers directly. Do not open a public issue for exploitable vulnerabilities or leaked credentials.
+Open a [private GitHub security advisory](https://github.com/foxandhenllc/open-merch-studio/security/advisories/new) or use the support contact published by the app. Do not open a public issue for exploitable vulnerabilities or leaked credentials.
 
 ## Repository Safety Rules
 

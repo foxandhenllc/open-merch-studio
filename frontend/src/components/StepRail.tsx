@@ -20,12 +20,20 @@ export function StepRail({
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
+    const enabledIndexes = steps
+      .map((step, stepIndex) => (states[step.id] === 'todo' ? -1 : stepIndex))
+      .filter((stepIndex) => stepIndex >= 0);
+    const enabledPosition = enabledIndexes.indexOf(index);
     const next =
       event.key === 'Home'
-        ? 0
+        ? enabledIndexes[0]
         : event.key === 'End'
-          ? steps.length - 1
-          : (index + (event.key === 'ArrowRight' ? 1 : -1) + steps.length) % steps.length;
+          ? enabledIndexes.at(-1)
+          : enabledIndexes[
+              (enabledPosition + (event.key === 'ArrowRight' ? 1 : -1) + enabledIndexes.length) %
+                enabledIndexes.length
+            ];
+    if (next === undefined) return;
     refs.current[next]?.focus();
   };
   return (

@@ -8,7 +8,9 @@ Thanks for helping improve Open Merch Studio. The project is intended to stay pu
 - Prefer fixture-backed tests for provider behavior.
 - Document new environment variables in `.env.example` with empty values.
 - Keep product-specific assumptions out of shared catalog, quote, and fulfillment logic.
-- Run `npm run type-check` and `npm test` before opening a pull request.
+- Use the root workspace `package-lock.json`; do not add separate backend/frontend lockfiles.
+- Run `npm audit --audit-level=high`, `npm run lint`, `npm run type-check`, `npm test`,
+  `npm run smoke:fixture`, `npm run build`, and `npm run test:browser` before opening a pull request.
 
 ## Pull Request Checklist
 

@@ -22,7 +22,6 @@ import {
   saveOrder,
 } from './runtime-store.js';
 import type {
-  CheckoutConfirmation,
   CheckoutSession,
   AdminOrderDetail,
   AdminOrderListItem,
@@ -31,6 +30,7 @@ import type {
   OrderSummary,
   QuoteBreakdown,
 } from '../types/catalog.js';
+import type { InternalCheckoutConfirmation } from './customer-order.service.js';
 import {
   canCreateStripeCheckout,
   createMerchCheckoutSession,
@@ -1627,7 +1627,7 @@ export async function getOrderSummary(orderId: string): Promise<OrderSummary | u
 
 export async function getOrderByCheckoutSession(
   stripeSessionId: string
-): Promise<CheckoutConfirmation> {
+): Promise<InternalCheckoutConfirmation> {
   let order: OrderSummary | undefined;
   if (env.databaseUrl) {
     const persisted = await prisma.order.findFirst({

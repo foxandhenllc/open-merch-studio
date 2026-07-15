@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import type { StatusNoteProps } from './StatusNote.types';
 
 export function StatusNote({
@@ -8,16 +7,10 @@ export function StatusNote({
   primaryAction,
   secondaryAction,
 }: StatusNoteProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (tone === 'error') ref.current?.focus();
-  }, [tone, title]);
   return (
     <div
       className={`status-note status-note--${tone}`}
       role={tone === 'error' ? 'alert' : 'status'}
-      tabIndex={tone === 'error' ? -1 : undefined}
-      ref={ref}
     >
       <span className="status-note__mark" aria-hidden="true">
         {tone === 'success' ? '✓' : tone === 'error' ? '!' : tone === 'warning' ? '△' : 'i'}

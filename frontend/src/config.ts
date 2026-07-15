@@ -7,7 +7,6 @@ const appMode = String(import.meta.env.VITE_PUBLIC_APP_MODE || 'oss').toLowerCas
 
 export const publicConfig = {
   appMode,
-  appName: import.meta.env.VITE_PUBLIC_APP_NAME || 'Open Merch Studio',
   supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@foxandhenllc.com',
   isProductionMode: appMode === 'production',
   enablePublicCheckout: normalizeBoolean(import.meta.env.VITE_ENABLE_PUBLIC_CHECKOUT),

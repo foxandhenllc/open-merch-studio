@@ -18,6 +18,8 @@ Use this template before enabling production checkout, live OpenAI generation, o
 - Refund-versus-fulfillment terminal-state guard:
 - Protected admin authorization test:
 - Production dependency audit:
+- Temporary host remains `noindex` before domain cutover:
+- Branded-domain cutover checklist (when applicable):
 
 ## Credential And Privacy Scan
 
@@ -35,6 +37,7 @@ Expected result: no live credentials, private provider values, private customer 
 - Stripe live checkout: disabled until OPS-002 and OPS-008 approval.
 - Printful live fulfillment: disabled until OPS-003 and OPS-006 approval.
 - Vercel/domain production readiness: blocked until OPS-007 approval.
+- App-owned transactional email: disabled until sender-domain and exactly-once delivery approval.
 
 ## Operations And Recovery
 
@@ -48,6 +51,8 @@ Expected result: no live credentials, private provider values, private customer 
 - Supabase schema and `_prisma_migrations` checksums match every migration folder on `main`:
 - Any open Stripe Checkout Sessions from the supervised window were explicitly expired:
 - Emergency checkout/fulfillment gates verified closed after the smoke:
+- Support mailbox and Stripe-hosted receipt/refund messages verified without enabling duplicate
+  app-owned email:
 
 ## Go/No-Go
 

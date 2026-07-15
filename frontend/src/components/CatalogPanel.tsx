@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import type { CatalogCategory, CatalogProduct } from '@app-types/catalog';
 import { ProductVisual } from './ProductVisual';
 
@@ -13,6 +14,7 @@ export function CatalogPanel({
   onCategory,
   onSelect,
   onClose,
+  headingRef,
 }: {
   categories: CatalogCategory[];
   products: CatalogProduct[];
@@ -22,13 +24,16 @@ export function CatalogPanel({
   onCategory: (category: string) => void;
   onSelect: (product: CatalogProduct) => void;
   onClose?: () => void;
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
-    <aside className="catalog" aria-label="Product catalog" aria-busy={loading}>
+    <section className="catalog" aria-labelledby="catalog-title" aria-busy={loading}>
       <div className="section-heading">
         <div>
           <span className="kicker">Curated catalog</span>
-          <h2 id="catalog-title" tabIndex={-1}>Choose a product</h2>
+          <h1 id="catalog-title" tabIndex={-1} ref={headingRef}>
+            Choose a product
+          </h1>
         </div>
         {onClose && (
           <button
@@ -116,6 +121,6 @@ export function CatalogPanel({
             );
           })}
       </div>
-    </aside>
+    </section>
   );
 }

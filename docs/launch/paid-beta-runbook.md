@@ -2,7 +2,7 @@
 
 **Status:** Ready for fixture mode and private provider testing after credentials
 **Visibility:** Public  
-**Private ops companion:** `/Users/chrisfox/git/staging/private/open-merch-studio-launch/`
+**Private ops companion:** Maintained outside this public repository
 
 Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and private provider testing, not unattended real-money launch.
 
@@ -10,7 +10,6 @@ Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea r
 
 Live provider behavior must stay behind explicit environment gates.
 
-- `PUBLIC_APP_MODE=production` switches the public app into customer-facing mode and hides OSS/operator-only surfaces.
 - `CHECKOUT_ACCESS_MODE=closed` blocks every Stripe Session until an explicit supervised window.
 - `CHECKOUT_ALLOWED_EMAILS=` is read only in `allowlist` mode. Use normalized operator emails and remove them after the smoke.
 - `VITE_PUBLIC_APP_MODE=production` should be set for the production frontend build.
@@ -30,9 +29,13 @@ Do not enable these gates until the matching private OPS tickets are reviewed, t
 ## Fixture Smoke Test
 
 ```bash
+npm audit --audit-level=high
+npm run lint
 npm test
 npm run type-check
+npm run smoke:fixture
 npm run build
+npm run test:browser
 ```
 
 The backend fixture smoke test verifies the safe end-to-end path without live credentials:
@@ -53,7 +56,7 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
   including `20260714233000_order_recovery_operations` before the supervised payment.
 - Preview and production environments are separated.
 - Vercel uses the full-stack Express backend through `api/[...path].js`; production API testing must hit real `/api/*` routes, not the archived fixture handlers under `api-fixtures/`.
-- Production has `PUBLIC_APP_MODE=production`, `VITE_PUBLIC_APP_MODE=production`, `CHECKOUT_ACCESS_MODE=closed`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
+- Production has `VITE_PUBLIC_APP_MODE=production`, `CHECKOUT_ACCESS_MODE=closed`, `CHECKOUT_ENABLED=false`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
 - Stripe Checkout Sessions are card-only and US-only with Stripe Tax enabled. Webhook reconciliation stores final total, tax, payment intent, and paid timestamp; signed subscriptions must include completed, expired, and refunded events. Tax registrations and accounting remain operator responsibilities.
 - OpenAI provider calls are implemented behind a gate with prompt moderation, product-neutral print prompt shaping, durable spend events when `DATABASE_URL` is configured, and checkout blocks for failed, warning, or policy-review designs. Spend alerts and pause steps must still be verified before live generation.
 - Printful catalog sync, curated product allowlisting, mockup task polling, duplicate draft-order recovery, technique-preserving payload validation, and draft-order creation are implemented behind gates. Drafts are never auto-confirmed. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.
@@ -139,3 +142,10 @@ If launch needs to pause:
 7. Review `oms_operational` errors, Stripe webhook delivery, protected order detail, and Printful
    drafts before reopening any gate.
 8. Keep public browsing, design preview, and fixture-safe local development available.
+
+## Branded Domain
+
+Keep the temporary deployment non-indexable until the intended canonical domain is owned, attached,
+and verified. Follow the portable
+[openmerchstudio.com domain cutover checklist](./domain-cutover-openmerchstudio-com.md) without
+placing DNS, provider, or signing-secret values in this repository.

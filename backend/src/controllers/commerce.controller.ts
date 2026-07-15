@@ -13,8 +13,13 @@ import {
   wasStripeEventProcessed,
 } from '../services/order.service.js';
 import { constructStripeWebhookEvent } from '../services/stripe.service.js';
+import {
+  toCustomerCheckoutConfirmation,
+  toCustomerOrderConfirmation,
+} from '../services/customer-order.service.js';
 import { trackServerEvent } from '../utils/analytics.js';
 import { logOperationalEvent } from '../utils/operational-logger.js';
+import { env } from '../config/env.js';
 
 export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Response) => {
   const sessionId = String(req.body?.sessionId ?? '').trim();
@@ -60,7 +65,10 @@ export const getOrder = asyncHandler(async (req: Request, res: Response) => {
   if (!order) {
     throw new HttpError('Order not found.', 404);
   }
-  res.json({ success: true, data: order });
+  res.json({
+    success: true,
+    data: toCustomerOrderConfirmation(order, env.supportEmail),
+  });
 });
 
 export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response) => {
@@ -68,7 +76,10 @@ export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response)
   if (!sessionId.startsWith('cs_')) {
     throw new HttpError('A valid Stripe Checkout Session ID is required.', 400);
   }
-  const confirmation = await getOrderByCheckoutSession(sessionId);
+  const confirmation = toCustomerCheckoutConfirmation(
+    await getOrderByCheckoutSession(sessionId),
+    env.supportEmail
+  );
   res.status(confirmation.state === 'processing' ? 202 : 200).json({
     success: true,
     data: confirmation,

@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /
+
+# Replace this temporary block only after openmerchstudio.com is attached, canonical, and verified.

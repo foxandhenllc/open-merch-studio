@@ -1,12 +1,11 @@
 import type {
-  AdminReport,
   CatalogCategory,
   CatalogProduct,
   CheckoutSession,
+  CustomerOrderConfirmation,
   DesignDraft,
   DesignIdea,
   DesignMockup,
-  LaunchReadiness,
   OrderSummary,
   QuoteBreakdown,
   StudioPass,
@@ -645,59 +644,41 @@ export function createLocalCheckout(quote: QuoteBreakdown, email?: string): Chec
   };
 }
 
-export function getLocalOrder(): OrderSummary | null {
-  return localOrder;
+export function getLocalCustomerOrder(supportEmail: string): CustomerOrderConfirmation | null {
+  if (!localOrder) return null;
+  return {
+    orderNumber: localOrder.orderNumber,
+    status: 'received',
+    message: 'This simulated order was received. No real payment or production order was created.',
+    totalCents: localOrder.totalCents,
+    taxCents: localOrder.taxCents,
+    refundedCents: localOrder.refundedCents,
+    paidAt: localOrder.paidAt,
+    currency: localOrder.currency,
+    items:
+      localOrder.quote?.items.map((item) => ({
+        title: item.title,
+        variantName: item.variantName,
+        quantity: item.quantity,
+      })) ?? [],
+    fulfillment: {
+      provider: 'fixture',
+      status: 'received',
+      message: 'Fixture fulfillment was simulated for product testing only.',
+    },
+    timeline: [
+      {
+        at: localOrder.createdAt,
+        status: 'awaiting_payment',
+        note: 'Simulated secure checkout was started.',
+      },
+      {
+        at: localOrder.createdAt,
+        status: 'received',
+        note: 'The simulated order was received.',
+      },
+    ],
+    support: { email: supportEmail },
+    createdAt: localOrder.createdAt,
+  };
 }
-
-export const localLaunchReadiness: LaunchReadiness = {
-  readyForPaidBeta: false,
-  gates: [
-    {
-      code: 'fixture-mode',
-      label: 'Clean fixture mode',
-      status: 'pass',
-      detail:
-        'Catalog, design, quote, checkout simulation, and fixture fulfillment run without credentials.',
-    },
-    {
-      code: 'openai-live',
-      label: 'Live OpenAI generation',
-      status: 'manual',
-      detail: 'Provide OpenAI credentials and explicitly enable live generation.',
-    },
-    {
-      code: 'stripe-live',
-      label: 'Production checkout',
-      status: 'manual',
-      detail: 'Provide Stripe private setup and enable live checkout.',
-    },
-    {
-      code: 'printful-live',
-      label: 'Real fulfillment',
-      status: 'manual',
-      detail: 'Provide Printful private setup and enable fulfillment.',
-    },
-  ],
-};
-
-export const localAdminReport: AdminReport = {
-  settings: {
-    studioPassPriceCents: 500,
-    freeDraftLimit: 3,
-    dailyAiBudgetCents: 2500,
-    perSessionBudgetCents: 800,
-    liveOpenAiEnabled: false,
-    liveStripeEnabled: false,
-    livePrintfulEnabled: false,
-    checkoutEnabled: true,
-    fulfillmentEnabled: false,
-    defaultMarginPercent: 30,
-    minMarginCents: 500,
-  },
-  sessions: localSession ? 1 : 0,
-  studioPasses: localPass ? 1 : 0,
-  designDrafts: localDraftCount,
-  orders: localOrder ? 1 : 0,
-  estimatedAiSpendCents: localDraftCount,
-  launchReadiness: localLaunchReadiness,
-};

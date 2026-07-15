@@ -139,7 +139,7 @@ export function GenerationStage({
           )}
         </div>
       ) : artworkUrl && !imageFailed ? (
-        <div className="artwork-preparation">
+        <div className={`artwork-preparation ${mockupBusy ? 'is-building-mockup' : ''}`}>
           <span className="kicker">Artwork ready</span>
           <img src={artworkUrl} alt={`Generated artwork for ${product.title}`} />
           <p>{mockupBusy ? 'Preparing the product mockup…' : 'Artwork is ready for a product.'}</p>

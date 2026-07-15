@@ -12,6 +12,13 @@ Run:
 
 ```bash
 npm run db:generate --workspace open-merch-studio-backend
-npm run db:push --workspace open-merch-studio-backend
+npm run db:migrate --workspace open-merch-studio-backend
 npm run db:seed --workspace open-merch-studio-backend
+```
+
+Use committed migrations rather than `db push` for shared environments. Production applies them
+from the repository root with:
+
+```bash
+npx prisma migrate deploy --schema backend/prisma/schema.prisma
 ```

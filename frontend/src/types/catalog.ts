@@ -229,42 +229,50 @@ export type OrderSummary = {
   createdAt: string;
 };
 
+export type CustomerOrderStatus =
+  | 'preparing'
+  | 'awaiting_payment'
+  | 'received'
+  | 'under_review'
+  | 'action_needed'
+  | 'in_production'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
+
+export type CustomerOrderConfirmation = {
+  orderNumber: string;
+  status: CustomerOrderStatus;
+  message: string;
+  totalCents: number;
+  taxCents: number;
+  refundedCents?: number;
+  paidAt?: string;
+  currency: string;
+  items: Array<{
+    title: string;
+    variantName: string;
+    quantity: number;
+  }>;
+  fulfillment: {
+    provider: 'fixture' | 'production';
+    status: CustomerOrderStatus;
+    message: string;
+  };
+  timeline: Array<{
+    at: string;
+    status: CustomerOrderStatus;
+    note: string;
+  }>;
+  support: {
+    email: string;
+  };
+  createdAt: string;
+};
+
 export type CheckoutConfirmation = {
   state: 'processing' | 'paid' | 'needs_review' | 'failed';
   message: string;
-  order?: OrderSummary;
-};
-
-export type AdminSettings = {
-  studioPassPriceCents: number;
-  freeDraftLimit: number;
-  dailyAiBudgetCents: number;
-  perSessionBudgetCents: number;
-  liveOpenAiEnabled: boolean;
-  liveStripeEnabled: boolean;
-  livePrintfulEnabled: boolean;
-  checkoutEnabled: boolean;
-  fulfillmentEnabled: boolean;
-  defaultMarginPercent: number;
-  minMarginCents: number;
-};
-
-export type LaunchReadiness = {
-  readyForPaidBeta: boolean;
-  gates: Array<{
-    code: string;
-    label: string;
-    status: 'pass' | 'blocked' | 'manual';
-    detail: string;
-  }>;
-};
-
-export type AdminReport = {
-  settings: AdminSettings;
-  sessions: number;
-  studioPasses: number;
-  designDrafts: number;
-  orders: number;
-  estimatedAiSpendCents: number;
-  launchReadiness: LaunchReadiness;
+  order?: CustomerOrderConfirmation;
 };

@@ -12,6 +12,7 @@ export function ReadinessChecks({ draft }: { draft: DesignDraft }) {
     >
       <summary className="section-heading">
         <div>
+          <span className="readiness__compact-label">Print details</span>
           <span className="kicker">Production check</span>
           <h3>Print readiness</h3>
         </div>

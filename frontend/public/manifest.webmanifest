@@ -1,0 +1,9 @@
+{
+  "name": "Open Merch Studio",
+  "short_name": "OMS",
+  "description": "Create original artwork and preview it on curated custom products.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f4",
+  "theme_color": "#0f172a"
+}

@@ -14,11 +14,15 @@ const policies: Record<string, PolicyRoute> = {
     sections: [
       section(
         'What we collect',
-        'Browsing and design exploration do not require an account. Checkout collects the contact, shipping, order, and payment information needed to complete and support an order.'
+        'Browsing and design exploration do not require an account. The studio processes the prompt, product choices, artwork, guest-session references, and preview details needed to restore your work. Checkout collects the contact, shipping, order, and payment information needed to complete and support an order.'
       ),
       section(
         'Provider processing',
-        'Stripe may process payment, Printful may fulfill an approved order, OpenAI may assist with artwork, and an email provider may deliver confirmations.'
+        'Vercel hosts the service and provides privacy-conscious product analytics. OpenAI generates and reviews AI-assisted artwork, remove.bg may prepare a transparent print file, Stripe processes payment and shipping details, and Printful builds previews and fulfills an approved order. Each provider processes only the information needed for its role.'
+      ),
+      section(
+        'Guest-browser recovery',
+        'This browser keeps your product choices, prompt, guest-session ID, and saved design, mockup, and quote references for up to 30 days so you can continue your work. Choose Start fresh in the studio to delete that browser copy sooner.'
       ),
       section(
         'Design prompts',
@@ -88,7 +92,7 @@ const policies: Record<string, PolicyRoute> = {
   '/support': {
     eyebrow: 'Help',
     title: 'Support',
-    summary: `For order help or production review, contact ${publicConfig.supportEmail}.`,
+    summary: 'For order help or production review, email us at',
     sections: [
       section(
         'What to include',
@@ -103,6 +107,7 @@ const policies: Record<string, PolicyRoute> = {
 };
 
 function PolicyPage({ route }: { route: PolicyRoute }) {
+  const isSupport = route === policies['/support'];
   return (
     <main className="policy-shell">
       <header className="policy-hero">
@@ -111,7 +116,15 @@ function PolicyPage({ route }: { route: PolicyRoute }) {
         </a>
         <span className="kicker">{route.eyebrow}</span>
         <h1>{route.title}</h1>
-        <p>{route.summary}</p>
+        <p>
+          {route.summary}
+          {isSupport && (
+            <>
+              {' '}
+              <a href={`mailto:${publicConfig.supportEmail}`}>{publicConfig.supportEmail}</a>.
+            </>
+          )}
+        </p>
       </header>
       <section className="policy-content">
         {route.sections.map((item) => (
@@ -135,7 +148,48 @@ function PolicyPage({ route }: { route: PolicyRoute }) {
   );
 }
 
+function NotFoundPage() {
+  return (
+    <main className="policy-shell">
+      <header className="policy-hero">
+        <a className="back-link" href="/">
+          ← Back to studio
+        </a>
+        <span className="kicker">Nothing to print here</span>
+        <h1>We couldn’t find that page</h1>
+        <p>
+          The link may be old, or the address may have a typo. Your saved studio work is unchanged.
+        </p>
+      </header>
+      <section className="policy-content">
+        <article>
+          <h2>Keep creating</h2>
+          <p>
+            Return to the studio to choose a product, restore saved guest work, or start something
+            new.
+          </p>
+          <a className="back-link" href="/">
+            Open the studio →
+          </a>
+        </article>
+      </section>
+      <footer className="site-footer">
+        <nav aria-label="Footer links">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/returns">Returns</a>
+          <a href="/content-policy">Content policy</a>
+          <a href="/support">Support</a>
+        </nav>
+        <span>Open Merch Studio</span>
+      </footer>
+    </main>
+  );
+}
+
 export default function App() {
-  const route = policies[path()];
-  return route ? <PolicyPage route={route} /> : <WorkbenchStudioApp />;
+  const currentPath = path();
+  const route = policies[currentPath];
+  if (route) return <PolicyPage route={route} />;
+  return currentPath === '/' ? <WorkbenchStudioApp /> : <NotFoundPage />;
 }

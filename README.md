@@ -2,7 +2,7 @@
 
 Open Merch Studio is an open-source, AI-first custom merch studio for curated Printful catalog fulfillment. It is product-neutral and designed for more than apparel.
 
-The current working title is temporary. The code, docs, and environment templates avoid private customer data, production credentials, payment artifacts, and organization-specific claims.
+Open Merch Studio is the public project name. The code, docs, and environment templates avoid private customer data, production credentials, payment artifacts, and organization-specific claims.
 
 ## What It Does
 
@@ -38,12 +38,20 @@ npm run dev
 
 The app works in fixture mode without provider credentials. Add local credentials only to ignored `.env` files or deployment-managed values.
 
+The example environment permits simulated local checkout while every live-payment and fulfillment
+gate remains disabled. Production must override `CHECKOUT_ENABLED=false` until an explicitly
+supervised checkout window.
+
 ## Useful Commands
 
 ```bash
+npm audit --audit-level=high
+npm run lint
 npm run type-check
 npm test
+npm run smoke:fixture
 npm run build
+npm run test:browser
 npm run dev:backend
 npm run dev:frontend
 ```
@@ -80,6 +88,7 @@ npm run dev:frontend
 - Paid beta flow: [docs/architecture/paid-beta-flow.md](./docs/architecture/paid-beta-flow.md)
 - Runbook: [docs/launch/paid-beta-runbook.md](./docs/launch/paid-beta-runbook.md)
 - Audit template: [docs/launch/launch-audit-template.md](./docs/launch/launch-audit-template.md)
+- Domain cutover: [docs/launch/domain-cutover-openmerchstudio-com.md](./docs/launch/domain-cutover-openmerchstudio-com.md)
 
 ## Printful References
 

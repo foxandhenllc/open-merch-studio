@@ -32,10 +32,25 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Reject browser-bundled credential variables
+        run: |
+          if git grep -nE 'VITE_[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|PRIVATE|ACCESS_CODE)' -- frontend .env.example; then
+            echo 'VITE_* values are public browser configuration and cannot contain credentials.' >&2
+            exit 1
+          fi
+      - name: Audit dependencies for high-severity vulnerabilities
+        run: npm audit --audit-level=high
       - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+      - run: npm run lint
       - run: npm run type-check
       - name: Run fixture and unit tests without a configured database
         run: DATABASE_URL= npm test
+      - name: Run the fixture end-to-end smoke path
+        run: DATABASE_URL= npm run smoke:fixture
       - name: Run serialized PostgreSQL recovery integration test
         run: node --import tsx --test --test-concurrency=1 backend/src/tests/database-recovery.integration.test.ts
       - run: npm run build
+      - name: Install the browser used by responsive smoke coverage
+        run: npx playwright install --with-deps chromium
+      - name: Run responsive and first-visitor browser smoke coverage
+        run: npm run test:browser

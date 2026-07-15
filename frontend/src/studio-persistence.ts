@@ -1,7 +1,8 @@
 import type { DesignMockup } from './types/catalog';
 
 export type StudioResumeState = {
-  version: 1;
+  version: 2;
+  savedAt: string;
   sessionId: string;
   selectedCategory: string;
   productId: string;
@@ -16,21 +17,52 @@ export type StudioResumeState = {
 };
 
 const STORAGE_KEY = 'open-merch-studio:guest-workbench:v1';
+const RESUME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+type PersistableStudioResumeState = Omit<StudioResumeState, 'savedAt'>;
+type StoredStudioResumeState = Omit<Partial<StudioResumeState>, 'version' | 'savedAt'> & {
+  version?: 2;
+  savedAt?: unknown;
+};
+
+const removeSavedState = () => {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in privacy-restricted browsing contexts.
+  }
+};
+
+const isCurrentSavedAt = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  const savedAt = Date.parse(value);
+  if (!Number.isFinite(savedAt)) return false;
+  const age = Date.now() - savedAt;
+  return age >= 0 && age <= RESUME_TTL_MS;
+};
 
 export function readStudioResumeState(): StudioResumeState | null {
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
     if (!value) return null;
-    const parsed = JSON.parse(value) as Partial<StudioResumeState>;
-    if (parsed.version !== 1 || typeof parsed.sessionId !== 'string' || !parsed.sessionId) {
-      window.localStorage.removeItem(STORAGE_KEY);
+    const parsed = JSON.parse(value) as StoredStudioResumeState;
+    if (
+      parsed.version !== 2 ||
+      typeof parsed.sessionId !== 'string' ||
+      !parsed.sessionId
+    ) {
+      removeSavedState();
       return null;
     }
-    return {
-      version: 1,
+    if (!isCurrentSavedAt(parsed.savedAt)) {
+      removeSavedState();
+      return null;
+    }
+    const restored: StudioResumeState = {
+      version: 2,
+      savedAt: parsed.savedAt,
       sessionId: parsed.sessionId,
-      selectedCategory:
-        typeof parsed.selectedCategory === 'string' ? parsed.selectedCategory : '',
+      selectedCategory: typeof parsed.selectedCategory === 'string' ? parsed.selectedCategory : '',
       productId: typeof parsed.productId === 'string' ? parsed.productId : '',
       variantId: typeof parsed.variantId === 'string' ? parsed.variantId : '',
       placementCodes: Array.isArray(parsed.placementCodes)
@@ -54,16 +86,24 @@ export function readStudioResumeState(): StudioResumeState | null {
           : 0,
       quoteId: typeof parsed.quoteId === 'string' ? parsed.quoteId : undefined,
     };
+    return restored;
   } catch {
-    window.localStorage.removeItem(STORAGE_KEY);
+    removeSavedState();
     return null;
   }
 }
 
-export function writeStudioResumeState(state: StudioResumeState): void {
+export function writeStudioResumeState(state: PersistableStudioResumeState): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...state, savedAt: new Date().toISOString() } satisfies StudioResumeState)
+    );
   } catch {
     // A private browsing quota failure should not interrupt the active studio session.
   }
+}
+
+export function clearStudioResumeState(): void {
+  removeSavedState();
 }

@@ -21,7 +21,6 @@ Store all provider values in deployment-managed storage. Do not commit provider 
 
 Keep live behavior disabled until the private OPS checklist is complete.
 
-- `PUBLIC_APP_MODE=production`
 - `CHECKOUT_ACCESS_MODE=closed`
 - `CHECKOUT_ALLOWED_EMAILS=`
 - `VITE_PUBLIC_APP_MODE=production`
@@ -33,12 +32,12 @@ Keep live behavior disabled until the private OPS checklist is complete.
 - `ALLOW_LIVE_PAYMENTS=false`
 - `ALLOW_LIVE_FULFILLMENT=false`
 - `PRINTFUL_AUTO_CONFIRM_ORDERS=false`
-- `CHECKOUT_ENABLED=true`
+- `CHECKOUT_ENABLED=false`
 - `FULFILLMENT_ENABLED=false`
 
-Preview deployments should not use production provider settings. Production checkout, live generation, and real fulfillment must remain separate switches. The backend contains guarded live adapters, but the Vercel fixture API remains public-safe and does not create live provider sessions.
+Preview deployments should not use production provider settings. Production checkout, live generation, and real fulfillment must remain separate switches. The backend contains guarded live adapters; fixture behavior is for local/test use and must not be mistaken for the production API.
 
-The current Vercel deployment shape is a static frontend plus lightweight `/api/*` functions. `CHECKOUT_ACCESS_MODE` is the authoritative server gate: `closed` blocks all Stripe Session creation, `allowlist` accepts only normalized emails in `CHECKOUT_ALLOWED_EMAILS`, and `public` opens the server path. The old `ENABLE_PUBLIC_CHECKOUT` value is ignored. `VITE_ENABLE_PUBLIC_CHECKOUT` controls presentation only and never authorizes payment.
+The current Vercel deployment serves the static frontend and routes `/api/*` through the full Express backend in `api/[...path].js`. `CHECKOUT_ACCESS_MODE` is the authoritative server gate: `closed` blocks all Stripe Session creation, `allowlist` accepts only normalized emails in `CHECKOUT_ALLOWED_EMAILS`, and `public` opens the server path. The old `ENABLE_PUBLIC_CHECKOUT` value is ignored. `VITE_ENABLE_PUBLIC_CHECKOUT` controls presentation only and never authorizes payment.
 
 Provider Checkout requires the quote, artwork, selected variants, and order to be retrievable from PostgreSQL. Stripe Checkout is card-only, US-only, and uses automatic tax. Subscribe the signed webhook endpoint to `checkout.session.completed`, `checkout.session.expired`, and `charge.refunded`.
 
@@ -62,11 +61,18 @@ The first generated migration is `backend/prisma/migrations/20260529180000_paid_
 Before public deployment:
 
 ```bash
+npm audit --audit-level=high
+npm run lint
 npm run type-check
 npm test
+npm run smoke:fixture
 npm run build
+npm run test:browser
 ```
 
 Run a manual catalog quote smoke test with fixture mode, then again with provider sandbox credentials if production integrations are enabled.
 
 See [docs/launch/paid-beta-runbook.md](./docs/launch/paid-beta-runbook.md) for the full paid beta gate sequence.
+
+The intended branded-domain promotion is documented separately in
+[docs/launch/domain-cutover-openmerchstudio-com.md](./docs/launch/domain-cutover-openmerchstudio-com.md).

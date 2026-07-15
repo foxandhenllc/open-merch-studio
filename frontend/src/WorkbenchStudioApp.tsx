@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogPanel } from '@components/CatalogPanel';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
@@ -16,6 +16,46 @@ import { trackEvent } from './utils/analytics';
 const money = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 
+const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
+
+const pendingCheckoutSession = (): string | null => {
+  try {
+    const value = window.sessionStorage.getItem(PENDING_CHECKOUT_KEY);
+    return value?.startsWith('cs_') ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+const savePendingCheckoutSession = (sessionId: string | null) => {
+  try {
+    if (sessionId) window.sessionStorage.setItem(PENDING_CHECKOUT_KEY, sessionId);
+    else window.sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+  } catch {
+    // Confirmation can still continue in the active page when session storage is unavailable.
+  }
+};
+
+const checkoutHandoff = (): { state: string | null; sessionId: string | null } => {
+  const params = new URLSearchParams(window.location.search);
+  const state = params.get('checkout');
+  const urlSessionId = params.get('session_id');
+  const validUrlSessionId = urlSessionId?.startsWith('cs_') ? urlSessionId : null;
+  if (state === 'cancelled') {
+    savePendingCheckoutSession(null);
+    return { state, sessionId: null };
+  }
+  if (state === 'success' && validUrlSessionId) {
+    savePendingCheckoutSession(validUrlSessionId);
+    return { state, sessionId: validUrlSessionId };
+  }
+  const savedSessionId = pendingCheckoutSession();
+  return {
+    state: state ?? (savedSessionId ? 'success' : null),
+    sessionId: validUrlSessionId ?? savedSessionId,
+  };
+};
+
 function ErrorNote({ error, onRetry }: { error?: SurfaceError; onRetry: () => void }) {
   if (!error) return null;
   return (
@@ -30,7 +70,7 @@ function ErrorNote({ error, onRetry }: { error?: SurfaceError; onRetry: () => vo
   );
 }
 
-function Footer() {
+function Footer({ onStartFresh }: { onStartFresh: () => void }) {
   return (
     <footer className="site-footer compact-footer">
       <nav aria-label="Footer links">
@@ -40,7 +80,9 @@ function Footer() {
         <a href="/content-policy">Content policy</a>
         <a href="/support">Support</a>
       </nav>
-      <span>Open Merch Studio</span>
+      <button className="text-action" type="button" onClick={onStartFresh}>
+        Start fresh
+      </button>
     </footer>
   );
 }
@@ -48,11 +90,39 @@ function Footer() {
 export function WorkbenchStudioApp() {
   const vm = useStudioViewModel();
   const panelHeading = useRef<HTMLHeadingElement>(null);
+  const catalogHeading = useRef<HTMLHeadingElement>(null);
+  const promptField = useRef<HTMLTextAreaElement>(null);
+  const checkoutParams = useRef<{ state: string | null; sessionId: string | null } | null>(null);
+  if (!checkoutParams.current) {
+    checkoutParams.current = checkoutHandoff();
+  }
   const [checkoutReturn, setCheckoutReturn] = useState<CheckoutConfirmation | null>(null);
+  const [checkoutPolling, setCheckoutPolling] = useState(false);
+  const [checkoutAttempt, setCheckoutAttempt] = useState(0);
+  const studioReady = vm.flow !== 'booting' && vm.flow !== 'boot_failed';
+
+  useLayoutEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutState = checkoutParams.current?.state ?? null;
+    const stripeSessionId = checkoutParams.current?.sessionId ?? null;
+    if (checkoutState || stripeSessionId) {
+      params.delete('checkout');
+      params.delete('session_id');
+      const remainingQuery = params.toString();
+      window.history.replaceState(
+        window.history.state,
+        document.title,
+        `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`
+      );
+    }
+  }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('checkout') === 'cancelled') {
+    if (!studioReady) return undefined;
+    const checkoutState = checkoutParams.current?.state ?? null;
+    const stripeSessionId = checkoutParams.current?.sessionId ?? null;
+    if (checkoutState === 'cancelled') {
+      savePendingCheckoutSession(null);
       trackEvent('checkout_returned', { result: 'cancelled', mode: 'live' });
       setCheckoutReturn({
         state: 'failed',
@@ -60,49 +130,64 @@ export function WorkbenchStudioApp() {
       });
       return undefined;
     }
-    const stripeSessionId = params.get('session_id');
-    if (params.get('checkout') !== 'success' || !stripeSessionId) return undefined;
+    if (checkoutState !== 'success' || !stripeSessionId) return undefined;
     let cancelled = false;
+    setCheckoutPolling(true);
     setCheckoutReturn({
       state: 'processing',
       message: 'Stripe returned successfully. Confirming your payment now.',
     });
     const confirm = async () => {
-      for (let attempt = 0; attempt < 30 && !cancelled; attempt += 1) {
-        try {
-          const result = await api.checkoutOrder(stripeSessionId);
-          const confirmation = result.data;
-          setCheckoutReturn(confirmation);
-          if (confirmation.state !== 'processing') {
-            trackEvent('checkout_returned', {
-              result: confirmation.state === 'failed' ? 'unknown' : 'success',
-              mode: 'live',
-            });
-            return;
+      try {
+        for (let attempt = 0; attempt < 30 && !cancelled; attempt += 1) {
+          try {
+            const result = await api.checkoutOrder(stripeSessionId);
+            const confirmation = result.data;
+            setCheckoutReturn(confirmation);
+            if (confirmation.state !== 'processing') {
+              savePendingCheckoutSession(null);
+              if (confirmation.order) vm.acceptConfirmedOrder(confirmation.order);
+              trackEvent('checkout_returned', {
+                result: confirmation.state === 'failed' ? 'unknown' : 'success',
+                mode: 'live',
+              });
+              return;
+            }
+          } catch {
+            // Stripe may redirect before the signed webhook is reconciled.
           }
-        } catch {
-          // Stripe may redirect before the signed webhook is reconciled.
+          await new Promise((resolve) => window.setTimeout(resolve, 2000));
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 2000));
-      }
-      if (!cancelled) {
-        trackEvent('checkout_returned', { result: 'unknown', mode: 'live' });
-        setCheckoutReturn({
-          state: 'processing',
-          message: 'Confirmation is still processing. Do not submit another payment.',
-        });
+        if (!cancelled) {
+          trackEvent('checkout_returned', { result: 'unknown', mode: 'live' });
+          setCheckoutReturn({
+            state: 'processing',
+            message: 'Confirmation is still processing. Do not submit another payment.',
+          });
+        }
+      } finally {
+        if (!cancelled) setCheckoutPolling(false);
       }
     };
     void confirm();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [checkoutAttempt, studioReady, vm.acceptConfirmedOrder]);
 
   useEffect(() => {
-    if (vm.flow === 'booting' || vm.flow === 'boot_failed') return;
-    panelHeading.current?.focus({ preventScroll: true });
-  }, [vm.workbenchMode, vm.flow]);
+    if (!studioReady) return undefined;
+    const focusFrame = window.requestAnimationFrame(() => {
+      const target =
+        vm.workbenchMode === 'product'
+          ? catalogHeading.current
+          : vm.workbenchMode === 'describe'
+            ? promptField.current
+            : panelHeading.current;
+      target?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [studioReady, vm.workbenchMode]);
 
   if (vm.flow === 'booting') {
     return (
@@ -154,12 +239,7 @@ export function WorkbenchStudioApp() {
         <a href="/support">Support</a>
       </header>
 
-      {!vm.online && (
-        <div className="connection-banner" role="status">
-          <strong>Offline — your work is safe in this browser.</strong>
-        </div>
-      )}
-      {checkoutReturn && (
+      {checkoutReturn ? (
         <div className="checkout-return compact-return">
           <StatusNote
             tone={
@@ -170,6 +250,13 @@ export function WorkbenchStudioApp() {
                   : 'info'
             }
             title={checkoutReturn.state === 'paid' ? 'Payment received' : 'Checkout update'}
+            primaryAction={
+              checkoutReturn.state === 'processing'
+                ? checkoutPolling
+                  ? undefined
+                  : { label: 'Check again', onClick: () => setCheckoutAttempt((value) => value + 1) }
+                : { label: 'Dismiss', onClick: () => setCheckoutReturn(null) }
+            }
           >
             <p>{checkoutReturn.message}</p>
             {checkoutReturn.order && (
@@ -181,14 +268,23 @@ export function WorkbenchStudioApp() {
             )}
           </StatusNote>
         </div>
-      )}
-      {vm.recoveryMessage && (
+      ) : !vm.online ? (
         <div className="checkout-return compact-return">
-          <StatusNote tone="info" title="Your previous work was restored">
+          <StatusNote tone="warning" title="You’re offline">
+            <p>Your work is safe in this browser. Reconnect before generating or checking out.</p>
+          </StatusNote>
+        </div>
+      ) : vm.recoveryMessage ? (
+        <div className="checkout-return compact-return">
+          <StatusNote
+            tone="info"
+            title="Your previous work was restored"
+            primaryAction={{ label: 'Dismiss', onClick: vm.dismissRecovery }}
+          >
             <p>{vm.recoveryMessage}</p>
           </StatusNote>
         </div>
-      )}
+      ) : null}
 
       <StepRail states={vm.stepStates} onNavigate={vm.navigate} />
 
@@ -221,7 +317,10 @@ export function WorkbenchStudioApp() {
           />
         </section>
 
-        <aside className="task-panel" aria-labelledby="task-panel-title">
+        <aside
+          className="task-panel"
+          aria-labelledby={vm.workbenchMode === 'product' ? 'catalog-title' : 'task-panel-title'}
+        >
           <div className="task-panel__scroll">
             {vm.workbenchMode !== 'product' && (
               <div className="task-panel__heading">
@@ -243,6 +342,7 @@ export function WorkbenchStudioApp() {
                 selectedProductId={vm.selectedProductId}
                 onCategory={vm.setSelectedCategory}
                 onSelect={vm.selectProduct}
+                headingRef={catalogHeading}
               />
             )}
 
@@ -319,7 +419,7 @@ export function WorkbenchStudioApp() {
                 <label className="prompt-field streamlined-prompt">
                   <span>What should we make?</span>
                   <textarea
-                    autoFocus
+                    ref={promptField}
                     value={vm.prompt}
                     onChange={(event) => vm.setPrompt(event.target.value)}
                     rows={6}
@@ -344,8 +444,24 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'generating' && (
-              <div className="panel-stack generation-panel" role="status" aria-live="polite">
-                <span className="progress-orbit" aria-hidden="true" />
+              <div className="panel-stack generation-panel">
+                {(vm.busy.generating || vm.busy.revising || vm.busy.mockup) && (
+                  <span className="progress-orbit" aria-hidden="true" />
+                )}
+                <strong
+                  className="generation-phase"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {vm.busy.revising
+                    ? 'Creating your variation'
+                    : vm.busy.generating
+                      ? vm.generationPhase
+                      : vm.busy.mockup
+                        ? 'Building product preview'
+                        : 'Finishing your design'}
+                </strong>
                 <p>We’ll move from artwork to a product-ready mockup automatically.</p>
                 {vm.busy.generating && (
                   <button
@@ -458,13 +574,23 @@ export function WorkbenchStudioApp() {
                     onChange={(event) => vm.setEmail(event.target.value)}
                     placeholder="you@example.com"
                     autoComplete="email"
+                    required
+                    aria-invalid={Boolean(vm.email && !vm.checkoutReadiness.emailValid)}
+                    aria-describedby="checkout-readiness-message"
                   />
                 </label>
+                <p
+                  id="checkout-readiness-message"
+                  className={`checkout-gate ${vm.checkoutReadiness.blocker ? 'is-blocked' : ''}`}
+                >
+                  {vm.checkoutReadiness.blocker || vm.checkoutReadiness.fulfillmentReview}
+                </p>
                 <button
                   className="button button--primary button--wide"
                   type="button"
                   onClick={vm.createCheckout}
                   disabled={!vm.checkoutReadiness.ready || vm.busy.checkout}
+                  aria-describedby="checkout-readiness-message"
                 >
                   {vm.busy.checkout ? 'Opening checkout…' : 'Continue to secure checkout'}
                 </button>
@@ -481,10 +607,10 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'order' && vm.order && <OrderTimeline order={vm.order} />}
+            <Footer onStartFresh={vm.startFresh} />
           </div>
         </aside>
       </section>
-      <Footer />
     </main>
   );
 }

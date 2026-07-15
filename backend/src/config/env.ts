@@ -7,13 +7,16 @@ const numberFromEnv = (name: string, fallback: number): number => {
   return Number.isFinite(value) ? value : fallback;
 };
 
-const booleanFromEnv = (name: string, fallback = false): boolean => {
-  const value = process.env[name];
+const booleanFromValue = (value: string | undefined, fallback = false): boolean => {
   if (value === undefined || value === '') return fallback;
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 };
 
+const booleanFromEnv = (name: string, fallback = false): boolean =>
+  booleanFromValue(process.env[name], fallback);
+
 export type CheckoutAccessMode = 'closed' | 'allowlist' | 'public';
+export type EmailProvider = 'fixture' | 'resend';
 
 export const checkoutAccessModeFromEnv = (value?: string): CheckoutAccessMode => {
   const normalized = value?.trim().toLowerCase();
@@ -26,11 +29,26 @@ export const checkoutAllowedEmailsFromEnv = (value?: string): string[] =>
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
 
+export const emailProviderFromEnv = (value?: string): EmailProvider =>
+  value?.trim().toLowerCase() === 'resend' ? 'resend' : 'fixture';
+
+export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => ({
+  enabled: booleanFromValue(source.TRANSACTIONAL_EMAILS_ENABLED, false),
+  provider: emailProviderFromEnv(source.EMAIL_PROVIDER),
+  from: source.EMAIL_FROM?.trim() || undefined,
+  replyTo: source.EMAIL_REPLY_TO?.trim() || undefined,
+  supportEmail: source.SUPPORT_EMAIL?.trim() || 'support@foxandhenllc.com',
+  resendApiKey: source.RESEND_API_KEY?.trim() || undefined,
+  resendWebhookSecret: source.RESEND_WEBHOOK_SECRET?.trim() || undefined,
+});
+
 export const backendUrlFromEnv = (source: NodeJS.ProcessEnv): string => {
   if (source.BACKEND_URL) return source.BACKEND_URL;
   const vercelHost = source.VERCEL_PROJECT_PRODUCTION_URL || source.VERCEL_URL;
   return vercelHost ? `https://${vercelHost}` : 'http://localhost:5000';
 };
+
+const transactionalEmail = transactionalEmailSettingsFromEnv(process.env);
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -53,6 +71,13 @@ export const env = {
   removeBgApiKey: process.env.REMOVE_BG_API_KEY,
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  transactionalEmailsEnabled: transactionalEmail.enabled,
+  emailProvider: transactionalEmail.provider,
+  emailFrom: transactionalEmail.from,
+  emailReplyTo: transactionalEmail.replyTo,
+  supportEmail: transactionalEmail.supportEmail,
+  resendApiKey: transactionalEmail.resendApiKey,
+  resendWebhookSecret: transactionalEmail.resendWebhookSecret,
   adminAccessCode: process.env.ADMIN_ACCESS_CODE,
   allowLivePayments: booleanFromEnv('ALLOW_LIVE_PAYMENTS', false),
   checkoutAccessMode: checkoutAccessModeFromEnv(process.env.CHECKOUT_ACCESS_MODE),

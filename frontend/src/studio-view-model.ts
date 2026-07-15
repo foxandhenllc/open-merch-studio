@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError, type DataSource, type Sourced } from '@services/api';
-import { canUseCustomerCheckout, publicConfig } from './config';
+import { canUseCustomerCheckout } from './config';
 import type {
-  AdminReport,
   CatalogCategory,
   CatalogProduct,
   CatalogVariant,
   CheckoutSession,
+  CustomerOrderConfirmation,
   DesignDraft,
   DesignIdea,
   DesignMockup,
-  OrderSummary,
   PlacementOption,
   QuoteBreakdown,
   StudioCapabilities,
@@ -18,7 +17,11 @@ import type {
   StudioSession,
 } from '@app-types/catalog';
 import type { StepState, StudioStep } from '@components/StepRail.types';
-import { readStudioResumeState, writeStudioResumeState } from './studio-persistence';
+import {
+  clearStudioResumeState,
+  readStudioResumeState,
+  writeStudioResumeState,
+} from './studio-persistence';
 import { productType, revisionBand, totalBand, trackEvent } from './utils/analytics';
 
 export type FlowState =
@@ -190,7 +193,6 @@ export function useStudioViewModel() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [session, setSession] = useState<StudioSession | null>(null);
   const [studioPass, setStudioPass] = useState<StudioPass | null>(null);
-  const [adminReport, setAdminReport] = useState<AdminReport | null>(null);
   const [capabilities, setCapabilities] = useState<StudioCapabilities>({
     ai: 'demo',
     checkout: 'demo',
@@ -211,7 +213,7 @@ export function useStudioViewModel() {
   const [mockup, setMockup] = useState<DesignMockup | null>(null);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
-  const [order, setOrder] = useState<OrderSummary | null>(null);
+  const [order, setOrder] = useState<CustomerOrderConfirmation | null>(null);
   const [busy, setBusy] = useState(emptyBusy);
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
   const [fallback, setFallback] = useState<{ visible: boolean; reason: string } | null>(null);
@@ -229,11 +231,11 @@ export function useStudioViewModel() {
   const quoteController = useRef<AbortController | null>(null);
   const quoteRequestId = useRef(0);
   const mockupRequestId = useRef(0);
+  const startingFresh = useRef(false);
   const mockupCache = useRef(new Map<string, DesignMockup>());
   const productSelections = useRef(
     new Map<string, { variantId: string; placements: string[]; orientation?: PreviewOrientation }>()
   );
-  const resumeState = useRef(readStudioResumeState());
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -298,15 +300,12 @@ export function useStudioViewModel() {
     setRecoveryMessage('');
     try {
       const saved = readStudioResumeState();
-      resumeState.current = saved;
-      const [categoryResult, productResult, sessionResult, capabilityResult, reportResult] =
-        await Promise.all([
-          api.categories(),
-          api.products(saved?.selectedCategory || undefined),
-          api.session(saved?.sessionId),
-          api.capabilities(),
-          publicConfig.isProductionMode ? Promise.resolve(null) : api.adminReport(),
-        ]);
+      const [categoryResult, productResult, sessionResult, capabilityResult] = await Promise.all([
+        api.categories(),
+        api.products(saved?.selectedCategory || undefined),
+        api.session(saved?.sessionId),
+        api.capabilities(),
+      ]);
       const nextProducts = consumeSource(productResult);
       setCategories(consumeSource(categoryResult));
       setProducts(nextProducts);
@@ -314,7 +313,6 @@ export function useStudioViewModel() {
       setCapabilities(consumeSource(capabilityResult));
       setSession(nextSession);
       setStudioPass(nextSession.studioPass ?? null);
-      if (reportResult) setAdminReport(reportResult.data);
 
       if (!saved) {
         setFlow('configuring');
@@ -458,9 +456,9 @@ export function useStudioViewModel() {
     void boot();
   }, [boot]);
   useEffect(() => {
-    if (!session || flow === 'booting' || flow === 'boot_failed') return;
+    if (startingFresh.current || !session || flow === 'booting' || flow === 'boot_failed') return;
     writeStudioResumeState({
-      version: 1,
+      version: 2,
       sessionId: session.id,
       selectedCategory,
       productId: selectedProductId,
@@ -583,6 +581,10 @@ export function useStudioViewModel() {
           new Error(result.errorMessage || 'The fulfillment provider could not build this mockup.')
         );
         setFlow(quote ? 'quote_stale' : 'drafted');
+        setAnnouncement(
+          'The product preview failed. Your artwork is safe; retry the preview or continue without it.'
+        );
+        if (params.revealReview !== false) setWorkbenchMode('review');
       } else {
         trackEvent('mockup_completed', {
           result: 'success',
@@ -601,6 +603,10 @@ export function useStudioViewModel() {
       });
       fail('mockup', error);
       setFlow(quote ? 'quote_stale' : 'drafted');
+      setAnnouncement(
+        'The product preview failed. Your artwork is safe; retry the preview or continue without it.'
+      );
+      if (params.revealReview !== false) setWorkbenchMode('review');
     } finally {
       if (requestId === mockupRequestId.current) {
         setAction('mockup', false);
@@ -931,6 +937,7 @@ export function useStudioViewModel() {
         result: 'success',
         remaining: revisionBand(revised.allowance.editsRemaining),
       });
+      setAction('revising', false);
       if (selectedProduct && selectedVariant) {
         await requestMockup({
           product: selectedProduct,
@@ -1167,7 +1174,7 @@ export function useStudioViewModel() {
         window.location.assign(result.checkoutUrl);
         return;
       }
-      const inlineOrder = (result as CheckoutSession & { order?: OrderSummary }).order;
+      const inlineOrder = (result as CheckoutSession & { order?: CustomerOrderConfirmation }).order;
       if (inlineOrder) {
         setOrder(inlineOrder);
         setFlow('confirmed');
@@ -1223,6 +1230,23 @@ export function useStudioViewModel() {
     if (step === 'make' && selectedProduct) setWorkbenchMode(design ? 'review' : 'configure');
     if (step === 'order' && artworkReady) setWorkbenchMode('checkout');
   };
+  const acceptConfirmedOrder = useCallback((confirmedOrder: CustomerOrderConfirmation) => {
+    setOrder(confirmedOrder);
+    setFlow('confirmed');
+    setAnnouncement(`Order ${confirmedOrder.orderNumber} is ready to review.`);
+    setWorkbenchMode('order');
+  }, []);
+  const startFresh = () => {
+    const confirmed = window.confirm(
+      'Start fresh? This clears the product, prompt, artwork, and price saved in this browser.'
+    );
+    if (!confirmed) return;
+    startingFresh.current = true;
+    generationController.current?.abort();
+    quoteController.current?.abort();
+    clearStudioResumeState();
+    window.location.replace(window.location.pathname);
+  };
 
   return {
     flow,
@@ -1231,7 +1255,6 @@ export function useStudioViewModel() {
     products,
     session,
     studioPass,
-    adminReport,
     capabilities,
     selectedCategory,
     selectedProduct,
@@ -1288,12 +1311,15 @@ export function useStudioViewModel() {
     createCheckout,
     boot,
     navigate,
+    acceptConfirmedOrder,
+    startFresh,
     continueFromConfigure: () => setWorkbenchMode(design ? 'review' : 'describe'),
     showProduct: () => setWorkbenchMode('product'),
     showConfigure: () => setWorkbenchMode('configure'),
     showDescribe: () => setWorkbenchMode('describe'),
     showReview: () => setWorkbenchMode('review'),
     showCheckout: () => setWorkbenchMode('checkout'),
+    dismissRecovery: () => setRecoveryMessage(''),
     dismissFallback: () => setFallback(null),
     clearError,
   };
