@@ -73,16 +73,21 @@ function ErrorNote({ error, onRetry }: { error?: SurfaceError; onRetry: () => vo
 function Footer({ onStartFresh }: { onStartFresh: () => void }) {
   return (
     <footer className="site-footer compact-footer">
-      <nav aria-label="Footer links">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/returns">Returns</a>
-        <a href="/content-policy">Content policy</a>
-        <a href="/support">Support</a>
-      </nav>
-      <button className="text-action" type="button" onClick={onStartFresh}>
-        Start fresh
-      </button>
+      <details className="workspace-menu">
+        <summary>Help &amp; session</summary>
+        <div className="workspace-menu__content">
+          <nav aria-label="Footer links">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/returns">Returns</a>
+            <a href="/content-policy">Content policy</a>
+            <a href="/support">Support</a>
+          </nav>
+          <button className="text-action" type="button" onClick={onStartFresh}>
+            Start fresh
+          </button>
+        </div>
+      </details>
     </footer>
   );
 }
@@ -92,6 +97,7 @@ export function WorkbenchStudioApp() {
   const panelHeading = useRef<HTMLHeadingElement>(null);
   const catalogHeading = useRef<HTMLHeadingElement>(null);
   const promptField = useRef<HTMLTextAreaElement>(null);
+  const taskPanelScroll = useRef<HTMLDivElement>(null);
   const checkoutParams = useRef<{ state: string | null; sessionId: string | null } | null>(null);
   if (!checkoutParams.current) {
     checkoutParams.current = checkoutHandoff();
@@ -99,6 +105,9 @@ export function WorkbenchStudioApp() {
   const [checkoutReturn, setCheckoutReturn] = useState<CheckoutConfirmation | null>(null);
   const [checkoutPolling, setCheckoutPolling] = useState(false);
   const [checkoutAttempt, setCheckoutAttempt] = useState(0);
+  const [designOptionsOpen, setDesignOptionsOpen] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [checkoutSubmitted, setCheckoutSubmitted] = useState(false);
   const studioReady = vm.flow !== 'booting' && vm.flow !== 'boot_failed';
 
   useLayoutEffect(() => {
@@ -116,6 +125,10 @@ export function WorkbenchStudioApp() {
       );
     }
   }, []);
+
+  useLayoutEffect(() => {
+    if (taskPanelScroll.current) taskPanelScroll.current.scrollTop = 0;
+  }, [vm.workbenchMode]);
 
   useEffect(() => {
     if (!studioReady) return undefined;
@@ -189,6 +202,10 @@ export function WorkbenchStudioApp() {
     return () => window.cancelAnimationFrame(focusFrame);
   }, [studioReady, vm.workbenchMode]);
 
+  useEffect(() => {
+    if (vm.workbenchMode !== 'review') setDesignOptionsOpen(false);
+  }, [vm.workbenchMode, vm.design?.id]);
+
   if (vm.flow === 'booting') {
     return (
       <main className="loading-shell" aria-busy="true">
@@ -214,12 +231,30 @@ export function WorkbenchStudioApp() {
 
   const selected = vm.selectedProduct && vm.selectedVariant;
   const promptBlocked = !selected || !vm.prompt.trim();
+  const reviewSettling =
+    vm.workbenchMode === 'review' &&
+    (vm.busy.mockup ||
+      vm.busy.quoting ||
+      (!vm.quote && !vm.errors.mockup && !vm.errors.quote));
+  const hasDesignOptions =
+    vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother;
+  const showEmailError =
+    vm.workbenchMode === 'checkout' &&
+    (emailTouched || checkoutSubmitted) &&
+    !vm.checkoutReadiness.emailValid;
+  const emailBlocker = vm.checkoutReadiness.blocker === 'Enter a valid email for your receipt.';
+  const visibleCheckoutBlocker =
+    showEmailError && emailBlocker
+      ? vm.checkoutReadiness.blocker
+      : emailBlocker
+        ? ''
+        : vm.checkoutReadiness.blocker;
   const panelTitle = {
     product: 'Choose a product',
     configure: 'Choose color and size',
     describe: 'Describe your design',
     generating: 'Making your artwork',
-    review: 'Your design is ready',
+    review: reviewSettling ? 'Finishing your preview' : 'Your design is ready',
     checkout: 'Review and checkout',
     order: 'Your order',
   }[vm.workbenchMode];
@@ -289,18 +324,31 @@ export function WorkbenchStudioApp() {
       <StepRail
         states={vm.stepStates}
         onNavigate={vm.navigate}
-        locked={vm.workbenchMode === 'generating'}
+        locked={vm.workbenchMode === 'generating' || vm.workbenchMode === 'order'}
       />
 
       <section className="focused-workbench">
         <section className="focused-workbench__canvas" aria-label="Product canvas">
-          {selected && vm.workbenchMode !== 'product' && vm.workbenchMode !== 'generating' && (
-            <button className="canvas-product-summary" type="button" onClick={vm.showProduct}>
-              <span>{vm.selectedProduct?.title}</span>
-              <b>{vm.selectedVariant?.name}</b>
-              <small>Change product</small>
-            </button>
-          )}
+          {selected &&
+            vm.workbenchMode !== 'product' &&
+            vm.workbenchMode !== 'generating' &&
+            (vm.workbenchMode === 'order' ? (
+              <div className="canvas-product-summary is-static">
+                <span className="canvas-product-summary__copy">
+                  <strong>{vm.selectedProduct?.title}</strong>
+                  <b>{vm.selectedVariant?.name}</b>
+                </span>
+                <small>Purchased item</small>
+              </div>
+            ) : (
+              <button className="canvas-product-summary" type="button" onClick={vm.showProduct}>
+                <span className="canvas-product-summary__copy">
+                  <strong>{vm.selectedProduct?.title}</strong>
+                  <b>{vm.selectedVariant?.name}</b>
+                </span>
+                <small>Change product</small>
+              </button>
+            ))}
           <GenerationStage
             product={vm.selectedProduct}
             variant={vm.selectedVariant}
@@ -318,6 +366,7 @@ export function WorkbenchStudioApp() {
             orientation={vm.selectedOrientation}
             activeViewIndex={vm.activeMockupViewIndex}
             onViewIndexChange={vm.setActiveMockupViewIndex}
+            showMeta={vm.workbenchMode === 'generating'}
           />
         </section>
 
@@ -325,12 +374,9 @@ export function WorkbenchStudioApp() {
           className="task-panel"
           aria-labelledby={vm.workbenchMode === 'product' ? 'catalog-title' : 'task-panel-title'}
         >
-          <div className="task-panel__scroll">
+          <div className="task-panel__scroll" ref={taskPanelScroll}>
             {vm.workbenchMode !== 'product' && (
               <div className="task-panel__heading">
-                <span className="kicker">
-                  {vm.workbenchMode === 'checkout' ? 'Secure checkout' : 'Make it yours'}
-                </span>
                 <h1 id="task-panel-title" tabIndex={-1} ref={panelHeading}>
                   {panelTitle}
                 </h1>
@@ -344,6 +390,7 @@ export function WorkbenchStudioApp() {
                 category={vm.selectedCategory}
                 loading={vm.busy.catalog}
                 selectedProductId={vm.selectedProductId}
+                selectedVariantId={vm.selectedVariantId}
                 onCategory={vm.setSelectedCategory}
                 onSelect={vm.selectProduct}
                 headingRef={catalogHeading}
@@ -455,55 +502,72 @@ export function WorkbenchStudioApp() {
 
             {vm.workbenchMode === 'review' && vm.design && (
               <div className="panel-stack review-panel">
-                <div className={`ready-confirmation is-${vm.design.readiness.status}`}>
-                  <span aria-hidden="true">{vm.artworkReady ? '✓' : '!'}</span>
-                  <div>
-                    <b>{vm.artworkReady ? 'Print ready' : 'Needs a quick review'}</b>
-                    <p>
-                      {vm.busy.mockup
-                        ? 'Building your product view…'
-                        : 'Your artwork is saved and ready to order.'}
-                    </p>
+                {reviewSettling ? (
+                  <div className="review-preparing" role="status" aria-live="polite">
+                    <span className="progress-orbit" aria-hidden="true" />
+                    <div>
+                      <b>Preparing the finished product view</b>
+                      <p>We’ll show checkout actions as soon as the preview and price are ready.</p>
+                    </div>
                   </div>
-                </div>
-                {vm.quote ? (
+                ) : (
+                  <div className={`ready-confirmation is-${vm.design.readiness.status}`}>
+                    <span aria-hidden="true">{vm.artworkReady ? '✓' : '!'}</span>
+                    <div>
+                      <b>{vm.artworkReady ? 'Print ready' : 'Needs a quick review'}</b>
+                      <p>Your artwork is saved and ready to order.</p>
+                    </div>
+                  </div>
+                )}
+                {!reviewSettling && vm.quote ? (
                   <div className="review-total">
                     <span>Estimated total before tax</span>
                     <strong>{money(vm.quote.totalCents, vm.quote.currency)}</strong>
                   </div>
-                ) : (
-                  <p className="muted-copy">Preparing your price…</p>
-                )}
+                ) : !reviewSettling ? (
+                  <p className="muted-copy">Price unavailable right now.</p>
+                ) : null}
                 <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
-                <button
-                  className="button button--primary button--wide"
-                  type="button"
-                  onClick={vm.showCheckout}
-                  disabled={
-                    !vm.quote ||
-                    vm.quoteStale ||
-                    vm.quoteExpired ||
-                    vm.busy.quoting ||
-                    vm.busy.mockup ||
-                    (vm.mockup?.status !== 'complete' && !vm.errors.mockup) ||
-                    !vm.artworkReady
-                  }
-                >
-                  {vm.busy.quoting ? 'Preparing price…' : 'Review and checkout'}
-                </button>
-                <button
-                  className="button button--secondary button--wide"
-                  type="button"
-                  onClick={vm.showDescribe}
-                >
-                  Make changes
-                </button>
-                <button className="text-action" type="button" onClick={vm.showProduct}>
-                  Try it on another product
-                </button>
-                <ReadinessChecks draft={vm.design} />
-                {(vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother) && (
-                  <details className="refine-panel">
+                {!reviewSettling && (
+                  <div className="review-actions">
+                    <button
+                      className="button button--primary button--wide"
+                      type="button"
+                      onClick={vm.showCheckout}
+                      disabled={
+                        !vm.quote ||
+                        vm.quoteStale ||
+                        vm.quoteExpired ||
+                        vm.busy.quoting ||
+                        vm.busy.mockup ||
+                        (vm.mockup?.status !== 'complete' && !vm.errors.mockup) ||
+                        !vm.artworkReady
+                      }
+                    >
+                      Review and checkout
+                    </button>
+                    <button
+                      className="button button--secondary button--wide"
+                      type="button"
+                      onClick={() => {
+                        if (hasDesignOptions) setDesignOptionsOpen(true);
+                        else vm.showDescribe();
+                      }}
+                    >
+                      Make changes
+                    </button>
+                    <button className="text-action" type="button" onClick={vm.showProduct}>
+                      Try it on another product
+                    </button>
+                  </div>
+                )}
+                {!reviewSettling && <ReadinessChecks draft={vm.design} />}
+                {!reviewSettling && hasDesignOptions && (
+                  <details
+                    className="refine-panel"
+                    open={designOptionsOpen}
+                    onToggle={(event) => setDesignOptionsOpen(event.currentTarget.open)}
+                  >
                     <summary>More design options</summary>
                     {vm.canRevise && (
                       <label className="revision-field">
@@ -529,6 +593,11 @@ export function WorkbenchStudioApp() {
                         Restore previous artwork
                       </button>
                     )}
+                    {vm.canGenerateAnother && (
+                      <button className="text-action" type="button" onClick={vm.showDescribe}>
+                        Generate another design
+                      </button>
+                    )}
                   </details>
                 )}
               </div>
@@ -550,24 +619,36 @@ export function WorkbenchStudioApp() {
                     type="email"
                     value={vm.email}
                     onChange={(event) => vm.setEmail(event.target.value)}
+                    onBlur={() => setEmailTouched(true)}
                     placeholder="you@example.com"
                     autoComplete="email"
                     required
-                    aria-invalid={Boolean(vm.email && !vm.checkoutReadiness.emailValid)}
+                    aria-invalid={showEmailError}
                     aria-describedby="checkout-readiness-message"
                   />
                 </label>
                 <p
                   id="checkout-readiness-message"
-                  className={`checkout-gate ${vm.checkoutReadiness.blocker ? 'is-blocked' : ''}`}
+                  className={`checkout-gate ${visibleCheckoutBlocker ? 'is-blocked' : ''}`}
                 >
-                  {vm.checkoutReadiness.blocker || vm.checkoutReadiness.fulfillmentReview}
+                  {visibleCheckoutBlocker || vm.checkoutReadiness.fulfillmentReview}
                 </p>
+                <details className="checkout-trust">
+                  <summary>Delivery and returns</summary>
+                  <p>
+                    Final tax, shipping eligibility, and timing are confirmed in secure checkout.
+                    Custom items can only be changed before production; damaged or misprinted items
+                    are covered by our <a href="/returns">returns policy</a>.
+                  </p>
+                </details>
                 <button
                   className="button button--primary button--wide"
                   type="button"
-                  onClick={vm.createCheckout}
-                  disabled={!vm.checkoutReadiness.ready || vm.busy.checkout}
+                  onClick={() => {
+                    setCheckoutSubmitted(true);
+                    if (vm.checkoutReadiness.emailValid) vm.createCheckout();
+                  }}
+                  disabled={!vm.checkoutReadiness.canOpen || vm.busy.checkout}
                   aria-describedby="checkout-readiness-message"
                 >
                   {vm.busy.checkout ? 'Opening checkout…' : 'Continue to secure checkout'}

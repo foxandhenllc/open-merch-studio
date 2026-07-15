@@ -271,7 +271,7 @@ export function useStudioViewModel() {
       quoteReady,
       emailValid,
       paymentAvailable: canUseCustomerCheckout,
-      fulfillmentReview: 'Orders are reviewed before Printful submission.',
+      fulfillmentReview: 'Your order is reviewed for print quality before production.',
       canOpen,
       ready: canOpen && emailValid,
       blocker,

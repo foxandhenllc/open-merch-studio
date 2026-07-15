@@ -129,8 +129,53 @@ async function exerciseResponsiveConfigure(browser, viewport) {
     await product.click();
     await page.getByRole('heading', { name: 'Choose color and size' }).waitFor();
     await assertNoHorizontalOverflow(page, `${label} configure`);
+    assert.equal(
+      await page.locator('.focused-workbench__canvas .stage__meta').count(),
+      0,
+      `${label} configure should not duplicate product metadata on the canvas`
+    );
+
+    if (viewport.width <= 600) {
+      const productChip = await page.locator('.canvas-product-summary').boundingBox();
+      const continueAction = await page
+        .getByRole('button', { name: 'Continue', exact: true })
+        .boundingBox();
+      assert.ok(productChip, `${label} should show the compact product chip`);
+      assert.ok(
+        productChip.height <= 40,
+        `${label} product chip should stay compact: ${JSON.stringify(productChip)}`
+      );
+      assert.ok(continueAction, `${label} should show one primary configure action`);
+      assert.ok(
+        continueAction.y + continueAction.height <= viewport.height - 8,
+        `${label} configure action should clear mobile browser chrome: ${JSON.stringify(continueAction)}`
+      );
+      const taskScroll = await page.locator('.task-panel__scroll').boundingBox();
+      assert.ok(taskScroll, `${label} should expose the internal task scroll region`);
+      assert.ok(
+        taskScroll.y + taskScroll.height <= continueAction.y,
+        `${label} action tray should not overlay task controls: ${JSON.stringify({ taskScroll, continueAction })}`
+      );
+      const mobileMetrics = await layoutMetrics(page);
+      assert.ok(
+        mobileMetrics.scrollHeight <= mobileMetrics.clientHeight + 1,
+        `${label} workbench should keep document scrolling inside the task panel: ${JSON.stringify(mobileMetrics)}`
+      );
+    }
 
     const white = page.getByRole('button', { name: 'White', exact: true });
+    if (viewport.width === 768) {
+      const whiteTarget = await white.boundingBox();
+      const placementTarget = await page.locator('.placement-options button').first().boundingBox();
+      assert.ok(
+        whiteTarget && whiteTarget.height >= 44,
+        `768px color targets should be at least 44px: ${JSON.stringify(whiteTarget)}`
+      );
+      assert.ok(
+        placementTarget && placementTarget.height >= 44,
+        `768px placement targets should be at least 44px: ${JSON.stringify(placementTarget)}`
+      );
+    }
     await white.click();
     await page.getByText('White · L', { exact: true }).waitFor();
 
@@ -185,6 +230,10 @@ async function exerciseFixtureJourney(browser) {
         },
       }),
     });
+  });
+  await context.route('**/api/catalog/quotes', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.abort('failed');
   });
   const page = await context.newPage();
   const assertNoPageErrors = watchPageErrors(page, '390x844 fixture journey');
@@ -252,6 +301,12 @@ async function exerciseFixtureJourney(browser) {
       0,
       'mockup preparation should not expose a stale generation cancel action'
     );
+    await page.getByRole('heading', { name: 'Finishing your preview' }).waitFor();
+    assert.equal(
+      await page.getByRole('button', { name: 'Review and checkout', exact: true }).count(),
+      0,
+      'review actions should stay hidden while the mockup and quote are settling'
+    );
     await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
     await assertNoHorizontalOverflow(page, '390x844 review');
 
@@ -306,7 +361,23 @@ async function exerciseFixtureJourney(browser) {
 
     const firstTeePreview = await page.locator('.mockup-preview').getAttribute('src');
     assert.ok(firstTeePreview, 'tee review should show a finished mockup');
+    await page.getByRole('button', { name: 'Make changes', exact: true }).click();
+    const designOptions = page.locator('.refine-panel');
+    assert.equal(
+      await designOptions.getAttribute('open'),
+      '',
+      'Make changes should reveal the contextual design options'
+    );
+    assert.ok(
+      (await designOptions.getByRole('button').count()) > 0,
+      'the design options disclosure should never open empty'
+    );
     await page.getByRole('button', { name: 'Try it on another product', exact: true }).click();
+    assert.equal(
+      await page.locator('.product-row.is-selected .product-row__price small').textContent(),
+      'current estimate',
+      'the reopened catalog should label the selected variant price as the current estimate'
+    );
     await page
       .getByRole('button', { name: /Everyday Canvas Tote/ })
       .first()
@@ -338,10 +409,63 @@ async function exerciseFixtureJourney(browser) {
 
     await page.getByRole('button', { name: 'Review and checkout', exact: true }).click();
     await page.getByRole('heading', { name: 'Review and checkout' }).waitFor();
-    await page.getByRole('textbox', { name: /Email/ }).fill('first.visitor@example.com');
-    await page.getByRole('button', { name: 'Continue to secure checkout', exact: true }).click();
+    assert.equal(
+      await page.locator('.task-panel__scroll').evaluate((element) => element.scrollTop),
+      0,
+      'checkout should open at the top of its task panel'
+    );
+    assert.equal(
+      await page.getByText(/Printful/i).count(),
+      0,
+      'checkout should use customer-facing language instead of provider terminology'
+    );
+    const email = page.getByRole('textbox', { name: /Email/ });
+    const checkoutAction = page.getByRole('button', {
+      name: 'Continue to secure checkout',
+      exact: true,
+    });
+    assert.equal(
+      await email.getAttribute('aria-invalid'),
+      'false',
+      'blank checkout email should begin in a neutral state'
+    );
+    assert.equal(
+      await page.getByText('Enter a valid email for your receipt.', { exact: true }).count(),
+      0,
+      'blank checkout email should not show an error before interaction'
+    );
+    const checkoutActionBox = await checkoutAction.boundingBox();
+    const checkoutScrollBox = await page.locator('.task-panel__scroll').boundingBox();
+    assert.ok(checkoutActionBox, 'mobile checkout should show one primary action');
+    assert.ok(checkoutScrollBox, 'mobile checkout should retain an internal scroll region');
+    assert.ok(
+      checkoutActionBox.y + checkoutActionBox.height <= 836,
+      `mobile checkout action should clear browser chrome: ${JSON.stringify(checkoutActionBox)}`
+    );
+    assert.ok(
+      checkoutScrollBox.y + checkoutScrollBox.height <= checkoutActionBox.y,
+      `mobile checkout action tray should not overlay checkout fields: ${JSON.stringify({ checkoutScrollBox, checkoutActionBox })}`
+    );
+    await checkoutAction.click();
+    assert.equal(
+      await email.getAttribute('aria-invalid'),
+      'true',
+      'submitting without an email should reveal the validation state'
+    );
+    await email.fill('first.visitor@example.com');
+    await checkoutAction.click();
     await page.getByRole('heading', { name: 'Your order' }).waitFor({ timeout: 15_000 });
     await page.getByRole('heading', { name: /OMS-\d{4}-FIXTURE/ }).waitFor();
+    assert.equal(
+      await page.getByRole('button', { name: /^Step 1: Product/ }).isEnabled(),
+      false,
+      'paid-order presentation should lock navigation back into product configuration'
+    );
+    assert.equal(
+      await page.getByText('Purchased item', { exact: true }).count(),
+      1,
+      'paid-order canvas should show a static purchased-item summary'
+    );
     await assertNoHorizontalOverflow(page, '390x844 order');
     assertNoPageErrors();
   } finally {

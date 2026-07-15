@@ -10,6 +10,7 @@
   --line-strong: #b9b9b0;
   --accent: #2b44c4;
   --accent-soft: #e4e8fa;
+  --accent-on-soft: #20369e;
   --on-accent: #ffffff;
   --ok: #157a50;
   --ok-soft: #ddf3e7;
@@ -427,7 +428,7 @@ h3 {
 .placement-options button[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-on-soft);
   font-weight: 700;
 }
 .product-list {
@@ -528,6 +529,9 @@ h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.product-visual__asset {
+  animation: productVisualSwap 180ms ease-out both;
 }
 .product-visual svg {
   width: 72%;
@@ -769,6 +773,12 @@ h3 {
     transform: scale(0.96) translateY(8px);
   }
 }
+@keyframes productVisualSwap {
+  from {
+    opacity: 0.72;
+    transform: scale(0.985);
+  }
+}
 .image-fallback {
   position: absolute;
   z-index: 2;
@@ -931,7 +941,7 @@ h3 {
 .size-options button[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-on-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .color-option:disabled,
@@ -2067,6 +2077,7 @@ input:focus {
     --line-strong: #555a64;
     --accent: #5269e8;
     --accent-soft: #272f59;
+    --accent-on-soft: #dce2ff;
     --on-accent: #ffffff;
     --ok: #39b77d;
     --ok-soft: #17372b;
@@ -2193,18 +2204,25 @@ input:focus {
   box-shadow: var(--shadow-1);
   backdrop-filter: blur(12px);
 }
-.canvas-product-summary span,
+.canvas-product-summary__copy {
+  display: grid;
+  min-width: 0;
+}
+.canvas-product-summary__copy strong,
 .selection-summary span {
   overflow: hidden;
   font-size: 11px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.canvas-product-summary b,
+.canvas-product-summary__copy b,
 .selection-summary b {
-  grid-column: 1;
   color: var(--ink-soft);
   font-size: 10px;
+}
+.selection-summary b {
+  grid-column: 1;
 }
 .canvas-product-summary small,
 .selection-summary small {
@@ -2214,6 +2232,9 @@ input:focus {
   color: var(--accent);
   font-size: 10px;
   font-weight: 750;
+}
+.canvas-product-summary.is-static {
+  cursor: default;
 }
 .task-panel {
   min-width: 0;
@@ -2231,6 +2252,7 @@ input:focus {
 }
 .task-panel__heading {
   margin-bottom: 24px;
+  animation: taskPanelReveal 180ms ease-out both;
 }
 .task-panel__heading h1 {
   margin: 0;
@@ -2243,6 +2265,7 @@ input:focus {
   max-height: none;
   padding: 0;
   overflow: visible;
+  animation: taskPanelReveal 180ms ease-out both;
 }
 .task-panel .catalog .section-heading h1 {
   font-size: clamp(25px, 2.3vw, 34px);
@@ -2254,6 +2277,12 @@ input:focus {
   display: grid;
   align-content: start;
   gap: 18px;
+  animation: taskPanelReveal 180ms ease-out 25ms both;
+}
+@keyframes taskPanelReveal {
+  from {
+    opacity: 0;
+  }
 }
 .panel-stack fieldset {
   min-width: 0;
@@ -2307,6 +2336,10 @@ input:focus {
   cursor: default;
   opacity: 1;
 }
+.mode-order .step-rail__item:disabled {
+  cursor: default;
+  opacity: 1;
+}
 .generation-panel p,
 .muted-copy,
 .disabled-reason {
@@ -2345,6 +2378,35 @@ input:focus {
   border-color: color-mix(in srgb, var(--warn-ink) 24%, var(--line));
   background: var(--warn-soft);
   color: var(--warn-ink);
+}
+.review-preparing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.review-preparing .progress-orbit {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+}
+.review-preparing b {
+  display: block;
+  font-size: 13px;
+}
+.review-preparing p {
+  margin: 3px 0 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.review-actions {
+  display: grid;
+  gap: 10px;
 }
 .review-total {
   display: flex;
@@ -2412,6 +2474,26 @@ input:focus {
   min-height: 48px;
   padding: 0 12px;
   text-align: left;
+}
+.checkout-trust {
+  padding-block: 2px;
+}
+.checkout-trust summary,
+.workspace-menu summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+.checkout-trust p {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.checkout-trust a {
+  color: var(--accent);
+  font-weight: 700;
 }
 .more-views {
   position: relative;
@@ -2558,9 +2640,14 @@ input:focus {
   .mode-product .compact-footer {
     display: none;
   }
+  .mode-configure .compact-footer,
+  .mode-describe .compact-footer,
+  .mode-review .compact-footer {
+    display: none;
+  }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .streamlined-app > .step-rail {
     padding: 0 4px;
     border: 0;
@@ -2578,6 +2665,8 @@ input:focus {
   .price-details > summary,
   .refine-panel > summary,
   .more-views > summary,
+  .workspace-menu > summary,
+  .checkout-trust > summary,
   .compact-header > a:last-child,
   .task-panel .compact-footer a {
     min-height: 44px;
@@ -2586,6 +2675,8 @@ input:focus {
   .price-details > summary,
   .refine-panel > summary,
   .more-views > summary,
+  .workspace-menu > summary,
+  .checkout-trust > summary,
   .compact-header > a:last-child,
   .task-panel .compact-footer a {
     display: inline-flex;
@@ -2594,6 +2685,11 @@ input:focus {
 }
 
 @media (max-width: 600px) {
+  .streamlined-app {
+    height: 100svh;
+    min-height: 0;
+    overflow: hidden;
+  }
   .compact-header .brand-symbol {
     width: 38px;
     height: 38px;
@@ -2612,14 +2708,27 @@ input:focus {
     font-size: 10px;
   }
   .focused-workbench {
+    grid-template-rows: auto minmax(0, 1fr);
     width: 100%;
+    height: calc(100svh - 112px);
+    min-height: 0;
     margin: 0;
+    overflow: hidden;
     border-inline: 0;
     border-radius: 0;
   }
   .focused-workbench__canvas {
     height: 38svh;
     min-height: 250px;
+  }
+  .mode-configure .focused-workbench__canvas,
+  .mode-describe .focused-workbench__canvas {
+    height: 30svh;
+    min-height: 210px;
+  }
+  .mode-checkout .focused-workbench__canvas {
+    height: 26svh;
+    min-height: 190px;
   }
   .focused-workbench__canvas .stage {
     padding: 34px 12px 18px;
@@ -2637,8 +2746,33 @@ input:focus {
     font-size: 14px;
   }
   .task-panel__scroll {
-    min-height: calc(62svh - 112px);
+    height: 100%;
+    min-height: 0;
     padding: 24px 18px 32px;
+    overflow-y: auto;
+  }
+  .task-panel {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .mode-configure .task-panel__scroll,
+  .mode-describe .task-panel__scroll,
+  .mode-review .task-panel__scroll,
+  .mode-checkout .task-panel__scroll {
+    height: calc(100% - 76px);
+    padding-bottom: 24px;
+  }
+  .mode-configure .panel-stack > .button--primary,
+  .mode-describe .panel-stack > .button--primary,
+  .mode-review .review-actions > .button--primary,
+  .mode-checkout .panel-stack > .button--primary {
+    position: fixed;
+    z-index: 40;
+    right: 18px;
+    bottom: max(14px, calc(10px + env(safe-area-inset-bottom)));
+    left: 18px;
+    width: auto;
+    box-shadow: 0 10px 28px rgb(24 27 31 / 18%);
   }
   .mode-product .focused-workbench__canvas {
     display: none;
@@ -2657,7 +2791,44 @@ input:focus {
     overflow-y: auto;
   }
   .canvas-product-summary {
-    max-width: calc(100% - 24px);
+    top: 8px;
+    right: 8px;
+    max-width: calc(100% - 16px);
+    gap: 8px;
+    padding: 6px 8px;
+  }
+  .canvas-product-summary__copy {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 5px;
+    overflow: hidden;
+  }
+  .canvas-product-summary__copy strong,
+  .canvas-product-summary__copy b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .canvas-product-summary__copy strong {
+    flex: 1 1 auto;
+  }
+  .canvas-product-summary__copy b {
+    flex: 0 1 auto;
+  }
+  .canvas-product-summary__copy b::before {
+    content: '· ';
+  }
+  .canvas-product-summary small {
+    font-size: 0;
+  }
+  .canvas-product-summary small::after {
+    content: 'Change';
+    font-size: 10px;
+  }
+  .canvas-product-summary.is-static small::after {
+    content: 'Purchased';
   }
   .mockup-viewer {
     inset: 40px 12px 72px;
@@ -2772,11 +2943,25 @@ input:focus {
 }
 
 .task-panel .compact-footer {
-  display: flex;
+  display: block;
   width: 100%;
   margin: 30px 0 0;
   padding: 18px 0 0;
   border-top: 1px solid var(--line);
+}
+.workspace-menu {
+  width: 100%;
+}
+.workspace-menu__content {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.workspace-menu__content nav {
+  gap: 8px 14px;
+}
+.workspace-menu__content .text-action {
+  justify-self: start;
 }
 .task-panel .compact-footer .text-action {
   color: var(--ink-soft);

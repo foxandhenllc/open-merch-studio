@@ -26,6 +26,7 @@ export function GenerationStage({
   orientation,
   activeViewIndex,
   onViewIndexChange,
+  showMeta = true,
 }: {
   product: CatalogProduct | null;
   variant: CatalogVariant | null;
@@ -43,6 +44,7 @@ export function GenerationStage({
   orientation?: 'portrait' | 'landscape' | 'square';
   activeViewIndex: number;
   onViewIndexChange: (index: number) => void;
+  showMeta?: boolean;
 }) {
   const [, tick] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
@@ -107,14 +109,16 @@ export function GenerationStage({
       className={`stage ${stale ? 'is-stale' : ''}`}
       aria-label="Design preview"
     >
-      <div className="stage__meta">
-        <span>{product.title}</span>
-        <b>
-          {variant.name}
-          {orientation ? ` · ${orientation}` : ''}
-        </b>
-        {stale && <span className="status-pill status-pill--warn">Preview stale</span>}
-      </div>
+      {showMeta && (
+        <div className="stage__meta">
+          <span>{product.title}</span>
+          <b>
+            {variant.name}
+            {orientation ? ` · ${orientation}` : ''}
+          </b>
+          {stale && <span className="status-pill status-pill--warn">Preview stale</span>}
+        </div>
+      )}
       {activeView && !imageFailed ? (
         <div className="mockup-viewer">
           <img
@@ -201,7 +205,7 @@ export function GenerationStage({
             <p>
               {generating
                 ? 'Usually 20–60 seconds.'
-                : 'Provider previews can take up to 90 seconds.'}
+                : 'Product previews can take up to 90 seconds.'}
             </p>
             <span className="mono">Elapsed {elapsedLabel(startedAt)}</span>
           </div>
@@ -220,12 +224,10 @@ export function GenerationStage({
       {(mockup?.status === 'failed' || error) && (
         <div className="stage__status">
           <StatusNote tone="error" title={error?.title ?? 'The product preview failed'}>
-            <p>
-              {error?.message ?? mockup?.errorMessage ?? 'Printful could not build this mockup.'}
-            </p>
+            <p>{error?.message ?? mockup?.errorMessage ?? 'We could not build this preview.'}</p>
             <p>
               {error?.recovery ??
-                'Your artwork is unchanged. Retry the mockup, or continue to price without it.'}
+                'Your artwork is unchanged. Retry the product preview, or continue without it.'}
             </p>
           </StatusNote>
           <div className="stage__status-actions">

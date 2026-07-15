@@ -11,6 +11,7 @@ export function CatalogPanel({
   category,
   loading,
   selectedProductId,
+  selectedVariantId,
   onCategory,
   onSelect,
   onClose,
@@ -21,6 +22,7 @@ export function CatalogPanel({
   category: string;
   loading: boolean;
   selectedProductId: string;
+  selectedVariantId?: string;
   onCategory: (category: string) => void;
   onSelect: (product: CatalogProduct) => void;
   onClose?: () => void;
@@ -30,7 +32,6 @@ export function CatalogPanel({
     <section className="catalog" aria-labelledby="catalog-title" aria-busy={loading}>
       <div className="section-heading">
         <div>
-          <span className="kicker">Curated catalog</span>
           <h1 id="catalog-title" tabIndex={-1} ref={headingRef}>
             Choose a product
           </h1>
@@ -73,10 +74,7 @@ export function CatalogPanel({
         {!loading && products.length === 0 && (
           <div className="empty-block">
             <strong>Nothing in this view yet.</strong>
-            <p>
-              This catalog is intentionally curated. Browse all products, or self-hosters can sync
-              another Printful category.
-            </p>
+            <p>Try another category, or browse every product currently available.</p>
             <button
               className="button button--secondary"
               type="button"
@@ -88,9 +86,13 @@ export function CatalogPanel({
         )}
         {!loading &&
           products.map((product) => {
-            const variant =
-              product.variants.find((item) => item.isAvailable) ?? product.variants[0];
             const selected = selectedProductId === product.id;
+            const variant =
+              (selected
+                ? product.variants.find((item) => item.id === selectedVariantId && item.isAvailable)
+                : undefined) ??
+              product.variants.find((item) => item.isAvailable) ??
+              product.variants[0];
             return (
               <button
                 className={`product-row ${selected ? 'is-selected' : ''}`}
@@ -110,7 +112,7 @@ export function CatalogPanel({
                   <small>{product.categoryTitle || product.type || 'Catalog item'}</small>
                 </span>
                 <span className="product-row__price">
-                  <small>estimated from</small>
+                  <small>{selected ? 'current estimate' : 'from'}</small>
                   <b>
                     {variant?.retailEstimateCents
                       ? money(variant.retailEstimateCents)

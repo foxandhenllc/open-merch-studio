@@ -62,10 +62,21 @@ export function ProductVisual({
       role="img"
     >
       {showImage ? (
-        <img src={imageUrl ?? ''} alt="" onError={() => setImageFailed(true)} />
+        <img
+          key={imageUrl}
+          className="product-visual__asset"
+          src={imageUrl ?? ''}
+          alt=""
+          onError={() => setImageFailed(true)}
+        />
       ) : (
-        <svg viewBox="0 0 120 120" aria-hidden="true">
-        <Silhouette category={category} orientation={orientation} />
+        <svg
+          key={`${category}-${orientation ?? 'default'}-${color ?? 'default'}`}
+          className="product-visual__asset"
+          viewBox="0 0 120 120"
+          aria-hidden="true"
+        >
+          <Silhouette category={category} orientation={orientation} />
         </svg>
       )}
     </div>

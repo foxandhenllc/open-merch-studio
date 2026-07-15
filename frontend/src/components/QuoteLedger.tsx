@@ -44,24 +44,26 @@ export function QuoteLedger({
       aria-label="Price ledger"
       aria-busy={loading}
     >
-      <div className="section-heading">
-        <div>
-          <span className="kicker">Secure checkout</span>
-          <h2 id="price-ledger-title" tabIndex={-1}>
-            Estimated total before tax
-          </h2>
+      {!embedded && (
+        <div className="section-heading">
+          <div>
+            <span className="kicker">Secure checkout</span>
+            <h2 id="price-ledger-title" tabIndex={-1}>
+              Estimated total before tax
+            </h2>
+          </div>
+          {onClose && (
+            <button
+              className="icon-button sheet-close"
+              type="button"
+              onClick={onClose}
+              aria-label="Close price details"
+            >
+              ×
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button
-            className="icon-button sheet-close"
-            type="button"
-            onClick={onClose}
-            aria-label="Close price details"
-          >
-            ×
-          </button>
-        )}
-      </div>
+      )}
       {loading && (
         <div className="ledger-skeleton">
           <span className="skeleton" />
@@ -92,7 +94,7 @@ export function QuoteLedger({
             </div>
           )}
           <div className="ledger-total">
-            <span>Estimated subtotal</span>
+            <span>{embedded ? 'Estimated total before tax' : 'Estimated subtotal'}</span>
             <strong>{money(quote.totalCents, quote.currency)}</strong>
           </div>
           <details className="price-details">
@@ -107,7 +109,7 @@ export function QuoteLedger({
             </div>
           </details>
           <p className="ledger-promise">
-            Stripe calculates final tax securely from your US shipping address.
+            Tax is calculated from your shipping address in secure checkout.
           </p>
           {showExpiry && (
             <p className="ledger-expiry">Quote {expired ? 'expired' : `held for ${expiry}`}.</p>
