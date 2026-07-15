@@ -6,11 +6,7 @@ import {
   createDesignIdea,
   createDesignMockup,
 } from '../services/design.service.js';
-import {
-  createCheckoutSession,
-  createStudioPassCheckout,
-  submitFixtureFulfillment,
-} from '../services/order.service.js';
+import { createCheckoutSession, submitFixtureFulfillment } from '../services/order.service.js';
 import { getOrCreateSession } from '../services/runtime-store.js';
 
 test('fixture paid-beta path reaches checkout and fulfillment without credentials', async () => {
@@ -37,9 +33,6 @@ test('fixture paid-beta path reaches checkout and fulfillment without credential
   assert.equal(draft.policy.status, 'pass');
   assert.ok(draft.id);
 
-  const passCheckout = await createStudioPassCheckout(session.id);
-  assert.equal(passCheckout.status, 'paid');
-
   const mockup = await createDesignMockup({
     sessionId: session.id,
     productId: product.id,
@@ -59,14 +52,13 @@ test('fixture paid-beta path reaches checkout and fulfillment without credential
         designAssetId: draft.id ?? undefined,
       },
     ],
-    { sessionId: session.id, studioPassId: passCheckout.studioPassId }
+    { sessionId: session.id }
   );
-  assert.equal(quote.studioPassCreditCents, 500);
+  assert.equal(quote.studioPassCreditCents, 0);
 
   const checkout = await createCheckoutSession({
     quoteId: quote.id,
     sessionId: session.id,
-    studioPassId: passCheckout.studioPassId,
     designAssetId: draft.id ?? undefined,
     email: 'fixture@example.com',
   });

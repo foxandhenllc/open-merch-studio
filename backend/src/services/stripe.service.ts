@@ -136,7 +136,7 @@ export async function retrieveStripeCheckoutSession(
   if (!sessionId || !env.stripeSecretKey || !env.enableLiveStripe) return null;
   try {
     return await getStripe().checkout.sessions.retrieve(sessionId, {
-      expand: ['payment_intent'],
+      expand: ['payment_intent.latest_charge'],
     });
   } catch {
     return null;
@@ -148,7 +148,18 @@ export async function retrieveStripePaymentIntent(
 ): Promise<Stripe.PaymentIntent | null> {
   if (!paymentIntentId || !env.stripeSecretKey || !env.enableLiveStripe) return null;
   try {
-    return await getStripe().paymentIntents.retrieve(paymentIntentId);
+    return await getStripe().paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge'],
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function retrieveStripeCharge(chargeId: string): Promise<Stripe.Charge | null> {
+  if (!chargeId || !env.stripeSecretKey || !env.enableLiveStripe) return null;
+  try {
+    return await getStripe().charges.retrieve(chargeId);
   } catch {
     return null;
   }

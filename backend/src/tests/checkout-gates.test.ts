@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createQuote, listProducts } from '../services/catalog.service.js';
+import { env } from '../config/env.js';
 import { createDesignDraft } from '../services/design.service.js';
-import { createCheckoutSession, getOrderByCheckoutSession } from '../services/order.service.js';
+import {
+  createCheckoutSession,
+  createStudioPassCheckout,
+  getOrderByCheckoutSession,
+} from '../services/order.service.js';
 import { getOrCreateSession, saveOrder } from '../services/runtime-store.js';
 
 async function firstProductSelection() {
@@ -12,6 +17,18 @@ async function firstProductSelection() {
   const placement = product.placements[0];
   return { product, variant, placement };
 }
+
+test('Studio Pass checkout is blocked by its server-side feature gate', async () => {
+  const originalEnabled = env.studioPassEnabled;
+  env.studioPassEnabled = false;
+  try {
+    const checkout = await createStudioPassCheckout('session-disabled-pass');
+    assert.equal(checkout.status, 'blocked');
+    assert.equal(checkout.checkoutUrl, null);
+  } finally {
+    env.studioPassEnabled = originalEnabled;
+  }
+});
 
 test('checkout blocks quotes without generated or uploaded artwork', async () => {
   const session = getOrCreateSession();

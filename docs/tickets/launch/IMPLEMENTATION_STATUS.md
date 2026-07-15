@@ -1,7 +1,7 @@
 # Launch Ticket Implementation Status
 
 **Status:** Fixture-mode implementation complete; guarded live-provider adapters ready for private testing  
-**Visibility:** Public  
+**Visibility:** Public
 
 This file records what has been completed in the repo and what remains blocked by private provider credentials or manual business review.
 
@@ -9,21 +9,21 @@ This file records what has been completed in the repo and what remains blocked b
 
 - `OMS-001`, `OMS-002`: Paid beta scope, public roadmap, and contribution positioning are documented.
 - `OMS-010` through `OMS-014`: Storefront, category browsing, product selection, studio flow, responsive layout, and customer-safe states are implemented in the React app.
-- `OMS-020` through `OMS-024`: `$5` Studio Pass, free-start policy, internal AI spend ledger, durable spend events when `DATABASE_URL` is configured, category-aware quote math, Studio Pass credit, and transparent quote lines are implemented. Production allowance accounting still needs live database verification and ops review.
+- `OMS-020` through `OMS-024`: The pass-free beta allowance, internal AI spend ledger, durable spend events when `DATABASE_URL` is configured, category-aware quote math, and transparent quote lines are implemented. Studio Pass UI is hidden and its checkout API is server-disabled unless the dedicated feature flag is explicitly enabled.
 - `OMS-030` through `OMS-034`: Fixture catalog sync, catalog persistence shape, curated launch catalog allowlisting, placement normalization, fixture mockups, guarded Printful mockup polling, Printful order payload validation, duplicate draft-order recovery, and guarded Printful draft-order submission are implemented. Printful auto-confirm is blocked for paid beta. Live status sync remains blocked.
 - `OMS-040` through `OMS-045`: Provider abstraction, idea assistant, rough drafts, revisions, OpenAI image-generation adapter, prompt moderation, print-ready prompt shaping, print-readiness checks, persisted failed-generation state, and content/IP guardrails are implemented with live OpenAI behind explicit environment gates.
 - `OMS-050` and `OMS-051`: Guest session and account-ready ownership shapes are implemented in fixture mode. Full third-party auth remains optional and gated.
-- `OMS-052` through `OMS-055`: Fixture checkout, checkout artwork/readiness gates, Studio Pass simulation, idempotent Stripe Checkout Session creation, Stripe webhook handling with event-ID persistence, order confirmation state, and support-policy documentation are implemented. Refunds, cancellation workflows, and transactional email remain blocked.
-- `OMS-060` through `OMS-063`: Order transitions, fixture fulfillment submission, guarded Printful draft-order submission, database-backed admin order fallback, guarded admin order/report surfaces, and recovery documentation are implemented. Real provider status sync and operational recovery automation remain blocked.
-- `OMS-070` through `OMS-072`: Admin settings guard, fixture AI spend reporting, launch readiness gates, and launch audit template are implemented.
+- `OMS-052` through `OMS-055`: Fixture checkout, checkout artwork/readiness gates, idempotent Stripe Checkout Session creation, signed Stripe webhook handling with recoverable event leases, durable payment/tax/refund references, full-versus-partial refund reconciliation, order confirmation state, and support-policy documentation are implemented. Automatic refunds/cancellations remain deliberately blocked.
+- `OMS-060` through `OMS-063`: Exact durable order/review/failure states, fulfillment attempts, guarded Printful draft-order submission, external-ID duplicate recovery, database-authoritative protected order list/detail/filter APIs, idempotent draft retry, and operator review audit actions are implemented. Real provider status sync and a visual operator dashboard remain deferred.
+- `OMS-070` through `OMS-072`: Admin settings guard, fixture AI spend reporting, launch readiness gates, request IDs, privacy-safe structured operational events, protected operator recovery APIs, and launch audit template are implemented. Automated external paging remains a pre-unattended-beta task.
 - `OMS-080` through `OMS-082`: Fixture-mode clean setup, API/architecture docs, and GitHub issue taxonomy are documented.
-- `OMS-090` through `OMS-094`: Deployment gates, generated production migration, fixture smoke test, credential/privacy scan path, and paid beta go/no-go checklist are implemented as docs, scripts, and runtime readiness checks. Production migration application and seed guards still need live database verification.
+- `OMS-090` through `OMS-094`: Deployment gates, production migrations, fixture smoke test, credential/privacy scan path, and paid beta go/no-go checklist are implemented as docs, scripts, and runtime readiness checks. Supabase schema and Prisma migration-history checksums were reconciled and verified on 2026-07-14; paid-order behavior still requires the supervised live smoke.
 
 ## Blocked Until Private Inputs
 
 - Live OpenAI generation: requires private OpenAI credentials, model policy approval, spend alert verification, and `ENABLE_LIVE_OPENAI=true`.
-- Live Stripe checkout: requires private Stripe test setup, webhook verification, tax/accounting review, `DATABASE_URL`, `ENABLE_LIVE_STRIPE=true`, and `ALLOW_LIVE_PAYMENTS=true` only when live charges are approved.
-- Real Printful fulfillment: requires private Printful store setup, `PRINTFUL_CURATED_PRODUCT_IDS` for the 4-6 product launch set, live price mapping review, status sync implementation, shipping/returns/support approval, `ENABLE_LIVE_PRINTFUL=true`, `ALLOW_LIVE_FULFILLMENT=true`, `PRINTFUL_AUTO_CONFIRM_ORDERS=false`, and `FULFILLMENT_ENABLED=true`.
+- Live Stripe checkout: remains closed except for an explicit allowlisted smoke window. Signed completed/expired/refunded webhooks, Tax configuration, and durable reconciliation are implemented; `ALLOW_LIVE_PAYMENTS=true` is still an explicit real-charge decision.
+- Real Printful fulfillment: live draft creation remains closed except for the supervised smoke. Live price/shipping review, status sync, returns/support approval, and manual draft inspection remain before external beta. Auto-confirm stays disabled.
 - Production domain and Vercel environment promotion: requires private domain/team review and deployment settings.
 - Tax, shipping, accounting, refund, and support policy sign-off: requires private operator review before real-money launch.
 
@@ -43,4 +43,4 @@ Expected result: all pass.
 
 ## Launch Rule
 
-The repo is now ready for public OSS review, fixture-mode product review, and private provider testing with test credentials. It is not ready for real customer payments or unattended fulfillment until the private OPS checklist, Stripe test webhook pass, database migration, and Printful draft-order review are complete.
+The repo is now ready for public OSS review, fixture-mode product review, and a supervised allowlisted provider smoke. It is not ready for public customer payments or unattended fulfillment until the private OPS checklist, one real Stripe webhook reconciliation, and one manually inspected Printful draft are complete.

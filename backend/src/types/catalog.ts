@@ -206,6 +206,7 @@ export type OrderSummary = {
   stripeSessionId?: string;
   stripePaymentIntentId?: string;
   taxCents: number;
+  refundedCents?: number;
   paidAt?: string;
   status:
     | 'draft'
@@ -239,6 +240,51 @@ export type CheckoutConfirmation = {
   state: 'processing' | 'paid' | 'needs_review' | 'failed';
   message: string;
   order?: OrderSummary;
+};
+
+export type OperatorReviewStatus = 'unreviewed' | 'acknowledged' | 'resolved';
+
+export type AdminOrderListItem = {
+  id: string;
+  orderNumber: string;
+  status: OrderSummary['status'];
+  fulfillmentStatus: OrderSummary['fulfillment']['status'];
+  customerEmail?: string;
+  totalCents: number;
+  taxCents: number;
+  refundedCents?: number;
+  currency: string;
+  paidAt?: string;
+  createdAt: string;
+  printfulOrderId?: string;
+  failureReason?: string;
+  operatorReviewStatus: OperatorReviewStatus;
+  operatorReviewedAt?: string;
+};
+
+export type AdminOrderDetail = {
+  summary: AdminOrderListItem;
+  order: OrderSummary;
+  paymentEvents: Array<{
+    id: string;
+    providerEventId?: string;
+    eventType: string;
+    status: string;
+    createdAt: string;
+  }>;
+  fulfillmentAttempts: Array<{
+    id: string;
+    providerOrderId?: string;
+    status: string;
+    errorMessage?: string;
+    createdAt: string;
+  }>;
+  auditTrail: Array<{
+    id: string;
+    action: string;
+    note?: string;
+    createdAt: string;
+  }>;
 };
 
 export type AdminSettings = {

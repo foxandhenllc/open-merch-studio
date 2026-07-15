@@ -103,12 +103,14 @@ test('buildPrintfulOrderPayload keeps placement and retail quote details', () =>
     recipient: {
       name: 'Example Customer',
       address1: '1 Main St',
+      address2: 'Suite 200',
       city: 'Boston',
       stateCode: 'MA',
       countryCode: 'US',
       zip: '02108',
     },
   }) as {
+    recipient: { address2?: string };
     order_items: Array<{
       placements: Array<{ placement: string; technique: string }>;
     }>;
@@ -117,6 +119,7 @@ test('buildPrintfulOrderPayload keeps placement and retail quote details', () =>
 
   assert.equal(payload.order_items[0].placements[0].placement, 'embroidery_front');
   assert.equal(payload.order_items[0].placements[0].technique, 'embroidery');
+  assert.equal(payload.recipient.address2, 'Suite 200');
   assert.equal(payload.retail_costs.total, (quote.totalCents / 100).toFixed(2));
 });
 

@@ -655,6 +655,7 @@ export function buildPrintfulOrderPayload(params: {
   recipient: {
     name: string;
     address1: string;
+    address2?: string;
     city: string;
     stateCode?: string;
     countryCode: string;
@@ -693,6 +694,7 @@ export function buildPrintfulOrderPayload(params: {
     recipient: {
       name: params.recipient.name,
       address1: params.recipient.address1,
+      address2: params.recipient.address2,
       city: params.recipient.city,
       state_code: normalizeStateCode(params.recipient.stateCode),
       country_code: normalizeCountryCode(params.recipient.countryCode),
@@ -726,24 +728,26 @@ export function buildPrintfulOrderPayload(params: {
   };
 }
 
-async function fetchPrintfulOrderByExternalId(
+export async function fetchPrintfulOrderByExternalId(
   client: AxiosInstance,
   externalId: string
 ): Promise<PrintfulOrderResponse | null> {
   try {
     const response = await client.get(`/v2/orders/@${encodeURIComponent(externalId)}`);
     return unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
-  } catch {
-    return null;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null;
+    throw error;
   }
 }
 
-export async function submitPrintfulDraftOrder(params: {
+export type SubmitPrintfulDraftOrderParams = {
   quote: QuoteBreakdown;
   orderNumber: string;
   recipient: {
     name: string;
     address1: string;
+    address2?: string;
     city: string;
     stateCode?: string;
     countryCode: string;
@@ -751,7 +755,45 @@ export async function submitPrintfulDraftOrder(params: {
     email?: string;
   };
   artworkUrl: string;
-}): Promise<{ providerOrderId: string; status: string; confirmed: boolean }> {
+};
+
+export async function submitPrintfulDraftOrderWithClient(
+  client: AxiosInstance,
+  params: SubmitPrintfulDraftOrderParams
+): Promise<{ providerOrderId: string; status: string; confirmed: boolean }> {
+  const payload = buildPrintfulOrderPayload({
+    quote: params.quote,
+    recipient: params.recipient,
+    artworkUrl: params.artworkUrl,
+  });
+
+  let order = await fetchPrintfulOrderByExternalId(client, params.orderNumber);
+  if (!order) {
+    try {
+      const response = await client.post('/v2/orders', {
+        external_id: params.orderNumber,
+        shipping: 'STANDARD',
+        ...payload,
+      });
+      order = unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
+    } catch (error) {
+      // A provider timeout can happen after Printful accepted the order. Resolve
+      // that ambiguity by immutable external ID before allowing any later retry.
+      order = await fetchPrintfulOrderByExternalId(client, params.orderNumber);
+      if (!order) throw error;
+    }
+  }
+  const providerOrderId = String(order?.id ?? order?.order_id ?? '');
+  if (!providerOrderId) {
+    throw new Error('Printful order creation did not return an order ID.');
+  }
+
+  return { providerOrderId, status: String(order?.status ?? 'draft'), confirmed: false };
+}
+
+export async function submitPrintfulDraftOrder(
+  params: SubmitPrintfulDraftOrderParams
+): Promise<{ providerOrderId: string; status: string; confirmed: boolean }> {
   if (!env.printfulApiKey || !env.enableLivePrintful || !env.allowLiveFulfillment) {
     throw new Error(
       'Printful live fulfillment requires PRINTFUL_API_KEY, ENABLE_LIVE_PRINTFUL, and ALLOW_LIVE_FULFILLMENT.'
@@ -762,45 +804,55 @@ export async function submitPrintfulDraftOrder(params: {
       'Printful auto-confirm is disabled for paid beta. Set PRINTFUL_AUTO_CONFIRM_ORDERS=false and review draft orders manually.'
     );
   }
+  return submitPrintfulDraftOrderWithClient(createPrintfulClient(), params);
+}
 
-  const client = createPrintfulClient();
-  const payload = buildPrintfulOrderPayload({
-    quote: params.quote,
-    recipient: params.recipient,
-    artworkUrl: params.artworkUrl,
-  });
-  let order: PrintfulOrderResponse;
-  try {
-    const response = await client.post('/v2/orders', {
-      external_id: params.orderNumber,
-      shipping: 'STANDARD',
-      ...payload,
-    });
-    order = unwrapPrintfulResponse<PrintfulOrderResponse>(response.data);
-  } catch (error) {
-    const message =
-      axios.isAxiosError(error) && typeof error.response?.data === 'object'
-        ? JSON.stringify(error.response.data)
-        : error instanceof Error
-          ? error.message
-          : 'Printful order creation failed.';
-    if (message.includes('External ID') || message.includes('external_id')) {
-      const existing = await fetchPrintfulOrderByExternalId(client, params.orderNumber);
-      if (existing?.id ?? existing?.order_id) {
-        order = existing;
-      } else {
-        throw error;
-      }
-    } else {
-      throw error;
-    }
+export function classifyPrintfulFailure(error: unknown): {
+  code: string;
+  message: string;
+  statusCode?: number;
+} {
+  const statusCode = axios.isAxiosError(error) ? error.response?.status : undefined;
+  const networkCode = axios.isAxiosError(error) ? error.code : undefined;
+  if (statusCode === 401 || statusCode === 403) {
+    return {
+      code: 'printful_authentication',
+      message: 'Printful rejected the configured store credentials.',
+      statusCode,
+    };
   }
-  const providerOrderId = String(order?.id ?? order?.order_id ?? '');
-  if (!providerOrderId) {
-    throw new Error('Printful order creation did not return an order ID.');
+  if (statusCode === 429) {
+    return {
+      code: 'printful_rate_limited',
+      message: 'Printful temporarily rate-limited the draft request.',
+      statusCode,
+    };
   }
-
-  return { providerOrderId, status: String(order?.status ?? 'draft'), confirmed: false };
+  if (statusCode === 400 || statusCode === 409 || statusCode === 422) {
+    return {
+      code: 'printful_validation',
+      message: `Printful rejected the draft payload (HTTP ${statusCode}).`,
+      statusCode,
+    };
+  }
+  if (statusCode && statusCode >= 500) {
+    return {
+      code: 'printful_unavailable',
+      message: `Printful was unavailable while creating the draft (HTTP ${statusCode}).`,
+      statusCode,
+    };
+  }
+  if (networkCode === 'ECONNABORTED' || networkCode === 'ETIMEDOUT') {
+    return {
+      code: 'printful_timeout',
+      message: 'Printful did not confirm the draft request before the timeout.',
+    };
+  }
+  return {
+    code: 'printful_unknown',
+    message: 'Printful could not create the draft order.',
+    statusCode,
+  };
 }
 
 export async function fetchPrintfulOrderStatus(

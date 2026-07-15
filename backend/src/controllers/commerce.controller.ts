@@ -14,6 +14,7 @@ import {
 } from '../services/order.service.js';
 import { constructStripeWebhookEvent } from '../services/stripe.service.js';
 import { trackServerEvent } from '../utils/analytics.js';
+import { logOperationalEvent } from '../utils/operational-logger.js';
 
 export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Response) => {
   const sessionId = String(req.body?.sessionId ?? '').trim();
@@ -35,6 +36,16 @@ export const postCheckoutSession = asyncHandler(async (req: Request, res: Respon
     email: String(req.body?.email ?? '') || undefined,
     designAssetId: String(req.body?.designAssetId ?? '') || undefined,
   });
+  logOperationalEvent(
+    checkout.status === 'blocked' ? 'warning' : 'info',
+    'checkout_session_result',
+    {
+      requestId: String(res.locals.requestId ?? ''),
+      orderId: checkout.orderId,
+      stripeSessionId: checkout.mode === 'stripe' ? checkout.id : undefined,
+      outcome: checkout.status,
+    }
+  );
   const status = checkout.status === 'blocked' ? 200 : 201;
   res.status(status).json({ success: true, data: checkout });
 });
@@ -74,6 +85,11 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
   } catch {
     throw new HttpError('Invalid Stripe webhook signature.', 400);
   }
+  logOperationalEvent('info', 'stripe_webhook_received', {
+    requestId: String(res.locals.requestId ?? ''),
+    stripeEventId: event.id,
+    outcome: event.type,
+  });
   if (event.type === 'checkout.session.completed') {
     const alreadyProcessed = await wasStripeEventProcessed(event.id);
     const order = await handleStripeCheckoutCompleted(event.data.object, event.id);
@@ -90,5 +106,10 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
   } else if (event.type === 'charge.refunded') {
     await handleStripeChargeRefunded(event.data.object, event.id);
   }
+  logOperationalEvent('info', 'stripe_webhook_processed', {
+    requestId: String(res.locals.requestId ?? ''),
+    stripeEventId: event.id,
+    outcome: event.type,
+  });
   res.json({ received: true });
 });

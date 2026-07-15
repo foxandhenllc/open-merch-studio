@@ -4,7 +4,7 @@
 **Visibility:** Public  
 **Private ops companion:** `/Users/chrisfox/git/staging/private/open-merch-studio-launch/`
 
-Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, Studio Pass simulation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and private provider testing, not unattended real-money launch.
+Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and private provider testing, not unattended real-money launch.
 
 ## Provider Gates
 
@@ -40,17 +40,17 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 1. Create guest studio session.
 2. Refine a merch idea.
 3. Generate a rough draft.
-4. Simulate a Studio Pass.
-5. Create a fixture mockup.
-6. Create a quote with Studio Pass credit.
-7. Simulate checkout.
-8. Submit fixture fulfillment.
+4. Create a fixture mockup.
+5. Create a pass-free quote.
+6. Simulate checkout.
+7. Submit fixture fulfillment.
 
 ## Launch Gate Checklist
 
 - Public repo has no live credentials, private provider values, private customer data, or billing artifacts.
 - Fixture mode works from a clean clone.
-- `backend/prisma/migrations/20260529180000_paid_beta_foundation/migration.sql` and `backend/prisma/migrations/20260530122000_paid_beta_provider_hardening/migration.sql` have been applied to the dedicated Open Merch Studio database.
+- All committed Prisma migrations have been applied to the dedicated Open Merch Studio database,
+  including `20260714233000_order_recovery_operations` before the supervised payment.
 - Preview and production environments are separated.
 - Vercel uses the full-stack Express backend through `api/[...path].js`; production API testing must hit real `/api/*` routes, not the archived fixture handlers under `api-fixtures/`.
 - Production has `PUBLIC_APP_MODE=production`, `VITE_PUBLIC_APP_MODE=production`, `CHECKOUT_ACCESS_MODE=closed`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
@@ -60,12 +60,82 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 - Tax, shipping, and Studio Pass accounting assumptions are reviewed before real-money launch.
 - `OMS-094` is reviewed with the private OPS checklist before inviting paid beta customers.
 
+## Protected Order Operations
+
+Set a long random `ADMIN_ACCESS_CODE` only in the deployment secret store. Never place it in a
+frontend variable, command history, ticket, screenshot, or repository file. All endpoints below
+require the exact value in `x-admin-access`.
+
+```bash
+curl -sS "$APP_URL/api/admin/orders?attention=failed" \
+  -H "x-admin-access: $ADMIN_ACCESS_CODE"
+
+curl -sS "$APP_URL/api/admin/orders/$ORDER_ID" \
+  -H "x-admin-access: $ADMIN_ACCESS_CODE"
+```
+
+Admin detail includes the durable order, payment-event summaries, fulfillment-attempt summaries,
+and an operator audit trail. It deliberately excludes raw Stripe/Printful payloads.
+
+### Paid Order With No Printful Draft
+
+1. Confirm the order is paid in Stripe and the OMS admin detail retains `paidAt`, final total, tax,
+   and payment-intent reference.
+2. Confirm no Printful order exists for the OMS order number. Printful retry also checks that
+   immutable external ID before attempting a create.
+3. Temporarily verify `ENABLE_LIVE_PRINTFUL=true`, `ALLOW_LIVE_FULFILLMENT=true`,
+   `FULFILLMENT_ENABLED=true`, and `PRINTFUL_AUTO_CONFIRM_ORDERS=false` for the supervised action.
+4. Retry once:
+
+   ```bash
+   curl -sS -X POST "$APP_URL/api/admin/orders/$ORDER_ID/fulfillment/retry" \
+     -H "x-admin-access: $ADMIN_ACCESS_CODE"
+   ```
+
+5. Inspect the returned attempt and the editable Printful draft. Never confirm it automatically.
+6. Acknowledge the issue while it is under review, or resolve it with a required note after the
+   provider result is verified:
+
+   ```bash
+   curl -sS -X POST "$APP_URL/api/admin/orders/$ORDER_ID/review" \
+     -H "content-type: application/json" \
+     -H "x-admin-access: $ADMIN_ACCESS_CODE" \
+     --data '{"status":"acknowledged"}'
+   ```
+
+### Refund Or Cancellation
+
+- Initiate refunds deliberately in Stripe. The signed `charge.refunded` webhook updates the local
+  order and distinguishes cumulative partial refunds from a full refund; do not add an automatic
+  refund action to the retry API.
+- Do not retry Printful for an order with any refunded amount or a cancelled order.
+- If a Printful draft exists, cancel/remove it manually in Printful and record the operator outcome.
+- A refund webhook that cannot find its durable OMS order emits `stripe_refund_orphaned` and returns
+  an error so provider retry plus operator review remain possible.
+
+### Log Review
+
+Search Vercel Functions logs for JSON records with `"kind":"oms_operational"`. High-value events
+include `stripe_payment_orphaned`, `stripe_refund_orphaned`, `printful_draft_failed`,
+`printful_draft_retry_failed`, and `request_failed`. Logs contain operational identifiers and safe
+failure classifications only; they must not contain email, address, prompt, artwork URL/content,
+credentials, webhook bodies, provider response bodies, or raw Stripe Checkout Session IDs. Session
+IDs appear only as stable one-way fingerprints for correlation.
+
 ## Pause Procedure
 
 If launch needs to pause:
 
-1. Set `CHECKOUT_ENABLED=false`.
-2. Set `ENABLE_LIVE_OPENAI=false`.
-3. Set `ENABLE_LIVE_PRINTFUL=false`.
-4. Confirm admin launch readiness reports checkout, generation, and fulfillment as manual or blocked.
-5. Keep public browsing and fixture-safe local development available.
+1. Set `CHECKOUT_ACCESS_MODE=closed` and clear `CHECKOUT_ALLOWED_EMAILS`.
+2. Set `CHECKOUT_ENABLED=false`, `ALLOW_LIVE_PAYMENTS=false`, and
+   `VITE_ENABLE_PUBLIC_CHECKOUT=false`.
+3. Set `FULFILLMENT_ENABLED=false` and `ALLOW_LIVE_FULFILLMENT=false`; retain
+   `PRINTFUL_AUTO_CONFIRM_ORDERS=false`.
+4. In Stripe, locate every still-open Checkout Session created during the supervised window and
+   expire it. Closing OMS gates prevents new sessions but cannot revoke an already-issued Stripe URL.
+5. Redeploy so server and frontend gates agree.
+6. Confirm `/api/health` reports checkout and fulfillment as configured/available rather than live,
+   and verify a checkout request is blocked.
+7. Review `oms_operational` errors, Stripe webhook delivery, protected order detail, and Printful
+   drafts before reopening any gate.
+8. Keep public browsing, design preview, and fixture-safe local development available.

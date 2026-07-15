@@ -199,6 +199,7 @@ export type OrderSummary = {
   stripeSessionId?: string;
   stripePaymentIntentId?: string;
   taxCents: number;
+  refundedCents?: number;
   paidAt?: string;
   status:
     | 'draft'
