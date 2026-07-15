@@ -176,7 +176,7 @@ export function WorkbenchStudioApp() {
   }, [checkoutAttempt, studioReady, vm.acceptConfirmedOrder]);
 
   useEffect(() => {
-    if (!studioReady) return undefined;
+    if (!studioReady || vm.workbenchMode === 'generating') return undefined;
     const focusFrame = window.requestAnimationFrame(() => {
       const target =
         vm.workbenchMode === 'product'
@@ -286,11 +286,15 @@ export function WorkbenchStudioApp() {
         </div>
       ) : null}
 
-      <StepRail states={vm.stepStates} onNavigate={vm.navigate} />
+      <StepRail
+        states={vm.stepStates}
+        onNavigate={vm.navigate}
+        locked={vm.workbenchMode === 'generating'}
+      />
 
       <section className="focused-workbench">
         <section className="focused-workbench__canvas" aria-label="Product canvas">
-          {selected && vm.workbenchMode !== 'product' && (
+          {selected && vm.workbenchMode !== 'product' && vm.workbenchMode !== 'generating' && (
             <button className="canvas-product-summary" type="button" onClick={vm.showProduct}>
               <span>{vm.selectedProduct?.title}</span>
               <b>{vm.selectedVariant?.name}</b>
@@ -445,33 +449,7 @@ export function WorkbenchStudioApp() {
 
             {vm.workbenchMode === 'generating' && (
               <div className="panel-stack generation-panel">
-                {(vm.busy.generating || vm.busy.revising || vm.busy.mockup) && (
-                  <span className="progress-orbit" aria-hidden="true" />
-                )}
-                <strong
-                  className="generation-phase"
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  {vm.busy.revising
-                    ? 'Creating your variation'
-                    : vm.busy.generating
-                      ? vm.generationPhase
-                      : vm.busy.mockup
-                        ? 'Building product preview'
-                        : 'Finishing your design'}
-                </strong>
-                <p>We’ll move from artwork to a product-ready mockup automatically.</p>
-                {vm.busy.generating && (
-                  <button
-                    className="button button--secondary"
-                    type="button"
-                    onClick={vm.cancelGeneration}
-                  >
-                    Cancel generation
-                  </button>
-                )}
+                <p>Your artwork and product preview will appear on the canvas automatically.</p>
               </div>
             )}
 

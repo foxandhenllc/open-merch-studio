@@ -12,14 +12,17 @@ const steps: Array<{ id: StudioStep; label: string }> = [
 export function StepRail({
   states,
   onNavigate,
+  locked = false,
 }: {
   states: Record<StudioStep, StepState>;
   onNavigate: (step: StudioStep) => void;
+  locked?: boolean;
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
+    if (locked) return;
     const enabledIndexes = steps
       .map((step, stepIndex) => (states[step.id] === 'todo' ? -1 : stepIndex))
       .filter((stepIndex) => stepIndex >= 0);
@@ -41,6 +44,7 @@ export function StepRail({
       {steps.map((step, index) => {
         const state = states[step.id];
         const enabled = state !== 'todo';
+        const navigationLocked = locked;
         return (
           <button
             key={step.id}
@@ -51,8 +55,10 @@ export function StepRail({
             className={`step-rail__item is-${state}`}
             aria-label={`Step ${index + 1}: ${step.label}${state === 'stale' ? ' — update required' : ''}`}
             aria-current={state === 'active' ? 'step' : undefined}
-            disabled={!enabled}
-            onClick={() => onNavigate(step.id)}
+            disabled={!enabled || navigationLocked}
+            onClick={() => {
+              if (!locked) onNavigate(step.id);
+            }}
             onKeyDown={(event) => onKeyDown(event, index)}
           >
             <span>{state === 'done' ? '✓' : index + 1}</span>

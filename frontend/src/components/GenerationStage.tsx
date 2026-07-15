@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CatalogProduct, CatalogVariant, DesignDraft, DesignMockup } from '@app-types/catalog';
 import { ProductVisual } from './ProductVisual';
 import { StatusNote } from './StatusNote';
@@ -46,12 +46,21 @@ export function GenerationStage({
 }) {
   const [, tick] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
+  const progressSurface = useRef<HTMLDivElement | null>(null);
+  const operationActive = generating || mockupBusy;
   useEffect(() => {
     if (!generating && !mockupBusy) return undefined;
     const timer = window.setInterval(() => tick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [generating, mockupBusy]);
   useEffect(() => setImageFailed(false), [draft?.imageUrl, mockup?.imageUrl]);
+  useEffect(() => {
+    if (!operationActive) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      progressSurface.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [operationActive]);
 
   if (!product || !variant) {
     return (
@@ -77,11 +86,26 @@ export function GenerationStage({
         ? [{ label: 'Product view', imageUrl: mockup.imageUrl }]
         : [];
   const activeView = mockupViews[activeViewIndex] ?? mockupViews[0];
+  const renderViewButton = (view: { label: string; imageUrl: string }, index: number) => (
+    <button
+      key={`${view.imageUrl}-${index}`}
+      type="button"
+      className={index === activeViewIndex ? 'is-active' : ''}
+      aria-label={`Show ${view.label}`}
+      aria-pressed={index === activeViewIndex}
+      onClick={() => {
+        setImageFailed(false);
+        onViewIndexChange(index);
+      }}
+    >
+      <img src={view.imageUrl} alt="" />
+      <span>{view.label}</span>
+    </button>
+  );
   return (
     <section
       className={`stage ${stale ? 'is-stale' : ''}`}
       aria-label="Design preview"
-      aria-busy={generating || mockupBusy}
     >
       <div className="stage__meta">
         <span>{product.title}</span>
@@ -100,42 +124,30 @@ export function GenerationStage({
             onError={() => setImageFailed(true)}
           />
           {mockupViews.length > 1 && (
-            <div className="mockup-viewer__rail" aria-label="Product mockup views">
-              {mockupViews.slice(0, 3).map((view, index) => (
-                <button
-                  key={view.imageUrl}
-                  type="button"
-                  className={index === activeViewIndex ? 'is-active' : ''}
-                  aria-label={`Show ${view.label}`}
-                  aria-pressed={index === activeViewIndex}
-                  onClick={() => {
-                    setImageFailed(false);
-                    onViewIndexChange(index);
-                  }}
-                >
-                  <img src={view.imageUrl} alt="" />
-                  <span>{view.label}</span>
-                </button>
-              ))}
-              {mockupViews.length > 3 && (
-                <details className="more-views">
-                  <summary>More views</summary>
-                  <div>
-                    {mockupViews.slice(3).map((view, index) => (
-                      <button
-                        key={view.imageUrl}
-                        type="button"
-                        aria-label={`Show ${view.label}`}
-                        onClick={() => onViewIndexChange(index + 3)}
-                      >
-                        <img src={view.imageUrl} alt="" />
-                        <span>{view.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
+            <>
+              <div
+                className="mockup-viewer__rail mockup-viewer__rail--desktop"
+                role="group"
+                aria-label="Product mockup views"
+              >
+                {mockupViews.slice(0, 3).map(renderViewButton)}
+                {mockupViews.length > 3 && (
+                  <details className="more-views">
+                    <summary>More views</summary>
+                    <div>
+                      {mockupViews.slice(3).map((view, index) => renderViewButton(view, index + 3))}
+                    </div>
+                  </details>
+                )}
+              </div>
+              <div
+                className="mockup-viewer__rail mockup-viewer__rail--mobile"
+                role="group"
+                aria-label="Product mockup views"
+              >
+                {mockupViews.map(renderViewButton)}
+              </div>
+            </>
           )}
         </div>
       ) : artworkUrl && !imageFailed ? (
@@ -165,10 +177,21 @@ export function GenerationStage({
         </div>
       )}
       {(generating || mockupBusy) && (
-        <div className="stage-progress">
+        <div
+          ref={progressSurface}
+          className="stage-progress"
+          role="group"
+          aria-labelledby="generation-progress-status"
+          tabIndex={-1}
+        >
           <span className="progress-orbit" aria-hidden="true" />
           <div>
-            <strong>
+            <strong
+              id="generation-progress-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
               {generating
                 ? phase
                 : mockup?.status === 'queued'
@@ -177,13 +200,18 @@ export function GenerationStage({
             </strong>
             <p>
               {generating
-                ? 'Usually 20–60 seconds. You can cancel without using a draft credit.'
+                ? 'Usually 20–60 seconds.'
                 : 'Provider previews can take up to 90 seconds.'}
             </p>
             <span className="mono">Elapsed {elapsedLabel(startedAt)}</span>
           </div>
           {generating && (
-            <button className="button button--secondary" type="button" onClick={onCancel}>
+            <button
+              className="button button--secondary"
+              type="button"
+              aria-label="Cancel generation"
+              onClick={onCancel}
+            >
               Cancel
             </button>
           )}

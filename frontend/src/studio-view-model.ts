@@ -809,6 +809,7 @@ export function useStudioViewModel() {
   };
   const generate = async () => {
     if (!selectedProduct || !selectedVariant || !prompt.trim()) return;
+    setRecoveryMessage('');
     const controller = new AbortController();
     generationController.current = controller;
     setAction('generating', true);
@@ -900,6 +901,7 @@ export function useStudioViewModel() {
   const cancelGeneration = () => generationController.current?.abort();
   const reviseDraft = async () => {
     if (!design?.id || !revision.trim()) return;
+    setRecoveryMessage('');
     if (!canRevise) {
       setErrors((current) => ({
         ...current,
@@ -1226,6 +1228,7 @@ export function useStudioViewModel() {
     [selectedProduct, design, workbenchMode]
   );
   const navigate = (step: StudioStep) => {
+    if (workbenchMode === 'generating' || busy.generating || busy.revising) return;
     if (step === 'product') setWorkbenchMode('product');
     if (step === 'make' && selectedProduct) setWorkbenchMode(design ? 'review' : 'configure');
     if (step === 'order' && artworkReady) setWorkbenchMode('checkout');

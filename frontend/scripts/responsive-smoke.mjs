@@ -64,6 +64,20 @@ async function assertNoHorizontalOverflow(page, label) {
   return metrics;
 }
 
+async function assertBoxContained(inner, outer, label) {
+  const [innerBox, outerBox] = await Promise.all([inner.boundingBox(), outer.boundingBox()]);
+  assert.ok(innerBox, `${label} should have a visible inner box`);
+  assert.ok(outerBox, `${label} should have a visible outer box`);
+  const tolerance = 1;
+  assert.ok(
+    innerBox.x >= outerBox.x - tolerance &&
+      innerBox.y >= outerBox.y - tolerance &&
+      innerBox.x + innerBox.width <= outerBox.x + outerBox.width + tolerance &&
+      innerBox.y + innerBox.height <= outerBox.y + outerBox.height + tolerance,
+    `${label} should stay inside its container: ${JSON.stringify({ innerBox, outerBox })}`
+  );
+}
+
 function watchPageErrors(page, label) {
   const errors = [];
   page.on('console', (message) => {
@@ -82,7 +96,8 @@ function watchPageErrors(page, label) {
       errors.push(`response: ${response.status()} ${response.url()}`);
     }
   });
-  return () => assert.deepEqual(errors, [], `${label} emitted browser errors:\n${errors.join('\n')}`);
+  return () =>
+    assert.deepEqual(errors, [], `${label} emitted browser errors:\n${errors.join('\n')}`);
 }
 
 async function openProduct(page) {
@@ -139,6 +154,38 @@ async function exerciseResponsiveConfigure(browser, viewport) {
 
 async function exerciseFixtureJourney(browser) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.route('**/api/design/drafts', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+    await route.abort('failed');
+  });
+  await context.route('**/api/design/mockups', async (route) => {
+    const body = route.request().postDataJSON();
+    const imageUrl = body.imageUrl;
+    const views = ['Product view', 'Front view', 'Back view', 'Side view', 'Detail view'].map(
+      (label, index) => ({ label, imageUrl: `${imageUrl}#view-${index}` })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: `mockup_mobile_${Date.now()}`,
+          status: 'complete',
+          provider: 'fixture',
+          productId: body.productId,
+          variantId: body.variantId,
+          placementCodes: body.placementCodes,
+          designAssetId: body.designAssetId,
+          orientation: body.orientation,
+          imageUrl: views[0].imageUrl,
+          views,
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    });
+  });
   const page = await context.newPage();
   const assertNoPageErrors = watchPageErrors(page, '390x844 fixture journey');
   try {
@@ -155,20 +202,125 @@ async function exerciseFixtureJourney(browser) {
       'A cheerful red panda tending a tiny garden, bold screen-print style, no words'
     );
     await page.getByRole('button', { name: 'Generate my design', exact: true }).click();
+    const progressStatus = page.getByRole('status').filter({ hasText: 'Generating artwork' });
+    await progressStatus.waitFor({ timeout: 5000 });
+    assert.equal(
+      await page.locator('.stage-progress:visible').count(),
+      1,
+      'mobile generation should show one progress surface'
+    );
+    assert.equal(
+      await page.locator('.progress-orbit:visible').count(),
+      1,
+      'mobile generation should show one progress icon'
+    );
+    assert.equal(
+      await page.getByRole('heading', { name: 'Making your artwork' }).count(),
+      0,
+      'mobile generation should not repeat the task-panel heading'
+    );
+    assert.equal(
+      await page.getByRole('button', { name: 'Cancel generation', exact: true }).count(),
+      1,
+      'mobile generation should expose one cancel action'
+    );
+    assert.equal(
+      await page.getByRole('button', { name: 'Step 2: Make', exact: true }).isEnabled(),
+      false,
+      'the active progress step should be non-interactive during generation'
+    );
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.matches('.stage-progress')),
+      true,
+      'mobile generation should move focus to its retained progress surface'
+    );
+    await assertBoxContained(
+      page.locator('.stage-progress'),
+      page.locator('.focused-workbench__canvas'),
+      'mobile generation progress'
+    );
+    await assertNoHorizontalOverflow(page, '390x844 generation');
+
+    await page.getByRole('status').filter({ hasText: 'Building product preview' }).waitFor();
+    assert.equal(
+      await page.locator('.stage-progress:visible').count(),
+      1,
+      'mobile mockup preparation should keep one progress surface'
+    );
+    assert.equal(
+      await page.getByRole('button', { name: 'Cancel generation', exact: true }).count(),
+      0,
+      'mockup preparation should not expose a stale generation cancel action'
+    );
     await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
     await assertNoHorizontalOverflow(page, '390x844 review');
+
+    const mobileRail = page.locator('.mockup-viewer__rail--mobile');
+    const desktopRail = page.locator('.mockup-viewer__rail--desktop');
+    await mobileRail.waitFor();
+    assert.equal(
+      await page.getByRole('group', { name: 'Product mockup views', exact: true }).count(),
+      1,
+      'the visible mobile view rail should expose one labeled group'
+    );
+    assert.equal(
+      await mobileRail.getByRole('button').count(),
+      5,
+      'mobile mockup rail should expose every provider view'
+    );
+    assert.equal(
+      await desktopRail.evaluate((element) => getComputedStyle(element).display),
+      'none',
+      'desktop More views rail should be hidden on phones'
+    );
+    const mobileRailMetrics = await mobileRail.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      overflowX: getComputedStyle(element).overflowX,
+    }));
+    assert.ok(
+      ['auto', 'scroll'].includes(mobileRailMetrics.overflowX),
+      `mobile mockup rail should scroll horizontally: ${JSON.stringify(mobileRailMetrics)}`
+    );
+    assert.ok(
+      mobileRailMetrics.scrollWidth > mobileRailMetrics.clientWidth,
+      `mobile mockup rail should contain swipeable overflow: ${JSON.stringify(mobileRailMetrics)}`
+    );
+    await assertBoxContained(
+      mobileRail,
+      page.locator('.focused-workbench__canvas'),
+      'mobile mockup view rail'
+    );
+    const detailView = mobileRail.getByRole('button', { name: 'Show Detail view' });
+    await detailView.scrollIntoViewIfNeeded();
+    await detailView.click();
+    assert.equal(await detailView.getAttribute('aria-pressed'), 'true');
+    assert.match(
+      (await page.locator('.mockup-preview').getAttribute('src')) || '',
+      /#view-4$/,
+      'selecting a mobile thumbnail should update the product preview'
+    );
+    const productView = mobileRail.getByRole('button', { name: 'Show Product view' });
+    await productView.scrollIntoViewIfNeeded();
+    await productView.click();
 
     const firstTeePreview = await page.locator('.mockup-preview').getAttribute('src');
     assert.ok(firstTeePreview, 'tee review should show a finished mockup');
     await page.getByRole('button', { name: 'Try it on another product', exact: true }).click();
-    await page.getByRole('button', { name: /Everyday Canvas Tote/ }).first().click();
+    await page
+      .getByRole('button', { name: /Everyday Canvas Tote/ })
+      .first()
+      .click();
     await page.getByRole('heading', { name: 'Choose color and size' }).waitFor();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('heading', { name: 'Your design is ready' }).waitFor();
     await page.locator('.mockup-preview[alt*="Everyday Canvas Tote"]').waitFor();
 
     await page.getByRole('button', { name: 'Try it on another product', exact: true }).click();
-    await page.getByRole('button', { name: /Heavyweight Cotton Tee/ }).first().click();
+    await page
+      .getByRole('button', { name: /Heavyweight Cotton Tee/ })
+      .first()
+      .click();
     await page.getByRole('heading', { name: 'Choose color and size' }).waitFor();
     assert.equal(
       await page.getByRole('button', { name: 'White', exact: true }).getAttribute('aria-pressed'),
@@ -224,7 +376,10 @@ async function exerciseProductMatrix(browser) {
       'Kiss-Cut Vinyl Sticker',
       'Museum Matte Poster',
     ]) {
-      await page.getByRole('button', { name: new RegExp(productName) }).first().click();
+      await page
+        .getByRole('button', { name: new RegExp(productName) })
+        .first()
+        .click();
       await page.getByRole('heading', { name: 'Choose color and size' }).waitFor();
       await page.getByText(productName, { exact: true }).first().waitFor();
       await assertNoHorizontalOverflow(page, `${productName} configure`);
@@ -246,7 +401,10 @@ async function exerciseKeyboardAndReducedMotion(browser) {
   const assertNoPageErrors = watchPageErrors(page, 'keyboard and reduced motion');
   try {
     await openProduct(page);
-    await page.getByRole('button', { name: /Heavyweight Cotton Tee/ }).first().click();
+    await page
+      .getByRole('button', { name: /Heavyweight Cotton Tee/ })
+      .first()
+      .click();
     const makeStep = page.getByRole('button', { name: /Step 2: Make/ });
     await makeStep.focus();
     await makeStep.press('ArrowRight');
@@ -261,10 +419,15 @@ async function exerciseKeyboardAndReducedMotion(browser) {
     const maxDurationMs = Math.max(
       ...duration.split(',').map((value) => {
         const trimmed = value.trim();
-        return trimmed.endsWith('ms') ? Number.parseFloat(trimmed) : Number.parseFloat(trimmed) * 1000;
+        return trimmed.endsWith('ms')
+          ? Number.parseFloat(trimmed)
+          : Number.parseFloat(trimmed) * 1000;
       })
     );
-    assert.ok(maxDurationMs <= 1, `reduced motion should collapse transitions, received ${duration}`);
+    assert.ok(
+      maxDurationMs <= 1,
+      `reduced motion should collapse transitions, received ${duration}`
+    );
     assertNoPageErrors();
   } finally {
     await context.close();
