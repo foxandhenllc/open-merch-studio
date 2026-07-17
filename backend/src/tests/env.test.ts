@@ -39,7 +39,7 @@ test('transactional email configuration is disabled and fixture-only by default'
     provider: 'fixture',
     from: undefined,
     replyTo: undefined,
-    supportEmail: 'support@foxandhenllc.com',
+    supportEmail: 'support@openmerchstudio.com',
     resendApiKey: undefined,
     resendWebhookSecret: undefined,
   });

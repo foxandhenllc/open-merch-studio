@@ -19,8 +19,10 @@ The paid-beta runbook, launch audit template, implementation ledger, monitoring/
 domain cutover checklist provide the decision surface. The final go/no-go still requires a supervised
 Stripe/Printful smoke and private operator sign-off. The branded Stripe webhook and Printful store URL
 are active, all five launch-product live mockups passed without an order, and the Workspace alias domain
-has Gmail/MX/SPF active. DKIM, support routing/round-trip verification, approved legal policy inputs,
-and removal of the intentional `noindex` gate remain incomplete.
+has Gmail/MX/SPF active. The branded support group routes to Chris Fox and Chris Henrich and its external
+inbound-and-reply test passed. DKIM is still authenticating, the tested reply displayed the primary-
+domain group address, and approved legal policy inputs plus removal of the intentional `noindex` gate
+remain incomplete.
 
 ## Requirements
 
@@ -50,8 +52,8 @@ and removal of the intentional `noindex` gate remain incomplete.
 - The order migration for `taxCents`, `stripePaymentIntentId`, and `paidAt` is applied before a live charge.
 - The signed live webhook receives completed, expired, and refunded events; a duplicate replay produces no second Printful draft.
 - Exactly one editable Printful draft matches the OMS order, recipient, variant, artwork, placement, and technique, and is not auto-confirmed.
-- `support@openmerchstudio.com` passes an external inbound-and-reply test after DKIM and the intended
-  support group/user route are complete.
+- `support@openmerchstudio.com` passes an external inbound-and-reply test through the intended support
+  group; verify DKIM reaches an active/pass state and approve the outbound From identity separately.
 - Approved seller identity, mailing address, policy dates, purchaser eligibility, jurisdiction,
   returns/refunds, artwork-rights, and retention language are deployed before indexing or public checkout.
 

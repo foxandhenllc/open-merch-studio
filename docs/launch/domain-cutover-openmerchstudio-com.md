@@ -1,6 +1,6 @@
 # openmerchstudio.com Domain Cutover Checklist
 
-**Status:** Branded origin and provider URLs active; support authentication/routing and indexing remain
+**Status:** Branded origin, provider URLs, and support routing active; DKIM authentication and indexing remain
 **Visibility:** Public-safe  
 **Intended canonical origin:** `https://openmerchstudio.com`
 
@@ -32,8 +32,8 @@ parking response until their pre-cutover TTL expires.
 
 ## 3. Promote The URL Contract With Gates Closed
 
-Use this target Production contract without copying secret values into repository files. Defer the
-branded support-address lines until the external mailbox round-trip in Step 6 passes:
+Use this target Production contract without copying secret values into repository files. The external
+mailbox round-trip in Step 6 has passed, so the branded support-address lines are ready to promote:
 
 ```dotenv
 FRONTEND_URL=https://openmerchstudio.com
@@ -65,8 +65,10 @@ controls the public artwork URLs that Printful retrieves. An empty `VITE_API_URL
 - Confirm a checkout-session request remains blocked before continuing.
 
 The Production `FRONTEND_URL` and `BACKEND_URL` values were promoted to the branded apex and deployed
-on July 17, 2026. Checkout and fulfillment authorization remained closed; support-address promotion
-remains deferred until the branded mailbox passes external send-and-receive testing.
+on July 17, 2026. Checkout and fulfillment authorization remained closed. The branded mailbox passed
+external inbound-and-reply testing. Repository defaults and the Production `VITE_SUPPORT_EMAIL` and
+`SUPPORT_EMAIL` values now use the branded support address; the release containing those defaults must
+still be redeployed and verified after each environment promotion.
 
 ## 4. Move The Stripe Webhook Safely
 
@@ -81,7 +83,8 @@ remains deferred until the branded mailbox passes external send-and-receive test
 - Checkout remains closed. Verify signed real delivery, terminal payment-event persistence, and
   duplicate replay during the supervised purchase; those checks cannot be proven by URL configuration
   alone.
-- Update the Stripe public business URL, branding, receipt/refund email settings, and support contact.
+- Stripe's public support email now uses `support@openmerchstudio.com`. Continue to review the public
+  business URL, branding, and receipt/refund email settings during the supervised commerce smoke.
 
 ## 5. Verify Printful And Artwork Retrieval
 
@@ -99,16 +102,25 @@ remains deferred until the branded mailbox passes external send-and-receive test
 ## 6. Prepare Branded Support And Sending
 
 - The `openmerchstudio.com` Google Workspace alias domain is verified; Gmail, MX, and SPF are active.
-- Complete DKIM, confirm that `support@openmerchstudio.com` maps to the intended support group or user,
-  and run an external inbound-and-reply test before presenting it as a working support address.
+- A 2048-bit DKIM TXT record is published under selector `google`. Google Admin currently reports
+  `Authenticating email with DKIM`; do not record DKIM as fully active or passing until that status
+  completes and a received-message authentication check confirms it.
+- `support@openmerchstudio.com` routes to the Open Merch Studio Support group. Chris Fox and Chris
+  Henrich are direct members with `Each email` subscriptions, and an external inbound message plus the
+  group reply both completed. Chris's first member-delivery probe was delivered to Spam and then marked
+  safe; Chris Henrich should mark his first support message `Not spam` if Gmail classifies it similarly.
+- Because `openmerchstudio.com` is configured as a Google Workspace alias domain, the tested outgoing
+  group reply displayed `support@foxandhenllc.com`. Treat branded inbound support as verified, but do
+  not claim a branded From identity until the Workspace domain/sender configuration is changed and
+  retested.
 - Complete legal review of the seller/operator identity and add the approved entity, effective date,
   and jurisdiction-specific terms to customer-facing policy pages before public payment access.
 - If Open Merch Studio later sends transactional email directly, configure a dedicated sender or
   subdomain with SPF, DKIM, and DMARC before enabling it.
 - Keep app-owned customer email sending disabled until the sender is verified and exactly-once email
   tests pass. Stripe-hosted receipts/refund messages remain the MVP payment-email surface.
-- Update production `VITE_SUPPORT_EMAIL` and `SUPPORT_EMAIL` only after the mailbox works from an
-  external address. Keep app-owned transactional sending disabled during that promotion.
+- Production `VITE_SUPPORT_EMAIL` and `SUPPORT_EMAIL` have been promoted after the successful external
+  round-trip. Keep app-owned transactional sending disabled until its separate sender is verified.
 
 ## 7. Make The Branded Origin Discoverable
 

@@ -19,6 +19,16 @@
 - Updated the Printful store website to the branded origin and completed a no-order live mockup matrix
   for the tee, tote, mug, sticker, and poster.
 - Verified the Google Workspace alias domain and activated Gmail, MX, and SPF for the branded domain.
+- Created the Open Merch Studio Support group with Chris Fox and Chris Henrich as direct members,
+  verified external inbound delivery to `support@openmerchstudio.com`, and verified the reply reached
+  the external sender.
+- Set both members to `Each email`, promoted the branded support address in the Vercel Production
+  environment and application defaults, and updated Stripe's public support email to the branded
+  address. Chris's first member-delivery probe landed in Spam; it was marked safe, and Gmail confirmed
+  future messages from that sender will go to Inbox. Chris Henrich should perform the same one-time
+  action if his first support message is classified as Spam.
+- Published the 2048-bit Google DKIM TXT record; Google Admin currently reports `Authenticating email
+  with DKIM`, so full DKIM activation is not yet recorded as passing.
 
 ## Verified
 
@@ -49,8 +59,9 @@
 - Public checkout and live fulfillment authorization.
 - Signed Stripe delivery, durable reconciliation, and duplicate-replay verification for the supervised
   real-money smoke.
-- DKIM, the intended support group/user route, external inbound-and-reply verification, and only then
-  customer-facing support-address promotion.
+- Final DKIM activation and received-message authentication evidence. Because the branded domain is a
+  Workspace alias domain, the tested group reply displayed `support@foxandhenllc.com`; a branded
+  outbound From identity remains a separate configuration and approval item.
 - Legal seller/DBA identity, public mailing address, policy dates, purchaser eligibility, governing
   law/dispute approach, returns/claims/refunds, artwork rights, and data-retention review.
 - Search indexing remains intentionally disabled; approved favicon/social image and Search Console

@@ -31,8 +31,10 @@ This file records what has been completed in the repo and what remains blocked b
 - The Printful store website is branded and the tee, tote, mug, sticker, and poster live mockup matrix
   passed without creating an order. Fulfillment authorization remains closed and auto-confirm remains
   disabled.
-- The Google Workspace alias domain is verified with Gmail, MX, and SPF active. DKIM, the intended
-  support group/user route, and an external inbound-and-reply test are still pending.
+- The Google Workspace alias domain is verified with Gmail, MX, and SPF active. The Open Merch Studio
+  Support group routes branded inbound mail to direct members Chris Fox and Chris Henrich, and its
+  external inbound-and-reply test passed. The published DKIM record is still authenticating, and the
+  tested group reply displayed the primary-domain address because the branded domain is an alias.
 - Search indexing remains disabled until legal/support content and the final design review are approved.
 
 ## Blocked Until Private Inputs

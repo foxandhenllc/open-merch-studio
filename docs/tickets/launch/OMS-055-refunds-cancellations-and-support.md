@@ -16,8 +16,9 @@ Customers know how to get help if they made a mistake or fulfillment has a probl
 ## Current State
 
 Public support and returns routes describe the custom-item boundary, while signed Stripe refund
-events and protected order recovery preserve operator truth. Automatic refund/cancellation actions,
-final business-policy sign-off, and a branded support mailbox remain deferred.
+events and protected order recovery preserve operator truth. Branded inbound support routing and an
+external reply round-trip are verified. Automatic refund/cancellation actions, final business-policy
+sign-off, final DKIM activation, and a branded outbound From identity remain deferred.
 
 ## Requirements
 

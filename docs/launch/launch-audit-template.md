@@ -41,8 +41,9 @@ Expected result: no live credentials, private provider values, private customer 
   stays closed until the one-draft supervised smoke.
 - Vercel/domain production readiness: branded apex and `www` cutover complete; retain the Vercel alias
   only as a rollback surface.
-- Support mail: Workspace alias, Gmail, MX, and SPF active; DKIM, support routing, and external
-  send-and-reply verification pending.
+- Support mail: Workspace alias, Gmail, MX, and SPF active; branded group routes to Chris Fox and
+  Chris Henrich; external inbound-and-reply test passed. DKIM is still authenticating, and the tested
+  group reply used the primary-domain From identity rather than the branded alias.
 - App-owned transactional email: disabled until sender-domain and exactly-once delivery approval.
 
 ## Legal And Customer-Policy Readiness

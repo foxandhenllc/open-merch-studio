@@ -9,10 +9,16 @@ Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea r
 As of July 17, 2026, the branded Stripe webhook is active at
 `https://openmerchstudio.com/api/stripe/webhook` for completed, expired, and refunded events; the
 Printful store website uses the branded origin; and no-order live mockups passed for all five launch
-products. The Google Workspace alias domain is verified and Gmail, MX, and SPF are active. DKIM,
-the `support@openmerchstudio.com` group/alias route, and an external send-and-reply test are still
-pending. Search indexing, public checkout, payment authorization, and fulfillment authorization
-remain closed.
+products. The Google Workspace alias domain is verified and Gmail, MX, and SPF are active. The
+`support@openmerchstudio.com` group routes to direct members Chris Fox and Chris Henrich, and an
+external inbound-and-reply test passed. Its published DKIM record remains in Google Admin's
+`Authenticating email with DKIM` state, and the tested outgoing group reply displayed the primary-
+domain `support@foxandhenllc.com` identity because the branded domain is an alias domain. Search
+indexing, public checkout, payment authorization, and fulfillment authorization remain closed.
+Both support members use `Each email`; Chris Fox's first external member-delivery probe was marked
+`Not spam`, and Chris Henrich should do the same once if Gmail classifies his first group message as
+Spam. Production application defaults, Vercel support variables, and Stripe's public support email now
+use `support@openmerchstudio.com`.
 
 ## Provider Gates
 
@@ -170,8 +176,9 @@ If launch needs to pause:
 
 ## Branded Domain
 
-Keep the branded production deployment non-indexable until legal/support content, support routing,
-and the final visual review pass. The branded provider callback/store URL and five-product artwork
-retrieval/mockup checks are complete. Follow the portable
+Keep the branded production deployment non-indexable until legal/support content and the final visual
+review pass. Branded support inbound routing and its external reply round-trip are verified; final
+DKIM activation and a branded outbound From identity are separate remaining email checks. The branded
+provider callback/store URL and five-product artwork retrieval/mockup checks are complete. Follow the portable
 [openmerchstudio.com domain cutover checklist](./domain-cutover-openmerchstudio-com.md) without
 placing DNS credentials, provider keys, database values, or signing secrets in this repository.
