@@ -44,6 +44,10 @@ import type Stripe from 'stripe';
 import { prisma } from '../config/database.js';
 import { resolveDesignAssetProviderUrl } from '../utils/design-asset-url.js';
 import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
+import {
+  checkoutPolicyAcceptanceIssue,
+  CURRENT_CHECKOUT_POLICY_VERSION,
+} from '../config/policies.js';
 
 type CheckoutInput = {
   quoteId?: string | null;
@@ -51,6 +55,8 @@ type CheckoutInput = {
   studioPassId?: string;
   email?: string;
   designAssetId?: string;
+  policyAccepted: boolean;
+  policyVersion: string;
 };
 
 export class OrderRecoveryError extends Error {
@@ -302,6 +308,8 @@ function mapPersistedOrder(order: PersistedOrder): OrderSummary {
     taxCents: order.taxCents,
     refundedCents: order.refundedCents,
     paidAt: order.paidAt?.toISOString(),
+    policyVersion: order.policyVersion ?? undefined,
+    policyAcceptedAt: order.policyAcceptedAt?.toISOString(),
     status: restoreRuntimeOrderStatus(order.status, order.fulfillmentStatus),
     customerEmail: order.email ?? undefined,
     totalCents: order.totalCents,
@@ -414,6 +422,8 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
         taxCents: order.taxCents,
         refundedCents: order.refundedCents,
         paidAt: order.paidAt ? new Date(order.paidAt) : undefined,
+        policyVersion: order.policyVersion,
+        policyAcceptedAt: order.policyAcceptedAt ? new Date(order.policyAcceptedAt) : undefined,
         currency: order.currency,
       },
       create: {
@@ -429,6 +439,8 @@ async function persistOrder(order: OrderSummary, stripeSessionId?: string): Prom
         taxCents: order.taxCents,
         refundedCents: order.refundedCents,
         paidAt: order.paidAt ? new Date(order.paidAt) : undefined,
+        policyVersion: order.policyVersion,
+        policyAcceptedAt: order.policyAcceptedAt ? new Date(order.policyAcceptedAt) : undefined,
         currency: order.currency,
         items: {
           create: order.quote.items.map((item) => ({
@@ -750,7 +762,10 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
   }
   const stripeBlocker = settings.liveStripeEnabled ? liveStripeBlocker(input.email) : null;
 
-  const quoteIssues = await validateQuoteForCheckout(quote, settings.liveStripeEnabled);
+  const quoteIssues: string[] = [];
+  const policyIssue = checkoutPolicyAcceptanceIssue(input);
+  if (policyIssue) quoteIssues.push(policyIssue);
+  quoteIssues.push(...(await validateQuoteForCheckout(quote, settings.liveStripeEnabled)));
   if (Date.now() > new Date(quote.expiresAt).getTime()) {
     quoteIssues.push('Quote expired. Create a fresh quote before checkout.');
   }
@@ -790,6 +805,8 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     customerEmail: input.email,
     totalCents: quote.totalCents,
     taxCents: 0,
+    policyVersion: CURRENT_CHECKOUT_POLICY_VERSION,
+    policyAcceptedAt: runtimeNow(),
     currency: quote.currency,
     quote,
     designAssetId: input.designAssetId ?? Array.from(requiredDesignIds)[0],

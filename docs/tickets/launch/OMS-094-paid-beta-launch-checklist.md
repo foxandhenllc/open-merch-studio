@@ -21,9 +21,12 @@ July 17, 2026 and production returned to closed authorization gates. One live pa
 original webhook plus two duplicate replays returned HTTP 200, and Printful contained exactly one
 editable draft that was never confirmed. The branded Stripe webhook and Printful store URL are active,
 all five launch-product live mockups passed, and the Workspace alias domain has Gmail/MX/SPF active.
-External testing confirmed the branded support From identity passes SPF, DKIM, and DMARC. Approved
-legal policy inputs, private operator sign-off, and an explicit decision to remove the intentional
-`noindex` gate remain incomplete.
+External testing confirmed the branded support From identity passes SPF, DKIM, and DMARC. Owner
+policy decisions identify FoxAndHen LLC as the operator of `Open Merch Studio`, use email-only public
+contact, omit the proposed Pennsylvania governing-law paragraph, and assign tax filing/remittance to
+FoxAndHen LLC using Stripe Tax reports without a TaxJar dependency. Pennsylvania fictitious-name
+registration confirmation, final paid-launch review of the deployed policy set, private operator
+sign-off, and an explicit decision to remove the intentional `noindex` gate remain incomplete.
 
 ## Requirements
 
@@ -55,8 +58,9 @@ legal policy inputs, private operator sign-off, and an explicit decision to remo
 - Exactly one editable Printful draft matches the OMS order, recipient, variant, artwork, placement, and technique, and is not auto-confirmed.
 - `support@openmerchstudio.com` passes an external inbound-and-reply test through the intended support
   group; verify DKIM reaches an active/pass state and approve the outbound From identity separately.
-- Approved seller identity, mailing address, policy dates, purchaser eligibility, jurisdiction,
-  returns/refunds, artwork-rights, and retention language are deployed before indexing or public checkout.
+- Confirmed Pennsylvania fictitious-name registration, approved operator identity, email-only contact,
+  policy dates, purchaser eligibility, returns/refunds, artwork-rights, and retention language are
+  deployed before indexing or public checkout.
 
 ## Supervised Smoke Evidence — July 17, 2026
 

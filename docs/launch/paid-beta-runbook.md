@@ -89,19 +89,19 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 
 ## Remaining Business And Legal Inputs
 
-Do not open public checkout or remove `noindex` until the complete proposed policy set is approved and
-deployed. The copy proposal resolves the dates, adult eligibility, US-only scope, return/claim rules,
-AI-output and artwork-rights language, and data retention/deletion language. Four owner decisions
-remain:
+Do not open public checkout or remove `noindex` until the deployed policy set receives the separate
+paid-launch approval. The owner decisions use `Open Merch Studio` as the public brand, identify FoxAndHen LLC
+as the operator, publish `support@openmerchstudio.com` as the email-only contact, omit the proposed
+Pennsylvania governing-law paragraph, and assign applicable tax registration, filing, and remittance
+to FoxAndHen LLC using Stripe Tax reports with self- or accountant-managed filing. TaxJar is not a
+launch dependency.
 
-- Approve the exact seller wording `Christopher Fox d/b/a Open Merch Studio`, or replace it.
-- Choose email-only public contact or explicitly approve a business mailing address for publication.
-- Approve, revise, or omit the proposed Pennsylvania governing-law paragraph.
-- Name the owner and operating path for applicable tax registration, filing, and remittance.
-
-Review and record those decisions in
-[the launch policy copy proposal](./legal-policy-copy-proposal-2026-07-17.md). Do not infer a private
-street address or tax-filing commitment from a provider account.
+Before public paid commerce, independently confirm that `Open Merch Studio` is registered to
+FoxAndHen LLC as a Pennsylvania fictitious name, then record final paid-launch approval of the
+deployed policy set in
+[the launch policy copy proposal](./legal-policy-copy-proposal-2026-07-17.md). Do not claim that the
+fictitious name is registered until confirmed, and do not infer or publish a street address, phone,
+tax ID, bank information, or other private detail from provider or business-account records.
 
 ## Protected Order Operations
 

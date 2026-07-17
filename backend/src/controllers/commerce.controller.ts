@@ -40,6 +40,8 @@ export const postCheckoutSession = asyncHandler(async (req: Request, res: Respon
     studioPassId: String(req.body?.studioPassId ?? '') || undefined,
     email: String(req.body?.email ?? '') || undefined,
     designAssetId: String(req.body?.designAssetId ?? '') || undefined,
+    policyAccepted: req.body?.policyAccepted === true,
+    policyVersion: typeof req.body?.policyVersion === 'string' ? req.body.policyVersion : '',
   });
   logOperationalEvent(
     checkout.status === 'blocked' ? 'warning' : 'info',

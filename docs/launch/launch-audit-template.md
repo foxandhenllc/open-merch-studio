@@ -50,10 +50,12 @@ Expected result: no live credentials, private provider values, private customer 
 
 ## Legal And Customer-Policy Readiness
 
-- Seller wording approved or replaced (`Christopher Fox d/b/a Open Merch Studio` proposed):
-- Email-only public contact or explicitly approved business mailing address:
-- Pennsylvania governing-law paragraph approved, revised, or omitted:
-- Tax registration, filing, and remittance owner plus operating path documented:
+- Public brand and operator wording approved (`Open Merch Studio`, operated by FoxAndHen LLC):
+- Pennsylvania fictitious-name registration for `Open Merch Studio` independently confirmed:
+- Email-only public contact approved (`support@openmerchstudio.com`; no street address):
+- Pennsylvania governing-law paragraph omitted as directed:
+- FoxAndHen LLC tax registration, filing, and remittance ownership documented:
+- Stripe Tax report review and self/accountant filing calendar documented; no TaxJar dependency:
 - Complete policy proposal approved and deployed with effective/last-updated dates:
 - Checkout policy links and assent reviewed:
 - Search indexing remains disabled until the approved text is deployed:

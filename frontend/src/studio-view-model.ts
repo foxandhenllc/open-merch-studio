@@ -1125,7 +1125,7 @@ export function useStudioViewModel() {
       setAction('pass', false);
     }
   };
-  const createCheckout = async () => {
+  const createCheckout = async (policyAccepted: true, policyVersion: string) => {
     if (!quote || !checkoutReadiness.ready) {
       setErrors((current) => ({
         ...current,
@@ -1163,6 +1163,8 @@ export function useStudioViewModel() {
           studioPassId: studioPass?.id,
           email: email || undefined,
           designAssetId: design?.id ?? undefined,
+          policyAccepted,
+          policyVersion,
         })
       );
       setCheckout(result);

@@ -9,6 +9,15 @@ import {
   getOrderByCheckoutSession,
 } from '../services/order.service.js';
 import { getOrCreateSession, saveOrder } from '../services/runtime-store.js';
+import {
+  checkoutPolicyAcceptanceIssue,
+  CURRENT_CHECKOUT_POLICY_VERSION,
+} from '../config/policies.js';
+
+const acceptedCheckoutPolicies = {
+  policyAccepted: true,
+  policyVersion: CURRENT_CHECKOUT_POLICY_VERSION,
+};
 
 async function firstProductSelection() {
   const products = await listProducts();
@@ -30,6 +39,21 @@ test('Studio Pass checkout is blocked by its server-side feature gate', async ()
   }
 });
 
+test('checkout policy acceptance requires an explicit flag and exact current version', () => {
+  assert.match(
+    checkoutPolicyAcceptanceIssue({
+      policyAccepted: false,
+      policyVersion: CURRENT_CHECKOUT_POLICY_VERSION,
+    }) ?? '',
+    /accept/i
+  );
+  assert.match(
+    checkoutPolicyAcceptanceIssue({ policyAccepted: true, policyVersion: '2026-07-16' }) ?? '',
+    /changed/i
+  );
+  assert.equal(checkoutPolicyAcceptanceIssue(acceptedCheckoutPolicies), null);
+});
+
 test('checkout blocks quotes without generated or uploaded artwork', async () => {
   const session = getOrCreateSession();
   const { product, variant, placement } = await firstProductSelection();
@@ -46,6 +70,7 @@ test('checkout blocks quotes without generated or uploaded artwork', async () =>
   );
 
   const checkout = await createCheckoutSession({
+    ...acceptedCheckoutPolicies,
     quoteId: quote.id,
     sessionId: session.id,
   });
@@ -80,6 +105,7 @@ test('checkout blocks artwork that needs policy review', async () => {
   );
 
   const checkout = await createCheckoutSession({
+    ...acceptedCheckoutPolicies,
     quoteId: quote.id,
     sessionId: session.id,
     designAssetId: draft.id ?? undefined,
@@ -115,6 +141,7 @@ test('checkout blocks artwork that has not passed print-readiness checks', async
   );
 
   const checkout = await createCheckoutSession({
+    ...acceptedCheckoutPolicies,
     quoteId: quote.id,
     sessionId: session.id,
     designAssetId: draft.id ?? undefined,

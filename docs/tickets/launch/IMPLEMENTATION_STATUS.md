@@ -52,10 +52,16 @@ This file records what has been completed in the repo and what remains blocked b
 - App-owned transactional email: deferred until the branded sender domain, delivery provider,
   notification idempotency, and template review are complete. Do not add a frontend or repository
   email credential.
-- Tax, shipping, accounting, refund, and support policy sign-off: requires private operator review
-  before public real-money launch. The complete proposed copy is prepared; the remaining owner
-  decisions are seller/DBA wording, email-only versus public mailing-address contact, Pennsylvania
-  governing-law wording, and the tax registration/filing/remittance owner and operating path.
+- Tax, shipping, accounting, refund, and support policy sign-off: owner decisions now use
+  `Open Merch Studio` as the public brand, identify FoxAndHen LLC as the operator, use
+  `support@openmerchstudio.com` as the email-only public contact, omit the proposed Pennsylvania
+  governing-law paragraph, and assign applicable tax registration, filing, and remittance to
+  FoxAndHen LLC using Stripe Tax reports with self- or accountant-managed filing. TaxJar is not a
+  dependency. The coordinated policy set and versioned Checkout assent are implemented for the
+  closed-checkout, `noindex` preview, and the nullable policy-audit migration was applied and checksum
+  verified on July 17, 2026. Public launch remains blocked until the `Open Merch Studio` Pennsylvania
+  fictitious-name registration is independently confirmed and the deployed policy set receives final
+  paid-launch approval.
 
 ## Verification
 
@@ -71,7 +77,7 @@ npm run test:browser
 npm audit --audit-level=high
 ```
 
-Result: all passed. The backend suite reported 56 passes and one intentional database-only skip; the
+Result: all passed. The backend suite reported 57 passes and one intentional database-only skip; the
 responsive browser smoke passed across 11 viewports and all five products; the dependency audit found
 zero vulnerabilities at the configured high-severity threshold.
 
@@ -79,8 +85,9 @@ zero vulnerabilities at the configured high-severity threshold.
 
 The repo is ready for public OSS review and fixture-mode product review, and the supervised allowlisted
 provider smoke is complete. It is not ready for public customer payments or unattended fulfillment
-until the private OPS checklist, legal/policy approval, tax-filing and remittance operating path, and
-explicit indexing plus public-launch decisions are complete.
+until the private OPS checklist, `Open Merch Studio` fictitious-name registration confirmation,
+legal/policy approval, private tax-filing calendar and remittance controls, and explicit indexing plus
+public-launch decisions are complete.
 
 The intended domain promotion sequence is captured in the
 [openmerchstudio.com cutover checklist](../../launch/domain-cutover-openmerchstudio-com.md).

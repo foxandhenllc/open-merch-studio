@@ -112,8 +112,10 @@ deployed and verified; redeploy and repeat the checks after any future environme
   identity. An external delivery test displayed that identity and passed SPF, DKIM, and DMARC. The
   reply behavior uses the address to which the incoming message was sent, while the unrelated primary
   mailbox identity remains unchanged.
-- Complete legal review of the seller/operator identity and add the approved entity, effective date,
-  and jurisdiction-specific terms to customer-facing policy pages before public payment access.
+- Independently confirm the Pennsylvania fictitious-name registration for `Open Merch Studio`, then
+  complete the final paid-launch review of the deployed FoxAndHen LLC operator identity, effective
+  date, and email-only public contact before public payment access. The owner directed that the
+  proposed Pennsylvania governing-law paragraph be omitted.
 - If Open Merch Studio later sends transactional email directly, configure a dedicated sender or
   subdomain with SPF, DKIM, and DMARC before enabling it.
 - Keep app-owned customer email sending disabled until the sender is verified and exactly-once email

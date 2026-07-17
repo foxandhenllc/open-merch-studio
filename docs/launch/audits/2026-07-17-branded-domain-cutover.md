@@ -61,8 +61,10 @@
 - Public checkout and live fulfillment authorization.
 - Public authorization to accept payments or create Printful drafts; the supervised window passed and
   production returned to closed gates with both capabilities reporting `available`, not `live`.
-- Legal seller/DBA identity, public mailing address, policy dates, purchaser eligibility, governing
-  law/dispute approach, returns/claims/refunds, artwork rights, and data-retention review.
+- Pennsylvania fictitious-name registration confirmation for `Open Merch Studio` and final paid-launch
+  approval of the deployed FoxAndHen LLC operator wording, email-only public contact, policy dates,
+  purchaser eligibility, returns/claims/refunds, artwork rights, and data-retention language. The
+  owner directed that the proposed Pennsylvania governing-law paragraph be omitted.
 - Search indexing remains intentionally disabled; approved favicon/social image and Search Console
   are still pending, and crawl metadata/404 behavior must pass final verification before indexing.
 - Private operator sign-off for public paid beta.

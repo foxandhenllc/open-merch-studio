@@ -1616,7 +1616,7 @@ input:focus {
 }
 .policy-hero,
 .policy-content {
-  width: min(880px, 100%);
+  width: min(760px, 100%);
   margin: 0 auto;
 }
 .policy-hero {
@@ -1642,15 +1642,11 @@ input:focus {
   line-height: 1.55;
 }
 .policy-content {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  margin-top: 1px;
-  background: var(--line);
+  margin-top: 12px;
 }
 .policy-content article {
-  padding: 28px;
-  background: var(--paper);
+  padding: 28px 0;
+  border-bottom: 1px solid var(--line);
 }
 .policy-content h2 {
   font-size: 18px;
@@ -2492,6 +2488,27 @@ input:focus {
   line-height: 1.55;
 }
 .checkout-trust a {
+  color: var(--accent);
+  font-weight: 700;
+}
+.checkout-assent {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.checkout-assent input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.checkout-assent a {
   color: var(--accent);
   font-weight: 700;
 }

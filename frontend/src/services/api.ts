@@ -228,6 +228,8 @@ export const api = {
     studioPassId?: string;
     email?: string;
     designAssetId?: string;
+    policyAccepted: true;
+    policyVersion: string;
   }) =>
     withFallback(
       request<CheckoutSession>('/api/checkout/sessions', {

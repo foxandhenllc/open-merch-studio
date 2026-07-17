@@ -43,9 +43,11 @@ opening public checkout or confirming a physical Printful order.
 
 ## Remaining Public-Launch Gates
 
-- Approve and deploy the legal seller identity, mailing/contact details, policy dates, eligibility,
-  jurisdiction, return/refund rules, artwork-rights language, and data-retention language.
-- Document the tax-filing and remittance operating path for applicable registrations.
+- Independently confirm the Pennsylvania fictitious-name registration for `Open Merch Studio`, then
+  give final paid-launch approval to the deployed FoxAndHen LLC operator identity, email-only contact,
+  policy dates, eligibility, return/refund rules, artwork-rights language, and data-retention language.
+- Operationalize the approved FoxAndHen LLC tax ownership path with Stripe Tax reports and a private
+  self/accountant-managed filing and remittance calendar; TaxJar is not required.
 - Complete the final content/visual review and private operator go/no-go.
 - Make a separate explicit decision to remove the HTML and response-header `noindex` controls. This
   audit does not authorize that change.

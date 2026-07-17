@@ -208,6 +208,8 @@ export type OrderSummary = {
   taxCents: number;
   refundedCents?: number;
   paidAt?: string;
+  policyVersion?: string;
+  policyAcceptedAt?: string;
   status:
     | 'draft'
     | 'quoted'

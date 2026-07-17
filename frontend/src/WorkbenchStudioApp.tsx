@@ -17,6 +17,7 @@ const money = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 
 const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
+const CHECKOUT_POLICY_VERSION = '2026-07-17';
 
 const pendingCheckoutSession = (): string | null => {
   try {
@@ -108,6 +109,7 @@ export function WorkbenchStudioApp() {
   const [designOptionsOpen, setDesignOptionsOpen] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [checkoutSubmitted, setCheckoutSubmitted] = useState(false);
+  const [checkoutPoliciesAccepted, setCheckoutPoliciesAccepted] = useState(false);
   const studioReady = vm.flow !== 'booting' && vm.flow !== 'boot_failed';
 
   useLayoutEffect(() => {
@@ -205,6 +207,13 @@ export function WorkbenchStudioApp() {
   useEffect(() => {
     if (vm.workbenchMode !== 'review') setDesignOptionsOpen(false);
   }, [vm.workbenchMode, vm.design?.id]);
+
+  useEffect(() => {
+    if (vm.workbenchMode !== 'checkout') {
+      setCheckoutPoliciesAccepted(false);
+      setCheckoutSubmitted(false);
+    }
+  }, [vm.workbenchMode]);
 
   if (vm.flow === 'booting') {
     return (
@@ -636,19 +645,54 @@ export function WorkbenchStudioApp() {
                 <details className="checkout-trust">
                   <summary>Delivery and returns</summary>
                   <p>
-                    Final tax, shipping eligibility, and timing are confirmed in secure checkout.
-                    Custom items can only be changed before production; damaged or misprinted items
-                    are covered by our <a href="/returns">returns policy</a>.
+                    Stripe shows the final charge, including applicable tax, before payment. Custom
+                    items can only be changed before production; damaged or misprinted items are
+                    covered by our <a href="/returns">returns policy</a>.
                   </p>
                 </details>
+                <label className="checkout-assent">
+                  <input
+                    type="checkbox"
+                    checked={checkoutPoliciesAccepted}
+                    onChange={(event) => setCheckoutPoliciesAccepted(event.target.checked)}
+                    required
+                  />
+                  <span>
+                    I confirm that I am at least 18, have reviewed the product, size, color, and
+                    artwork, and agree to the{' '}
+                    <a href="/terms" target="_blank" rel="noreferrer">
+                      Terms of Use
+                    </a>
+                    ,{' '}
+                    <a href="/returns" target="_blank" rel="noreferrer">
+                      Returns and Refunds Policy
+                    </a>
+                    ,{' '}
+                    <a href="/privacy" target="_blank" rel="noreferrer">
+                      Privacy Policy
+                    </a>
+                    , and{' '}
+                    <a href="/content-policy" target="_blank" rel="noreferrer">
+                      Content Policy
+                    </a>
+                    . I will review the shipping details and final tax shown by Stripe before
+                    payment.
+                  </span>
+                </label>
                 <button
                   className="button button--primary button--wide"
                   type="button"
                   onClick={() => {
                     setCheckoutSubmitted(true);
-                    if (vm.checkoutReadiness.emailValid) vm.createCheckout();
+                    if (vm.checkoutReadiness.emailValid && checkoutPoliciesAccepted) {
+                      vm.createCheckout(true, CHECKOUT_POLICY_VERSION);
+                    }
                   }}
-                  disabled={!vm.checkoutReadiness.canOpen || vm.busy.checkout}
+                  disabled={
+                    !vm.checkoutReadiness.canOpen ||
+                    !checkoutPoliciesAccepted ||
+                    vm.busy.checkout
+                  }
                   aria-describedby="checkout-readiness-message"
                 >
                   {vm.busy.checkout ? 'Opening checkout…' : 'Continue to secure checkout'}
@@ -658,7 +702,14 @@ export function WorkbenchStudioApp() {
                     Checkout is currently closed. Your design and price stay saved.
                   </p>
                 )}
-                <ErrorNote error={vm.errors.checkout} onRetry={vm.createCheckout} />
+                <ErrorNote
+                  error={vm.errors.checkout}
+                  onRetry={() => {
+                    if (checkoutPoliciesAccepted) {
+                      vm.createCheckout(true, CHECKOUT_POLICY_VERSION);
+                    }
+                  }}
+                />
                 <button className="text-action" type="button" onClick={vm.showReview}>
                   Back to design
                 </button>

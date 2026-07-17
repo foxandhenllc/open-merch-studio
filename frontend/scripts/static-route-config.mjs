@@ -25,9 +25,9 @@ export const STATIC_ROUTES = [
   {
     path: '/returns',
     output: 'returns/index.html',
-    title: 'Returns and Cancellations | Open Merch Studio',
+    title: 'Returns and Refunds Policy | Open Merch Studio',
     description:
-      'Review Open Merch Studio guidance for custom-product changes, cancellations, damage, and production mistakes.',
+      'Review Open Merch Studio guidance for custom-product changes, cancellations, refunds, damage, and production mistakes.',
   },
   {
     path: '/content-policy',

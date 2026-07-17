@@ -1,37 +1,43 @@
 # Open Merch Studio Launch Policy Copy Proposal
 
-**Status:** NOT FOR PUBLICATION — owner approval required  
+**Status:** APPROVED FOR CLOSED-CHECKOUT PREVIEW — public paid launch remains blocked pending fictitious-name confirmation and an explicit go/no-go
 **Prepared:** July 17, 2026  
 **Scope:** United States paid-MVP physical merchandise  
-**Current effect:** Documentation only. This proposal does not change customer-facing policy pages,
-checkout access, fulfillment authorization, search indexing, or production configuration.
+**Current effect:** Coordinated customer-facing copy and versioned Checkout assent are implemented
+behind closed Checkout and `noindex`. This record does not authorize payment, fulfillment, or search
+indexing. The policy URLs remain publicly reachable; `noindex` is a crawler directive, not an access
+control.
 
-This is conservative operating copy for review, not legal advice. Do not copy it into the public site
-until every owner decision below is recorded and the resulting text is reviewed as one complete set.
+This is conservative operating copy, not legal advice. The owner decisions below were recorded on
+July 17, 2026 and implemented as one coordinated set for closed-checkout review. Do not open public
+paid commerce until the remaining launch gates are complete and the deployed text has received the
+owner's final go/no-go.
 
-## Owner Decisions Required Before Publication
+## Owner Decisions And Remaining Publication Gates
 
-These are the only unresolved business decisions in this proposal.
+Owner decisions recorded July 17, 2026:
 
-1. **Legal seller identity:** Approve `Christopher Fox d/b/a Open Merch Studio`, or provide the exact
-   replacement legal seller and trade-name wording.
-2. **Public contact address:** Choose whether the policies will publish a business mailing address or
-   use `support@openmerchstudio.com` as the public policy contact without a street address. Do not
-   publish a residential address by inference from a provider account.
-3. **Governing law:** Approve the proposed Pennsylvania governing-law paragraph below, revise it, or
-   omit it. This proposal does not add mandatory arbitration, a class-action waiver, or an exclusive
-   venue clause.
-4. **Sales-tax ownership:** Confirm who owns tax registration, filing, and remittance, and document
-   the operating path. Stripe Checkout and Stripe Tax can calculate and collect applicable tax, but
-   enabling those tools does not transfer the seller's filing or remittance responsibilities.
+1. **Public brand:** Use `Open Merch Studio` as the exact customer-facing name.
+2. **Legal operator:** Public policy copy should state that Open Merch Studio is operated by
+   `FoxAndHen LLC`. The supporting legal-entity evidence was reviewed privately and must not be added
+   to the public repository.
+3. **Public contact:** Use `support@openmerchstudio.com` without publishing a street address, phone
+   number, tax ID, bank information, or other private account details.
+4. **Governing law:** Omit the proposed Pennsylvania governing-law paragraph. The policies do not add
+   mandatory arbitration, a class-action waiver, or an exclusive venue clause.
+5. **Sales-tax ownership:** FoxAndHen LLC owns applicable tax registration, filing, and remittance.
+   The operating path uses Stripe Tax reports with self-managed or accountant-managed filing and
+   remittance. TaxJar or another managed-filing subscription is not a launch dependency. Stripe's
+   calculation and reporting tools do not transfer the seller's filing or remittance obligations.
 
-Approval record:
+Remaining public paid-launch gates:
 
-- Legal seller identity approved by/date:
-- Public mailing-address or email-only decision approved by/date:
-- Pennsylvania governing-law decision approved by/date:
-- Tax registration, filing, and remittance owner/path approved by/date:
-- Complete policy set approved for publication by/date:
+- Confirm that `Open Merch Studio` is registered to FoxAndHen LLC as a Pennsylvania fictitious name,
+  or complete that registration before using the different name for public commercial activity. Do
+  not represent the fictitious name as registered until the filing is independently confirmed.
+- Deployed policy set reviewed and approved for public paid launch by/date:
+- Search-indexing decision approved by/date:
+- Public-checkout decision approved by/date:
 
 ## Proposed Privacy Policy
 
@@ -46,11 +52,11 @@ Effective July 17, 2026. Last updated July 17, 2026.
 
 ### Who operates the service
 
-Open Merch Studio is operated by Christopher Fox, doing business as Open Merch Studio. Contact us
-at support@openmerchstudio.com.
+Open Merch Studio is operated by FoxAndHen LLC. Contact us at support@openmerchstudio.com.
 
-This sentence may be published only after the legal seller decision is approved. Add a public
-business mailing address only if the separate address decision approves one.
+This identity disclosure is approved for the closed-checkout preview. Do not open public paid
+commerce until the `Open Merch Studio` fictitious-name registration is confirmed. The approved public
+contact is email-only; do not add a street address or other private account data.
 
 ### What we collect
 
@@ -114,11 +120,11 @@ Effective July 17, 2026. Last updated July 17, 2026.
 
 ### Seller and agreement
 
-Open Merch Studio is operated by Christopher Fox, doing business as Open Merch Studio. By using the
-studio or placing an order, you agree to these Terms and the Privacy Policy, Returns and Refunds
-Policy, and Content Policy.
+Open Merch Studio is operated by FoxAndHen LLC. By using the studio or placing an order, you agree to
+these Terms and the Privacy Policy, Returns and Refunds Policy, and Content Policy.
 
-The seller sentence may be published only after the legal seller decision is approved.
+This operator sentence is approved for the closed-checkout preview. Do not open public paid commerce
+until the `Open Merch Studio` fictitious-name registration is confirmed.
 
 ### Eligibility and availability
 
@@ -175,15 +181,6 @@ a materially different product without your approval.
 
 Custom products are made for one order and are subject to the Returns and Refunds Policy. Review
 your artwork, product, color, size, and shipping information carefully before paying.
-
-### Proposed Pennsylvania governing law — owner approval required
-
-These Terms are governed by the laws of the Commonwealth of Pennsylvania, without regard to
-conflict-of-law principles. Please contact support before filing a claim so we can try to resolve
-the issue informally. Nothing in this section limits rights that cannot be waived under applicable
-law.
-
-Do not publish this paragraph unless the Pennsylvania governing-law decision is approved.
 
 ## Proposed Returns and Refunds Policy
 
@@ -306,39 +303,46 @@ session. No payment is collected until you complete Stripe Checkout.
 
 ### Seller and policy contact
 
-Open Merch Studio is operated by Christopher Fox, doing business as Open Merch Studio. For order,
-privacy, policy, or production questions, email support@openmerchstudio.com.
+Open Merch Studio is operated by FoxAndHen LLC. For order, privacy, policy, or production questions,
+email support@openmerchstudio.com.
 
-The seller sentence may be published only after the legal seller decision is approved. Add a public
-business mailing address only if the separate address decision approves one.
+This operator sentence is approved for the closed-checkout preview. Do not open public paid commerce
+until the `Open Merch Studio` fictitious-name registration is confirmed. The approved public contact
+is email-only; do not add a street address or other private account data.
 
 ## Proposed Checkout Assent
 
 Place this sentence immediately next to the primary Checkout action, with each policy name linked:
 
 > By continuing to secure Checkout, you confirm that you are at least 18, that you have reviewed the
-> product, size, color, artwork, and shipping details, and that you agree to the Terms of Use, Returns
-> and Refunds Policy, Privacy Policy, and Content Policy.
+> product, size, color, and artwork, and that you agree to the Terms of Use, Returns and Refunds
+> Policy, Privacy Policy, and Content Policy. You will review the shipping details and final tax shown
+> by Stripe before payment.
 
-For stronger evidence of assent, persist the accepted policy version and timestamp with the order.
-An unchecked required checkbox would create clearer assent than adjacent text alone, but that is a
-product and legal approval decision rather than an assumption in this proposal.
+The implemented Checkout uses an unchecked required checkbox and persists the accepted policy version
+and a server-generated timestamp with the order. Missing or stale acceptance blocks Checkout before
+an order or Stripe Session can be created.
 
 ## Publication Implementation Notes
 
-- Do not implement this proposal until the approval record is complete.
+- Deploy this set only with Checkout closed and `noindex` retained until the fictitious-name
+  registration is confirmed and the owner gives the separate public paid-launch approval.
 - Replace the existing policy copy as one coordinated change; do not mix approved and baseline
   versions.
-- Use `July 17, 2026` as both effective and last-updated date only if the complete set is approved on
-  that date. Otherwise use the actual approval/publication date consistently.
+- Use `July 17, 2026` as both effective and last-updated date for this owner-reviewed closed-checkout
+  deployment. Update the policy version and dates together after any material revision.
 - Persist a policy-version identifier with paid orders before relying on the Checkout assent.
-- Keep the public mailing address out of source code unless its publication is explicitly approved.
+- Keep street addresses, phone numbers, tax IDs, bank information, and other private account details
+  out of public policy copy and source code. The approved public policy contact is
+  `support@openmerchstudio.com`.
 - Keep payment-card collection on Stripe-hosted Checkout.
 - Keep the Printful order as an unconfirmed draft until the manual review is complete.
 - Do not remove `noindex` as part of the legal-copy implementation. Search indexing is a separate,
   explicit launch decision after the published pages and paid-order smoke are verified.
-- Record the tax registration, filing, and remittance owner/path in private operations material, not
-  in customer-facing policy copy.
+- Record the operational filing calendar, registration details, assigned preparer, and remittance
+  evidence in private operations material, not in customer-facing policy copy. The approved operating
+  model is FoxAndHen LLC ownership with Stripe Tax reports and self- or accountant-managed filing and
+  remittance; it does not depend on TaxJar.
 
 ## Source Basis
 
@@ -353,4 +357,8 @@ product and legal approval decision rather than an assumption in this proposal.
   policy: <https://www.printful.com/uk/blog/top-5-printful-policies-your-store-should-copy>
 - Stripe documents automatic tax calculation through Checkout and separately identifies tax
   registration setup: <https://docs.stripe.com/tax/set-up>
-
+- Stripe documents the reports available to support filing and reconciliation:
+  <https://docs.stripe.com/tax/reports>
+- The Pennsylvania Department of State states that an LLC conducting commercial activity under a
+  name other than its proper legal name must register that fictitious name:
+  <https://www.pa.gov/agencies/dos/programs/business/types-of-filings-and-registrations/fictitious-names>

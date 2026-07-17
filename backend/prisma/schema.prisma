@@ -320,6 +320,8 @@ model Order {
   taxCents              Int                  @default(0)
   refundedCents         Int                  @default(0)
   paidAt                DateTime?
+  policyVersion         String?
+  policyAcceptedAt      DateTime?
   currency              String               @default("USD")
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt

@@ -424,6 +424,19 @@ async function exerciseFixtureJourney(browser) {
       name: 'Continue to secure checkout',
       exact: true,
     });
+    const policyAssent = page.getByRole('checkbox', {
+      name: /I confirm that I am at least 18/i,
+    });
+    assert.equal(
+      await policyAssent.isChecked(),
+      false,
+      'checkout policy assent should begin unchecked'
+    );
+    assert.equal(
+      await checkoutAction.isDisabled(),
+      true,
+      'checkout should remain blocked until the current policies are accepted'
+    );
     assert.equal(
       await email.getAttribute('aria-invalid'),
       'false',
@@ -445,6 +458,12 @@ async function exerciseFixtureJourney(browser) {
     assert.ok(
       checkoutScrollBox.y + checkoutScrollBox.height <= checkoutActionBox.y,
       `mobile checkout action tray should not overlay checkout fields: ${JSON.stringify({ checkoutScrollBox, checkoutActionBox })}`
+    );
+    await policyAssent.check();
+    assert.equal(
+      await checkoutAction.isEnabled(),
+      true,
+      'accepting the current policies should unlock the checkout action'
     );
     await checkoutAction.click();
     assert.equal(
@@ -470,6 +489,62 @@ async function exerciseFixtureJourney(browser) {
     assertNoPageErrors();
   } finally {
     await context.close();
+  }
+}
+
+async function exercisePolicyPages(browser) {
+  const routes = [
+    ['/privacy', 'Privacy Policy'],
+    ['/terms', 'Terms of Use'],
+    ['/returns', 'Returns and Refunds Policy'],
+    ['/content-policy', 'Content Policy'],
+    ['/support', 'Support'],
+  ];
+
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 1280, height: 720 },
+  ]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    const label = `${viewport.width}x${viewport.height} policies`;
+    const assertNoPageErrors = watchPageErrors(page, label);
+    try {
+      for (const [route, heading] of routes) {
+        await page.goto(`${origin}${route}`, { waitUntil: 'networkidle' });
+        await page.getByRole('heading', { name: heading, exact: true }).waitFor();
+        await assertNoHorizontalOverflow(page, `${label} ${route}`);
+        assert.equal(
+          await page.getByText('Effective July 17, 2026. Last updated July 17, 2026.', {
+            exact: true,
+          }).count(),
+          route === '/support' ? 0 : 1,
+          `${route} should expose the approved policy date where applicable`
+        );
+        const body = await page.locator('body').innerText();
+        assert.doesNotMatch(
+          body,
+          /governing law|arbitration|class[- ]action|exclusive venue|taxjar|d\/b\/a/i,
+          `${route} should omit unapproved legal and tax-service language`
+        );
+      }
+      await page.goto(`${origin}/support`, { waitUntil: 'networkidle' });
+      assert.equal(
+        await page.getByText('Open Merch Studio is operated by FoxAndHen LLC.', {
+          exact: false,
+        }).count(),
+        1,
+        'support should identify the approved legal operator'
+      );
+      assert.equal(
+        await page.getByRole('link', { name: 'support@openmerchstudio.com' }).count(),
+        1,
+        'support should expose the branded support mailbox'
+      );
+      assertNoPageErrors();
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -678,6 +753,7 @@ try {
     await exerciseKeyboardAndReducedMotion(browser);
     await exerciseCheckoutReloadRecovery(browser);
     await exerciseLegacyRecoveryExpiry(browser);
+    await exercisePolicyPages(browser);
     process.stdout.write(
       'Responsive browser smoke passed across 11 viewports, five products, and the recoverable fixture checkout flow.\n'
     );
