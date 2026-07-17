@@ -53,13 +53,13 @@ This file records what has been completed in the repo and what remains blocked b
   notification idempotency, and template review are complete. Do not add a frontend or repository
   email credential.
 - Tax, shipping, accounting, refund, and support policy sign-off: requires private operator review
-  before real-money launch. Customer policies still need approved seller/DBA identity, public mailing
-  address, dates, purchaser eligibility, jurisdiction/dispute terms, return/claim/refund rules,
-  artwork rights, and data-retention language.
+  before public real-money launch. The complete proposed copy is prepared; the remaining owner
+  decisions are seller/DBA wording, email-only versus public mailing-address contact, Pennsylvania
+  governing-law wording, and the tax registration/filing/remittance owner and operating path.
 
 ## Verification
 
-Last local verification run:
+Last local verification run: July 17, 2026, from `e74c50d` with production commerce gates closed.
 
 ```bash
 npm run lint
@@ -71,7 +71,9 @@ npm run test:browser
 npm audit --audit-level=high
 ```
 
-Expected result: all pass.
+Result: all passed. The backend suite reported 56 passes and one intentional database-only skip; the
+responsive browser smoke passed across 11 viewports and all five products; the dependency audit found
+zero vulnerabilities at the configured high-severity threshold.
 
 ## Launch Rule
 

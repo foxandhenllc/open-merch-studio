@@ -50,13 +50,12 @@ Expected result: no live credentials, private provider values, private customer 
 
 ## Legal And Customer-Policy Readiness
 
-- Contracting entity and approved DBA/trade-name wording:
-- Public mailing address and approved policy contact:
-- Effective/last-updated dates:
-- Purchaser eligibility/minimum age:
-- Governing law, venue, and dispute approach:
-- Return/claim windows, evidence, refund timing, and lost/delayed shipment rules:
-- AI-output/customer-artwork rights and data retention/deletion language:
+- Seller wording approved or replaced (`Christopher Fox d/b/a Open Merch Studio` proposed):
+- Email-only public contact or explicitly approved business mailing address:
+- Pennsylvania governing-law paragraph approved, revised, or omitted:
+- Tax registration, filing, and remittance owner plus operating path documented:
+- Complete policy proposal approved and deployed with effective/last-updated dates:
+- Checkout policy links and assent reviewed:
 - Search indexing remains disabled until the approved text is deployed:
 
 ## Operations And Recovery

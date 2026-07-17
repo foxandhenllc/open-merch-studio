@@ -89,6 +89,8 @@ npm run dev:frontend
 - Runbook: [docs/launch/paid-beta-runbook.md](./docs/launch/paid-beta-runbook.md)
 - Audit template: [docs/launch/launch-audit-template.md](./docs/launch/launch-audit-template.md)
 - Domain cutover: [docs/launch/domain-cutover-openmerchstudio-com.md](./docs/launch/domain-cutover-openmerchstudio-com.md)
+- Supervised live-commerce evidence: [docs/launch/audits/2026-07-17-supervised-live-commerce-smoke.md](./docs/launch/audits/2026-07-17-supervised-live-commerce-smoke.md)
+- Policy copy awaiting owner approval: [docs/launch/legal-policy-copy-proposal-2026-07-17.md](./docs/launch/legal-policy-copy-proposal-2026-07-17.md)
 
 ## Printful References
 

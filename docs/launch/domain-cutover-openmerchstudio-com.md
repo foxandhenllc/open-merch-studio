@@ -5,7 +5,8 @@
 **Intended canonical origin:** `https://openmerchstudio.com`
 
 Use this checklist after the domain is registered. Domain ownership does not authorize payments or
-fulfillment: checkout and provider gates remain closed until the separate supervised-purchase review.
+fulfillment: the supervised purchase has passed, and checkout plus provider gates remain closed until
+the separate explicit public-launch decision.
 Never place DNS credentials, provider keys, database values, or webhook signing secrets in this file.
 
 ## 1. Register And Protect The Domain
@@ -67,8 +68,8 @@ controls the public artwork URLs that Printful retrieves. An empty `VITE_API_URL
 The Production `FRONTEND_URL` and `BACKEND_URL` values were promoted to the branded apex and deployed
 on July 17, 2026. Checkout and fulfillment authorization remained closed. The branded mailbox passed
 external inbound-and-reply testing. Repository defaults and the Production `VITE_SUPPORT_EMAIL` and
-`SUPPORT_EMAIL` values now use the branded support address; the release containing those defaults must
-still be redeployed and verified after each environment promotion.
+`SUPPORT_EMAIL` values now use the branded support address. The release containing those defaults was
+deployed and verified; redeploy and repeat the checks after any future environment promotion.
 
 ## 4. Move The Stripe Webhook Safely
 

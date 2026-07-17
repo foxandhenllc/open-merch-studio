@@ -89,18 +89,19 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 
 ## Remaining Business And Legal Inputs
 
-Do not open public checkout or remove `noindex` until approved customer-facing policies identify the
-seller and the operating rules precisely. The remaining manual inputs are:
+Do not open public checkout or remove `noindex` until the complete proposed policy set is approved and
+deployed. The copy proposal resolves the dates, adult eligibility, US-only scope, return/claim rules,
+AI-output and artwork-rights language, and data retention/deletion language. Four owner decisions
+remain:
 
-- Exact contracting entity and any approved Open Merch Studio DBA/trade-name wording.
-- Public business mailing address and approved policy/support contact.
-- Terms/privacy/returns effective and last-updated dates.
-- Governing state, venue, and dispute-resolution approach.
-- Minimum purchaser age or other eligibility rule.
-- Approved return/claim windows, evidence requirements, refund timing, lost/delayed shipment rules,
-  AI-output/customer-artwork rights language, and data retention/deletion language.
+- Approve the exact seller wording `Christopher Fox d/b/a Open Merch Studio`, or replace it.
+- Choose email-only public contact or explicitly approve a business mailing address for publication.
+- Approve, revise, or omit the proposed Pennsylvania governing-law paragraph.
+- Name the owner and operating path for applicable tax registration, filing, and remittance.
 
-These are business/legal decisions, not values to infer from provider accounts or source code.
+Review and record those decisions in
+[the launch policy copy proposal](./legal-policy-copy-proposal-2026-07-17.md). Do not infer a private
+street address or tax-filing commitment from a provider account.
 
 ## Protected Order Operations
 
