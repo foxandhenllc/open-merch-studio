@@ -11,6 +11,7 @@ import {
 import { getProductsByIds } from './catalog.service.js';
 import { describePrintfulError, generatePrintfulMockupPreview } from './printful.service.js';
 import { prepareArtworkForPrint } from './background-removal.service.js';
+import { resolveDesignAssetProviderUrl } from '../utils/design-asset-url.js';
 import {
   authorizeDesignAction,
   getAllowanceState,
@@ -97,19 +98,19 @@ function buildReadiness(prompt: string, placementCodes: string[]): DesignDraft['
   };
 }
 
-function publicArtworkUrl(id: string, imageUrl: string): string {
-  return /^https?:\/\//.test(imageUrl)
-    ? imageUrl
-    : `${env.backendUrl}/api/design/assets/${encodeURIComponent(id)}.png`;
-}
-
 async function getArtworkForProvider(designAssetId?: string): Promise<DesignArtwork | null> {
   if (!designAssetId) return null;
   const draft = getDraft(designAssetId);
   if (draft?.id && draft.imageUrl) {
+    const imageUrl = resolveDesignAssetProviderUrl({
+      assetId: draft.id,
+      storedUrl: draft.imageUrl,
+      backendUrl: env.backendUrl,
+    });
+    if (!imageUrl) return null;
     return {
       id: draft.id,
-      imageUrl: publicArtworkUrl(draft.id, draft.imageUrl),
+      imageUrl,
       policyStatus: draft.policy.status,
       readinessStatus: draft.readiness.status,
     };
@@ -117,11 +118,17 @@ async function getArtworkForProvider(designAssetId?: string): Promise<DesignArtw
 
   if (!env.databaseUrl) return null;
   const asset = await prisma.designAsset.findUnique({ where: { id: designAssetId } });
-  const imageUrl = asset?.transparentUrl ?? asset?.imageUrl;
-  if (!asset || !imageUrl) return null;
+  const storedUrl = asset?.transparentUrl ?? asset?.imageUrl;
+  if (!asset || !storedUrl) return null;
+  const imageUrl = resolveDesignAssetProviderUrl({
+    assetId: asset.id,
+    storedUrl,
+    backendUrl: env.backendUrl,
+  });
+  if (!imageUrl) return null;
   return {
     id: asset.id,
-    imageUrl: publicArtworkUrl(asset.id, imageUrl),
+    imageUrl,
     policyStatus: asset.policyStatus as DesignDraft['policy']['status'],
     readinessStatus: asset.readinessStatus as DesignDraft['readiness']['status'],
   };

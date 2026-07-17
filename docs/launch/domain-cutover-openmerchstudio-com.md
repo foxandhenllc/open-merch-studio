@@ -1,6 +1,6 @@
 # openmerchstudio.com Domain Cutover Checklist
 
-**Status:** In progress; domain owned and attached to the Vercel project, DNS cutover pending
+**Status:** Branded origin active; provider, support, and indexing follow-ups remain
 **Visibility:** Public-safe  
 **Intended canonical origin:** `https://openmerchstudio.com`
 
@@ -25,9 +25,10 @@ Never place DNS credentials, provider keys, database values, or webhook signing 
 - Keep the existing Vercel URL available for rollback, but stop presenting it as canonical after the
   branded origin passes verification.
 
-As of July 17, 2026, both hostnames are attached to the RatBenetar production project and Vercel is
-configured to redirect `www` to the apex with HTTP 308. The registrar DNS records and resulting HTTPS
-certificate remain the active cutover gate.
+As of July 17, 2026, both hostnames are attached to the RatBenetar production project, registrar DNS
+uses Vercel's project-specific records, and HTTPS is active. Vercel redirects `www` to the apex with
+HTTP 308 while preserving paths and queries. Resolver caches may briefly retain the former registrar
+parking response until their pre-cutover TTL expires.
 
 ## 3. Promote The URL Contract With Gates Closed
 
@@ -61,6 +62,10 @@ controls the public artwork URLs that Printful retrieves. An empty `VITE_API_URL
 - Redeploy after changing environment values; an environment edit does not alter an existing build.
 - Confirm public capability reporting remains configured/available rather than live.
 - Confirm a checkout-session request remains blocked before continuing.
+
+The Production `FRONTEND_URL` and `BACKEND_URL` values were promoted to the branded apex and deployed
+on July 17, 2026. Checkout and fulfillment authorization remained closed; support-address promotion
+remains deferred until the branded mailbox passes external send-and-receive testing.
 
 ## 4. Move The Stripe Webhook Safely
 

@@ -145,7 +145,7 @@ If launch needs to pause:
 
 ## Branded Domain
 
-Keep the temporary deployment non-indexable until the intended canonical domain is owned, attached,
-and verified. Follow the portable
+Keep the branded production deployment non-indexable until legal/support content, branded provider
+callbacks, production artwork retrieval, and the final visual review pass. Follow the portable
 [openmerchstudio.com domain cutover checklist](./domain-cutover-openmerchstudio-com.md) without
-placing DNS, provider, or signing-secret values in this repository.
+placing DNS credentials, provider keys, database values, or signing secrets in this repository.

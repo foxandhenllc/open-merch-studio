@@ -42,6 +42,7 @@ import {
 } from './stripe.service.js';
 import type Stripe from 'stripe';
 import { prisma } from '../config/database.js';
+import { resolveDesignAssetProviderUrl } from '../utils/design-asset-url.js';
 import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
 
 type CheckoutInput = {
@@ -957,22 +958,24 @@ async function getArtworkUrl(order: OrderSummary): Promise<string | null> {
         select: { id: true, transparentUrl: true, imageUrl: true },
       });
       const storedUrl = asset?.transparentUrl ?? asset?.imageUrl;
-      if (storedUrl && /^https?:\/\//.test(storedUrl)) return storedUrl;
-      if (asset?.id && storedUrl?.startsWith('data:')) {
-        return `${env.backendUrl}/api/design/assets/${encodeURIComponent(asset.id)}.png`;
-      }
-      return null;
+      return asset?.id && storedUrl
+        ? resolveDesignAssetProviderUrl({
+            assetId: asset.id,
+            storedUrl,
+            backendUrl: env.backendUrl,
+          })
+        : null;
     } catch {
       return null;
     }
   }
   const draft = getDraft(order.designAssetId);
   if (!draft?.id || !draft.imageUrl) return null;
-  if (/^https?:\/\//.test(draft.imageUrl)) return draft.imageUrl;
-  if (draft.imageUrl.startsWith('data:')) {
-    return `${env.backendUrl}/api/design/assets/${encodeURIComponent(draft.id)}.png`;
-  }
-  return null;
+  return resolveDesignAssetProviderUrl({
+    assetId: draft.id,
+    storedUrl: draft.imageUrl,
+    backendUrl: env.backendUrl,
+  });
 }
 
 type StripeEventClaim = 'claimed' | 'duplicate' | 'busy';

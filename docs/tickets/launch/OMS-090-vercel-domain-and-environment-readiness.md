@@ -1,6 +1,6 @@
 # OMS-090: Vercel Domain And Environment Readiness
 
-**Status:** In progress; domain owned and attached, DNS and environment cutover pending
+**Status:** Complete (July 17, 2026)
 **Visibility:** Public  
 **Epic:** EPIC-09: Deployment And Paid Beta Launch  
 **Critical path:** Yes
@@ -15,9 +15,10 @@ Customers reach a stable branded shop instead of a temporary deployment URL.
 
 ## Current State
 
-The app is live on Vercel. The branded apex and `www` hostnames are attached to the production
-project with a permanent `www` to apex redirect, while registrar DNS, canonical environment values,
-and branded-origin verification remain transitional.
+The app is live on Vercel at `https://openmerchstudio.com`. The branded apex and `www` hostnames are
+attached to the production project, registrar DNS uses the project-specific Vercel records, and
+`www` permanently redirects to the apex. Production URL configuration uses the branded origin while
+preview environments remain isolated from production provider values.
 
 ## Requirements
 
