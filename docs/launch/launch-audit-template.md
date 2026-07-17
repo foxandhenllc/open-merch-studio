@@ -35,15 +35,17 @@ Expected result: no live credentials, private provider values, private customer 
 
 - OpenAI generation: verify provider policy, moderation, spend controls, and pause behavior independently
   of the closed commerce gates.
-- Stripe live endpoint: branded URL active for completed, expired, and refunded events; checkout stays
-  closed until the allowlisted smoke and signed delivery/duplicate-replay evidence.
-- Printful preview: branded store URL and five-product no-order live mockup matrix verified; fulfillment
-  stays closed until the one-draft supervised smoke.
+- Stripe live endpoint: branded URL active for completed, expired, and refunded events; the one-time
+  allowlisted smoke plus signed delivery and duplicate-replay evidence passed on July 17, 2026. Keep
+  checkout closed until a separate public-launch decision.
+- Printful preview: branded store URL and five-product no-order live mockup matrix verified; the
+  one-draft supervised smoke passed without confirmation or a duplicate side effect. Keep fulfillment
+  closed until a separate public-launch decision.
 - Vercel/domain production readiness: branded apex and `www` cutover complete; retain the Vercel alias
   only as a rollback surface.
 - Support mail: Workspace alias, Gmail, MX, and SPF active; branded group routes to Chris Fox and
-  Chris Henrich; external inbound-and-reply test passed. DKIM is still authenticating, and the tested
-  group reply used the primary-domain From identity rather than the branded alias.
+  Chris Henrich; external inbound-and-reply test passed. A branded outbound From test also passed SPF,
+  DKIM for `openmerchstudio.com`, and DMARC.
 - App-owned transactional email: disabled until sender-domain and exactly-once delivery approval.
 
 ## Legal And Customer-Policy Readiness

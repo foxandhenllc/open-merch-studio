@@ -1,6 +1,6 @@
 # Paid Beta Runbook
 
-**Status:** Branded closed-gate production active; supervised commerce smoke still pending
+**Status:** Branded closed-gate production active; supervised commerce smoke passed
 **Visibility:** Public  
 **Private ops companion:** Maintained outside this public repository
 
@@ -11,14 +11,22 @@ As of July 17, 2026, the branded Stripe webhook is active at
 Printful store website uses the branded origin; and no-order live mockups passed for all five launch
 products. The Google Workspace alias domain is verified and Gmail, MX, and SPF are active. The
 `support@openmerchstudio.com` group routes to direct members Chris Fox and Chris Henrich, and an
-external inbound-and-reply test passed. Its published DKIM record remains in Google Admin's
-`Authenticating email with DKIM` state, and the tested outgoing group reply displayed the primary-
-domain `support@foxandhenllc.com` identity because the branded domain is an alias domain. Search
-indexing, public checkout, payment authorization, and fulfillment authorization remain closed.
+external inbound-and-reply test passed. A branded outbound test from
+`Open Merch Studio Support <support@openmerchstudio.com>` passed SPF, DKIM for
+`openmerchstudio.com`, and DMARC. Search indexing, public checkout, payment authorization, and
+fulfillment authorization remain closed.
 Both support members use `Each email`; Chris Fox's first external member-delivery probe was marked
 `Not spam`, and Chris Henrich should do the same once if Gmail classifies his first group message as
 Spam. Production application defaults, Vercel support variables, and Stripe's public support email now
 use `support@openmerchstudio.com`.
+
+The supervised allowlisted commerce smoke passed on July 17, 2026. One live Stripe payment reconciled
+to OMS order `OMS-2026-655AFL` at a final total of $16.94, including $0.96 Pennsylvania tax. The
+original webhook delivery and two deliberate duplicate replays each returned HTTP 200, while Printful
+contained exactly one editable draft and it was never confirmed. The live webhook signing secret was
+rotated and verified without recording it. Production was then returned to closed gates; public health
+reports checkout and fulfillment as `available`, meaning configured but not authorized. Stripe-hosted
+successful-payment and refund customer emails are enabled.
 
 ## Provider Gates
 
@@ -177,8 +185,8 @@ If launch needs to pause:
 ## Branded Domain
 
 Keep the branded production deployment non-indexable until legal/support content and the final visual
-review pass. Branded support inbound routing and its external reply round-trip are verified; final
-DKIM activation and a branded outbound From identity are separate remaining email checks. The branded
-provider callback/store URL and five-product artwork retrieval/mockup checks are complete. Follow the portable
+review pass. Branded support inbound routing, its external reply round-trip, and authenticated branded
+outbound sending are verified. The branded provider callback/store URL, five-product artwork
+retrieval/mockup checks, and one supervised live-commerce smoke are complete. Follow the portable
 [openmerchstudio.com domain cutover checklist](./domain-cutover-openmerchstudio-com.md) without
 placing DNS credentials, provider keys, database values, or signing secrets in this repository.

@@ -14,8 +14,9 @@
   `6b0d2d9` as deployment `dpl_6uRkGSQord9UTdqDY82C6Ryyyqrj`.
 - Retained the Vercel project alias as a rollback path.
 - Updated the existing live Stripe webhook in place to
-  `https://openmerchstudio.com/api/stripe/webhook` while preserving its signing secret and completed,
-  expired, and refunded event subscriptions.
+  `https://openmerchstudio.com/api/stripe/webhook` with completed, expired, and refunded event
+  subscriptions. The signing secret was subsequently rotated and verified in deployment-managed
+  configuration without recording its value.
 - Updated the Printful store website to the branded origin and completed a no-order live mockup matrix
   for the tee, tote, mug, sticker, and poster.
 - Verified the Google Workspace alias domain and activated Gmail, MX, and SPF for the branded domain.
@@ -27,8 +28,8 @@
   address. Chris's first member-delivery probe landed in Spam; it was marked safe, and Gmail confirmed
   future messages from that sender will go to Inbox. Chris Henrich should perform the same one-time
   action if his first support message is classified as Spam.
-- Published the 2048-bit Google DKIM TXT record; Google Admin currently reports `Authenticating email
-  with DKIM`, so full DKIM activation is not yet recorded as passing.
+- Published the 2048-bit Google DKIM TXT record. A subsequent external branded-sender test passed SPF,
+  DKIM for `openmerchstudio.com`, and DMARC.
 
 ## Verified
 
@@ -49,23 +50,23 @@
   route as a valid RGBA PNG.
 - Search indexing remains blocked by the HTML robots directive and response header.
 - Printful retrieved branded artwork for all five launch products without creating an order.
-- The Stripe endpoint configuration is active at the branded URL; signed real delivery and duplicate
-  replay remain part of the supervised-purchase evidence.
+- The Stripe endpoint configuration is active at the branded URL. One signed real delivery plus two
+  duplicate replays returned HTTP 200 during the supervised purchase, while exactly one Printful draft
+  was created and never confirmed.
 - The new deployment reported zero dependency vulnerabilities and no error-level runtime logs during
   the cutover smoke.
 
 ## Still Gated
 
 - Public checkout and live fulfillment authorization.
-- Signed Stripe delivery, durable reconciliation, and duplicate-replay verification for the supervised
-  real-money smoke.
-- Final DKIM activation and received-message authentication evidence. Because the branded domain is a
-  Workspace alias domain, the tested group reply displayed `support@foxandhenllc.com`; a branded
-  outbound From identity remains a separate configuration and approval item.
+- Public authorization to accept payments or create Printful drafts; the supervised window passed and
+  production returned to closed gates with both capabilities reporting `available`, not `live`.
 - Legal seller/DBA identity, public mailing address, policy dates, purchaser eligibility, governing
   law/dispute approach, returns/claims/refunds, artwork rights, and data-retention review.
 - Search indexing remains intentionally disabled; approved favicon/social image and Search Console
   are still pending, and crawl metadata/404 behavior must pass final verification before indexing.
-- One allowlisted payment and exactly one manually reviewed, never auto-confirmed Printful draft.
+- Private operator sign-off for public paid beta.
 
-Opening an allowlisted real-money smoke window remains a separate explicit operator action.
+The allowlisted real-money smoke is recorded separately in
+[the supervised live-commerce audit](./2026-07-17-supervised-live-commerce-smoke.md). It did not
+authorize public checkout, fulfillment, or indexing.

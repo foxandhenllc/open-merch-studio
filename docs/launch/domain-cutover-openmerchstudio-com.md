@@ -1,6 +1,6 @@
 # openmerchstudio.com Domain Cutover Checklist
 
-**Status:** Branded origin, provider URLs, and support routing active; DKIM authentication and indexing remain
+**Status:** Branded origin, provider URLs, authenticated support sending, and supervised commerce smoke verified; indexing remains gated
 **Visibility:** Public-safe  
 **Intended canonical origin:** `https://openmerchstudio.com`
 
@@ -77,14 +77,13 @@ still be redeployed and verified after each environment promotion.
   - `checkout.session.completed`
   - `checkout.session.expired`
   - `charge.refunded`
-- Because the endpoint was edited rather than replaced, its signing secret remained unchanged and no
-  secret rotation or environment update was required. If the endpoint is replaced later, treat the
-  new signing secret as distinct and update deployment-managed configuration without recording it here.
-- Checkout remains closed. Verify signed real delivery, terminal payment-event persistence, and
-  duplicate replay during the supervised purchase; those checks cannot be proven by URL configuration
-  alone.
-- Stripe's public support email now uses `support@openmerchstudio.com`. Continue to review the public
-  business URL, branding, and receipt/refund email settings during the supervised commerce smoke.
+- The live signing secret was rotated on July 17, 2026, updated only in deployment-managed Production
+  configuration, and verified with a signed HTTP 200 delivery. No secret value was recorded in the
+  repository or launch evidence.
+- The supervised purchase produced one successful signed delivery. Two deliberate duplicate replays
+  of the same event also returned HTTP 200 without creating another Printful draft.
+- Stripe's public support email uses `support@openmerchstudio.com`; successful-payment and refund
+  customer emails are enabled. Checkout returned to closed immediately after the smoke.
 
 ## 5. Verify Printful And Artwork Retrieval
 
@@ -102,17 +101,16 @@ still be redeployed and verified after each environment promotion.
 ## 6. Prepare Branded Support And Sending
 
 - The `openmerchstudio.com` Google Workspace alias domain is verified; Gmail, MX, and SPF are active.
-- A 2048-bit DKIM TXT record is published under selector `google`. Google Admin currently reports
-  `Authenticating email with DKIM`; do not record DKIM as fully active or passing until that status
-  completes and a received-message authentication check confirms it.
+- A 2048-bit DKIM TXT record is published under selector `google`. A received-message authentication
+  check on July 17, 2026 confirmed SPF, DKIM for `openmerchstudio.com`, and DMARC all pass.
 - `support@openmerchstudio.com` routes to the Open Merch Studio Support group. Chris Fox and Chris
   Henrich are direct members with `Each email` subscriptions, and an external inbound message plus the
   group reply both completed. Chris's first member-delivery probe was delivered to Spam and then marked
   safe; Chris Henrich should mark his first support message `Not spam` if Gmail classifies it similarly.
-- Because `openmerchstudio.com` is configured as a Google Workspace alias domain, the tested outgoing
-  group reply displayed `support@foxandhenllc.com`. Treat branded inbound support as verified, but do
-  not claim a branded From identity until the Workspace domain/sender configuration is changed and
-  retested.
+- Gmail is configured with the branded `Open Merch Studio Support <support@openmerchstudio.com>` From
+  identity. An external delivery test displayed that identity and passed SPF, DKIM, and DMARC. The
+  reply behavior uses the address to which the incoming message was sent, while the unrelated primary
+  mailbox identity remains unchanged.
 - Complete legal review of the seller/operator identity and add the approved entity, effective date,
   and jurisdiction-specific terms to customer-facing policy pages before public payment access.
 - If Open Merch Studio later sends transactional email directly, configure a dedicated sender or
@@ -151,5 +149,7 @@ Only after apex HTTPS, redirects, legal/support routes, and production content p
 - If domain behavior is wrong, close checkout/fulfillment gates, restore the last known-good URL
   values, redeploy, and keep the branded origin non-indexable until corrected.
 
-Passing this checklist establishes the branded origin. Opening an allowlisted real-money smoke window
-remains a separate, explicit operator decision under the paid-beta runbook.
+Passing this checklist establishes the branded origin. The one-time allowlisted real-money smoke
+passed on July 17, 2026 and production returned to closed checkout and fulfillment gates. Public paid
+beta still requires approved legal content and a separate explicit indexing and launch decision under
+the paid-beta runbook.

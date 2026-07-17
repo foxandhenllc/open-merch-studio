@@ -16,13 +16,14 @@ The launch happens only after the shop can responsibly accept money and fulfill 
 ## Current State
 
 The paid-beta runbook, launch audit template, implementation ledger, monitoring/recovery audit, and
-domain cutover checklist provide the decision surface. The final go/no-go still requires a supervised
-Stripe/Printful smoke and private operator sign-off. The branded Stripe webhook and Printful store URL
-are active, all five launch-product live mockups passed without an order, and the Workspace alias domain
-has Gmail/MX/SPF active. The branded support group routes to Chris Fox and Chris Henrich and its external
-inbound-and-reply test passed. DKIM is still authenticating, the tested reply displayed the primary-
-domain group address, and approved legal policy inputs plus removal of the intentional `noindex` gate
-remain incomplete.
+domain cutover checklist provide the decision surface. The supervised Stripe/Printful smoke passed on
+July 17, 2026 and production returned to closed authorization gates. One live payment reconciled, the
+original webhook plus two duplicate replays returned HTTP 200, and Printful contained exactly one
+editable draft that was never confirmed. The branded Stripe webhook and Printful store URL are active,
+all five launch-product live mockups passed, and the Workspace alias domain has Gmail/MX/SPF active.
+External testing confirmed the branded support From identity passes SPF, DKIM, and DMARC. Approved
+legal policy inputs, private operator sign-off, and an explicit decision to remove the intentional
+`noindex` gate remain incomplete.
 
 ## Requirements
 
@@ -56,6 +57,20 @@ remain incomplete.
   group; verify DKIM reaches an active/pass state and approve the outbound From identity separately.
 - Approved seller identity, mailing address, policy dates, purchaser eligibility, jurisdiction,
   returns/refunds, artwork-rights, and retention language are deployed before indexing or public checkout.
+
+## Supervised Smoke Evidence — July 17, 2026
+
+- OMS order `OMS-2026-655AFL` completed as one live Stripe payment for $16.94, including $0.96
+  Pennsylvania tax.
+- The original signed webhook delivery and two duplicate replays returned HTTP 200. Duplicate handling
+  produced no second fulfillment side effect.
+- Exactly one Printful draft was created, remained editable, and was never confirmed.
+- The webhook signing secret was rotated in deployment-managed configuration and verified without
+  recording its value.
+- Checkout and fulfillment gates were closed again after the smoke; production health reports both
+  capabilities as `available`, not `live`.
+- A branded external sender test passed SPF, DKIM, and DMARC, and Stripe-hosted successful-payment and
+  refund customer emails are enabled.
 
 ## Test Plan
 

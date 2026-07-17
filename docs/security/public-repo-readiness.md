@@ -8,5 +8,7 @@ Before publishing:
 - Keep legacy staging-domain references out of public copy unless a temporary staging note explicitly needs them.
 - Keep private local filesystem paths, deployment/team links, and database project references out of
   public launch evidence.
-- While the app uses a temporary host, verify HTML plus the `X-Robots-Tag` header are `noindex` and
-  `robots.txt` blocks crawling. Enable indexing only through the reviewed branded-domain cutover.
+- While launch review is incomplete, verify the HTML robots directive and `X-Robots-Tag` header both
+  remain `noindex`. Keep `robots.txt` crawlable and pointed at the canonical sitemap so crawlers can
+  observe the page-level noindex directives. Enable indexing only through the reviewed branded-domain
+  cutover.
