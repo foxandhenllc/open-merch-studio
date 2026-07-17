@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
+  "trailingSlash": false,
   "functions": {
     "api/[...path].js": {
       "includeFiles": "backend/dist/**"
@@ -45,8 +46,24 @@
       "destination": "/api/[...path]?...path=$1"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms/index.html"
+    },
+    {
+      "source": "/returns",
+      "destination": "/returns/index.html"
+    },
+    {
+      "source": "/content-policy",
+      "destination": "/content-policy/index.html"
+    },
+    {
+      "source": "/support",
+      "destination": "/support/index.html"
     }
   ]
 }

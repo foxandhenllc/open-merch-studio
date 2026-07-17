@@ -27,7 +27,8 @@
     "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test",
     "test:browser": "node frontend/scripts/responsive-smoke.mjs",
     "smoke:fixture": "node --import tsx backend/src/tests/fixture-smoke.test.ts",
-    "db:generate": "node \"$npm_execpath\" --workspace open-merch-studio-backend run db:generate"
+    "db:generate": "node \"$npm_execpath\" --workspace open-merch-studio-backend run db:generate",
+    "verify:static-routes": "node \"$npm_execpath\" --workspace open-merch-studio-frontend run verify:static-routes"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

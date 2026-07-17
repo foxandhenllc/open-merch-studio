@@ -19,21 +19,26 @@ Store all provider values in deployment-managed storage. Do not commit provider 
 
 ## Live Provider Gates
 
-Keep live behavior disabled until the private OPS checklist is complete.
+Keep commerce authorization disabled until the private OPS checklist is complete. Provider capability
+switches are separate from money/order authorization: production may enable OpenAI generation,
+Stripe webhook/reconciliation access, and Printful mockups while the commerce gates below remain
+closed.
 
 - `CHECKOUT_ACCESS_MODE=closed`
 - `CHECKOUT_ALLOWED_EMAILS=`
 - `VITE_PUBLIC_APP_MODE=production`
 - `VITE_ENABLE_PUBLIC_CHECKOUT=false`
 - `VITE_ENABLE_LOCAL_FALLBACKS=false`
-- `ENABLE_LIVE_OPENAI=false`
-- `ENABLE_LIVE_STRIPE=false`
-- `ENABLE_LIVE_PRINTFUL=false`
 - `ALLOW_LIVE_PAYMENTS=false`
 - `ALLOW_LIVE_FULFILLMENT=false`
 - `PRINTFUL_AUTO_CONFIRM_ORDERS=false`
 - `CHECKOUT_ENABLED=false`
 - `FULFILLMENT_ENABLED=false`
+
+`ENABLE_LIVE_OPENAI`, `ENABLE_LIVE_STRIPE`, and `ENABLE_LIVE_PRINTFUL` indicate that the matching
+provider adapter is configured. They never replace the payment/fulfillment authorization gates.
+In particular, `ENABLE_LIVE_PRINTFUL=true` can support live mockup previews while
+`ALLOW_LIVE_FULFILLMENT=false` and `FULFILLMENT_ENABLED=false` prevent order creation.
 
 Preview deployments should not use production provider settings. Production checkout, live generation, and real fulfillment must remain separate switches. The backend contains guarded live adapters; fixture behavior is for local/test use and must not be mistaken for the production API.
 

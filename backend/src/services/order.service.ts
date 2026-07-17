@@ -848,7 +848,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
       quoteId: quote.id,
       studioPassId: pass?.id,
       orderId: order.id,
-      message: 'Stripe Checkout session created. Complete payment in Stripe test mode.',
+      message: 'Stripe Checkout session created. Complete payment securely with Stripe.',
     };
   }
 

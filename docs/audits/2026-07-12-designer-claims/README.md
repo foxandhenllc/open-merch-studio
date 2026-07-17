@@ -1,7 +1,7 @@
 # Open Merch Studio Designer-Claims Audit
 
 **Audit date:** 2026-07-12  
-**Surface:** Production studio at `https://open-merch-studio-vercel-output.vercel.app`  
+**Historical surface:** Production studio at `open-merch-studio-vercel-output.vercel.app`; the current canonical origin is [openmerchstudio.com](https://openmerchstudio.com).
 **Flow:** First visit → product selection → live generation/mockup → blocked revision → quote → refresh → narrow mobile  
 **Target:** Trustworthy MVP checkout journey with keyboard- and mobile-usable guidance
 

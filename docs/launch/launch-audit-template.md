@@ -18,8 +18,8 @@ Use this template before enabling production checkout, live OpenAI generation, o
 - Refund-versus-fulfillment terminal-state guard:
 - Protected admin authorization test:
 - Production dependency audit:
-- Temporary host remains `noindex` before domain cutover:
-- Branded-domain cutover checklist (when applicable):
+- Branded origin remains `noindex` until legal/support/final-design approval:
+- Branded-domain cutover checklist:
 
 ## Credential And Privacy Scan
 
@@ -33,11 +33,28 @@ Expected result: no live credentials, private provider values, private customer 
 
 ## Provider Readiness
 
-- OpenAI live generation: disabled until OPS-004 approval.
-- Stripe live checkout: disabled until OPS-002 and OPS-008 approval.
-- Printful live fulfillment: disabled until OPS-003 and OPS-006 approval.
-- Vercel/domain production readiness: blocked until OPS-007 approval.
+- OpenAI generation: verify provider policy, moderation, spend controls, and pause behavior independently
+  of the closed commerce gates.
+- Stripe live endpoint: branded URL active for completed, expired, and refunded events; checkout stays
+  closed until the allowlisted smoke and signed delivery/duplicate-replay evidence.
+- Printful preview: branded store URL and five-product no-order live mockup matrix verified; fulfillment
+  stays closed until the one-draft supervised smoke.
+- Vercel/domain production readiness: branded apex and `www` cutover complete; retain the Vercel alias
+  only as a rollback surface.
+- Support mail: Workspace alias, Gmail, MX, and SPF active; DKIM, support routing, and external
+  send-and-reply verification pending.
 - App-owned transactional email: disabled until sender-domain and exactly-once delivery approval.
+
+## Legal And Customer-Policy Readiness
+
+- Contracting entity and approved DBA/trade-name wording:
+- Public mailing address and approved policy contact:
+- Effective/last-updated dates:
+- Purchaser eligibility/minimum age:
+- Governing law, venue, and dispute approach:
+- Return/claim windows, evidence, refund timing, and lost/delayed shipment rules:
+- AI-output/customer-artwork rights and data retention/deletion language:
+- Search indexing remains disabled until the approved text is deployed:
 
 ## Operations And Recovery
 

@@ -1,4 +1,5 @@
 User-agent: *
-Disallow: /
+Allow: /
 
-# Replace this prelaunch block only after the final paid-beta launch review approves indexing.
+# The HTML and response headers retain noindex until the final paid-beta launch review.
+Sitemap: https://openmerchstudio.com/sitemap.xml

@@ -1,0 +1,106 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CANONICAL_ORIGIN, NOT_FOUND_ROUTE, STATIC_ROUTES } from './static-route-config.mjs';
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const frontendDirectory = path.resolve(scriptDirectory, '..');
+const repositoryDirectory = path.resolve(frontendDirectory, '..');
+const distDirectory = path.join(frontendDirectory, 'dist');
+
+const escapeHtml = (value) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+const occurrences = (value, pattern) => value.match(pattern)?.length ?? 0;
+
+for (const route of STATIC_ROUTES) {
+  const html = await readFile(path.join(distDirectory, route.output), 'utf8');
+  const canonicalUrl = `${CANONICAL_ORIGIN}${route.path}`;
+  assert.ok(html.includes(`<title>${escapeHtml(route.title)}</title>`), `${route.path} title`);
+  assert.ok(
+    html.includes(`<meta name="description" content="${escapeHtml(route.description)}" />`),
+    `${route.path} description`
+  );
+  assert.ok(
+    html.includes(`<link rel="canonical" href="${canonicalUrl}" />`),
+    `${route.path} canonical`
+  );
+  assert.ok(
+    html.includes(`<meta property="og:url" content="${canonicalUrl}" />`),
+    `${route.path} Open Graph URL`
+  );
+  assert.ok(
+    html.includes(`<meta property="og:title" content="${escapeHtml(route.title)}" />`),
+    `${route.path} Open Graph title`
+  );
+  assert.ok(
+    html.includes(
+      `<meta property="og:description" content="${escapeHtml(route.description)}" />`
+    ),
+    `${route.path} Open Graph description`
+  );
+  assert.equal(occurrences(html, /rel="canonical"/g), 1, `${route.path} canonical count`);
+  assert.equal(occurrences(html, /property="og:url"/g), 1, `${route.path} og:url count`);
+  assert.match(html, /<meta\s+name="robots"\s+content="[^"]*noindex[^"]*"\s*\/>/i);
+}
+
+const notFoundHtml = await readFile(path.join(distDirectory, NOT_FOUND_ROUTE.output), 'utf8');
+assert.ok(notFoundHtml.includes(`<title>${NOT_FOUND_ROUTE.title}</title>`));
+assert.doesNotMatch(notFoundHtml, /rel="canonical"/i);
+assert.doesNotMatch(notFoundHtml, /property="og:url"/i);
+assert.match(notFoundHtml, /<meta\s+name="robots"\s+content="[^"]*noindex[^"]*"\s*\/>/i);
+
+const robots = await readFile(path.join(distDirectory, 'robots.txt'), 'utf8');
+assert.match(robots, /^Allow:\s*\/$/m);
+assert.doesNotMatch(robots, /^Disallow:\s*\/$/m);
+assert.match(robots, /^Sitemap:\s*https:\/\/openmerchstudio\.com\/sitemap\.xml$/m);
+
+const sitemap = await readFile(path.join(distDirectory, 'sitemap.xml'), 'utf8');
+const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+assert.deepEqual(
+  sitemapUrls,
+  STATIC_ROUTES.map((route) => `${CANONICAL_ORIGIN}${route.path}`)
+);
+
+const vercelConfig = JSON.parse(await readFile(path.join(repositoryDirectory, 'vercel.json'), 'utf8'));
+const rewrites = vercelConfig.rewrites ?? [];
+const globalHeaders = (vercelConfig.headers ?? []).find((rule) => rule.source === '/(.*)')?.headers;
+assert.equal(
+  vercelConfig.trailingSlash,
+  false,
+  'trailing-slash variants must redirect to the canonical extensionless route'
+);
+assert.ok(
+  globalHeaders?.some(
+    (header) => header.key.toLowerCase() === 'x-robots-tag' && header.value.includes('noindex')
+  ),
+  'global X-Robots-Tag noindex must remain in place before launch review'
+);
+assert.ok(
+  rewrites.some(
+    (rewrite) =>
+      rewrite.source === '/api/(.*)' && rewrite.destination === '/api/[...path]?...path=$1'
+  ),
+  'API rewrite must remain intact'
+);
+for (const route of STATIC_ROUTES.filter((item) => item.path !== '/')) {
+  assert.ok(
+    rewrites.some(
+      (rewrite) => rewrite.source === route.path && rewrite.destination === `/${route.output}`
+    ),
+    `${route.path} must target its generated HTML`
+  );
+}
+assert.ok(
+  !rewrites.some((rewrite) => rewrite.source === '/(.*)' && rewrite.destination === '/index.html'),
+  'blanket SPA fallback must stay removed so Vercel can return 404.html with status 404'
+);
+
+console.log(
+  `Verified ${STATIC_ROUTES.length} canonical routes, sitemap, crawlable noindex controls, and custom 404 output.`
+);

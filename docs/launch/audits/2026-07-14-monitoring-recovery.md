@@ -9,7 +9,8 @@
 ## Release
 
 - Release commit: `1d8e3c2` (monitoring/recovery implementation begins at `ef23bf4`).
-- Canonical production URL: [open-merch-studio-vercel-output.vercel.app](https://open-merch-studio-vercel-output.vercel.app)
+- Audited deployment URL at the time: `open-merch-studio-vercel-output.vercel.app`.
+- Current canonical origin after the July 17 cutover: [openmerchstudio.com](https://openmerchstudio.com).
 - Immutable deployment and provider-account inspection details are retained in private operations
   notes rather than this public audit.
 - Runtime: Node.js 22.x.
@@ -55,7 +56,7 @@
 
 ## Live Observations
 
-- Canonical `/api/health`: HTTP 200 with an `x-request-id`.
+- The audited deployment's `/api/health`: HTTP 200 with an `x-request-id`.
 - Protected settings confirm checkout and fulfillment are disabled.
 - The current immutable deployment has no error logs after health/admin verification.
 - A safe negative admin request records its exact `order_not_found` recovery code without exposing request secrets.

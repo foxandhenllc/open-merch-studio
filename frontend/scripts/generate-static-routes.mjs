@@ -1,0 +1,80 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CANONICAL_ORIGIN, NOT_FOUND_ROUTE, STATIC_ROUTES } from './static-route-config.mjs';
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const frontendDirectory = path.resolve(scriptDirectory, '..');
+const distDirectory = path.join(frontendDirectory, 'dist');
+const baseDocument = await readFile(path.join(distDirectory, 'index.html'), 'utf8');
+
+const escapeHtml = (value) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+const replaceOrInsertHeadTag = (html, pattern, tag) => {
+  if (pattern.test(html)) return html.replace(pattern, tag);
+  return html.replace('</head>', `    ${tag}\n  </head>`);
+};
+
+const removeHeadTag = (html, pattern) => html.replace(pattern, '');
+
+const renderDocument = ({ title, description, canonicalUrl }) => {
+  const safeTitle = escapeHtml(title);
+  const safeDescription = escapeHtml(description);
+  let html = baseDocument.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`);
+
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*name=["']description["'][^>]*>/i,
+    `<meta name="description" content="${safeDescription}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*property=["']og:title["'][^>]*>/i,
+    `<meta property="og:title" content="${safeTitle}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*property=["']og:description["'][^>]*>/i,
+    `<meta property="og:description" content="${safeDescription}" />`
+  );
+
+  if (canonicalUrl) {
+    html = replaceOrInsertHeadTag(
+      html,
+      /<link\s+[^>]*rel=["']canonical["'][^>]*>/i,
+      `<link rel="canonical" href="${canonicalUrl}" />`
+    );
+    html = replaceOrInsertHeadTag(
+      html,
+      /<meta\s+[^>]*property=["']og:url["'][^>]*>/i,
+      `<meta property="og:url" content="${canonicalUrl}" />`
+    );
+  } else {
+    html = removeHeadTag(html, /\s*<link\s+[^>]*rel=["']canonical["'][^>]*>/i);
+    html = removeHeadTag(html, /\s*<meta\s+[^>]*property=["']og:url["'][^>]*>/i);
+  }
+
+  return html;
+};
+
+for (const route of STATIC_ROUTES) {
+  const canonicalUrl = `${CANONICAL_ORIGIN}${route.path}`;
+  const outputPath = path.join(distDirectory, route.output);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, renderDocument({ ...route, canonicalUrl }), 'utf8');
+}
+
+await writeFile(
+  path.join(distDirectory, NOT_FOUND_ROUTE.output),
+  renderDocument(NOT_FOUND_ROUTE),
+  'utf8'
+);
+
+console.log(
+  `Generated ${STATIC_ROUTES.length} canonical route documents and ${NOT_FOUND_ROUTE.output}.`
+);

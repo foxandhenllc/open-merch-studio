@@ -1,10 +1,18 @@
 # Paid Beta Runbook
 
-**Status:** Ready for fixture mode and private provider testing after credentials
+**Status:** Branded closed-gate production active; supervised commerce smoke still pending
 **Visibility:** Public  
 **Private ops companion:** Maintained outside this public repository
 
-Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and private provider testing, not unattended real-money launch.
+Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and supervised provider testing, not unattended real-money launch.
+
+As of July 17, 2026, the branded Stripe webhook is active at
+`https://openmerchstudio.com/api/stripe/webhook` for completed, expired, and refunded events; the
+Printful store website uses the branded origin; and no-order live mockups passed for all five launch
+products. The Google Workspace alias domain is verified and Gmail, MX, and SPF are active. DKIM,
+the `support@openmerchstudio.com` group/alias route, and an external send-and-reply test are still
+pending. Search indexing, public checkout, payment authorization, and fulfillment authorization
+remain closed.
 
 ## Provider Gates
 
@@ -15,9 +23,11 @@ Live provider behavior must stay behind explicit environment gates.
 - `VITE_PUBLIC_APP_MODE=production` should be set for the production frontend build.
 - `VITE_ENABLE_PUBLIC_CHECKOUT=false` keeps checkout controls disabled for public visitors; it is not a payment authorization gate.
 - `VITE_ENABLE_LOCAL_FALLBACKS=false` prevents browser-only fixture fallbacks from masking production API failures.
-- `ENABLE_LIVE_OPENAI=false` keeps design generation in mock mode.
-- `ENABLE_LIVE_STRIPE=false` keeps Studio Pass and merchandise checkout in fixture mode.
-- `ENABLE_LIVE_PRINTFUL=false` keeps fulfillment in fixture mode.
+- `ENABLE_LIVE_OPENAI` controls provider-backed design generation independently of checkout.
+- `ENABLE_LIVE_STRIPE` exposes configured Stripe capability and webhook/recovery access, but does not
+  override checkout access or live-payment gates.
+- `ENABLE_LIVE_PRINTFUL=true` may be used for live mockup previews while fulfillment remains blocked by
+  `ALLOW_LIVE_FULFILLMENT=false` and `FULFILLMENT_ENABLED=false`.
 - `ALLOW_LIVE_PAYMENTS=false` prevents accidental live Stripe charges if a live key is configured.
 - `ALLOW_LIVE_FULFILLMENT=false` prevents accidental Printful order creation if a live store token is configured.
 - `PRINTFUL_AUTO_CONFIRM_ORDERS=false` is required. Paid beta fulfillment is draft-order only; auto-confirm is blocked in code.
@@ -58,10 +68,25 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 - Vercel uses the full-stack Express backend through `api/[...path].js`; production API testing must hit real `/api/*` routes, not the archived fixture handlers under `api-fixtures/`.
 - Production has `VITE_PUBLIC_APP_MODE=production`, `CHECKOUT_ACCESS_MODE=closed`, `CHECKOUT_ENABLED=false`, `VITE_ENABLE_PUBLIC_CHECKOUT=false`, and `VITE_ENABLE_LOCAL_FALLBACKS=false` until checkout approval.
 - Stripe Checkout Sessions are card-only and US-only with Stripe Tax enabled. Webhook reconciliation stores final total, tax, payment intent, and paid timestamp; signed subscriptions must include completed, expired, and refunded events. Tax registrations and accounting remain operator responsibilities.
-- OpenAI provider calls are implemented behind a gate with prompt moderation, product-neutral print prompt shaping, durable spend events when `DATABASE_URL` is configured, and checkout blocks for failed, warning, or policy-review designs. Spend alerts and pause steps must still be verified before live generation.
-- Printful catalog sync, curated product allowlisting, mockup task polling, duplicate draft-order recovery, technique-preserving payload validation, and draft-order creation are implemented behind gates. Drafts are never auto-confirmed. Store setup, live price mapping, status sync, shipping, return, and support assumptions must be reviewed before real fulfillment.
+- OpenAI provider calls are implemented behind a gate with prompt moderation, product-neutral print prompt shaping, durable spend events when `DATABASE_URL` is configured, and checkout blocks for failed, warning, or policy-review designs. Spend alerts and pause steps must be verified continuously while live generation remains enabled.
+- Printful catalog sync, curated product allowlisting, mockup task polling, duplicate draft-order recovery, technique-preserving payload validation, and draft-order creation are implemented behind gates. Drafts are never auto-confirmed. Store identity and branded mockup retrieval are verified; live price mapping, status sync, shipping, return, and support assumptions must still be reviewed before real fulfillment.
 - Tax, shipping, and Studio Pass accounting assumptions are reviewed before real-money launch.
 - `OMS-094` is reviewed with the private OPS checklist before inviting paid beta customers.
+
+## Remaining Business And Legal Inputs
+
+Do not open public checkout or remove `noindex` until approved customer-facing policies identify the
+seller and the operating rules precisely. The remaining manual inputs are:
+
+- Exact contracting entity and any approved Open Merch Studio DBA/trade-name wording.
+- Public business mailing address and approved policy/support contact.
+- Terms/privacy/returns effective and last-updated dates.
+- Governing state, venue, and dispute-resolution approach.
+- Minimum purchaser age or other eligibility rule.
+- Approved return/claim windows, evidence requirements, refund timing, lost/delayed shipment rules,
+  AI-output/customer-artwork rights language, and data retention/deletion language.
+
+These are business/legal decisions, not values to infer from provider accounts or source code.
 
 ## Protected Order Operations
 
@@ -145,7 +170,8 @@ If launch needs to pause:
 
 ## Branded Domain
 
-Keep the branded production deployment non-indexable until legal/support content, branded provider
-callbacks, production artwork retrieval, and the final visual review pass. Follow the portable
+Keep the branded production deployment non-indexable until legal/support content, support routing,
+and the final visual review pass. The branded provider callback/store URL and five-product artwork
+retrieval/mockup checks are complete. Follow the portable
 [openmerchstudio.com domain cutover checklist](./domain-cutover-openmerchstudio-com.md) without
 placing DNS credentials, provider keys, database values, or signing secrets in this repository.

@@ -1,6 +1,6 @@
 # openmerchstudio.com Domain Cutover Checklist
 
-**Status:** Branded origin active; provider, support, and indexing follow-ups remain
+**Status:** Branded origin and provider URLs active; support authentication/routing and indexing remain
 **Visibility:** Public-safe  
 **Intended canonical origin:** `https://openmerchstudio.com`
 
@@ -32,7 +32,8 @@ parking response until their pre-cutover TTL expires.
 
 ## 3. Promote The URL Contract With Gates Closed
 
-Set deployment-managed Production values, without copying their values into repository files:
+Use this target Production contract without copying secret values into repository files. Defer the
+branded support-address lines until the external mailbox round-trip in Step 6 passes:
 
 ```dotenv
 FRONTEND_URL=https://openmerchstudio.com
@@ -69,58 +70,64 @@ remains deferred until the branded mailbox passes external send-and-receive test
 
 ## 4. Move The Stripe Webhook Safely
 
-- Create a live Stripe webhook endpoint at
+- The existing live endpoint was updated in place on July 17, 2026 to
   `https://openmerchstudio.com/api/stripe/webhook` for:
   - `checkout.session.completed`
   - `checkout.session.expired`
   - `charge.refunded`
-- Store that endpoint's new signing secret as the deployment-managed `STRIPE_WEBHOOK_SECRET`. Signing
-  secrets belong to one endpoint and must not be assumed to match the temporary-host endpoint.
-- Redeploy with checkout still closed, send a signed test event, and verify one terminal payment-event
-  row plus privacy-safe operational logging.
-- Keep the old endpoint active until the branded endpoint has passed delivery and duplicate-replay
-  checks. Disable the old endpoint afterward so events are not delivered twice indefinitely.
+- Because the endpoint was edited rather than replaced, its signing secret remained unchanged and no
+  secret rotation or environment update was required. If the endpoint is replaced later, treat the
+  new signing secret as distinct and update deployment-managed configuration without recording it here.
+- Checkout remains closed. Verify signed real delivery, terminal payment-event persistence, and
+  duplicate replay during the supervised purchase; those checks cannot be proven by URL configuration
+  alone.
 - Update the Stripe public business URL, branding, receipt/refund email settings, and support contact.
 
 ## 5. Verify Printful And Artwork Retrieval
 
-- Update the Printful store name and website to the branded origin.
+- The Printful store name and website use Open Merch Studio and `https://openmerchstudio.com/`.
 - Verify `ENABLE_LIVE_PRINTFUL=true` for this mockup-only check. That provider-preview flag is
   separate from `ALLOW_LIVE_FULFILLMENT` and `FULFILLMENT_ENABLED`, which must both remain false so
   no Printful order can be created.
 - Generate a synthetic test design while fulfillment remains disabled.
 - Open its `https://openmerchstudio.com/api/design/assets/...png` URL without an authenticated browser
   session and verify the correct PNG content type and artwork.
-- Build mockups for the tee, tote, mug, sticker, and poster; confirm Printful can retrieve the branded
-  asset URL and no preview references the temporary host.
+- A no-order live matrix passed for the tee, tote, mug, sticker, and poster on July 17, 2026. Printful
+  retrieved the branded asset URL for every product without creating a provider order.
 - Do not create or confirm a physical order during this domain-only verification.
 
 ## 6. Prepare Branded Support And Sending
 
-- Create and test `support@openmerchstudio.com`, including inbound delivery and replies.
+- The `openmerchstudio.com` Google Workspace alias domain is verified; Gmail, MX, and SPF are active.
+- Complete DKIM, confirm that `support@openmerchstudio.com` maps to the intended support group or user,
+  and run an external inbound-and-reply test before presenting it as a working support address.
 - Complete legal review of the seller/operator identity and add the approved entity, effective date,
   and jurisdiction-specific terms to customer-facing policy pages before public payment access.
 - If Open Merch Studio later sends transactional email directly, configure a dedicated sender or
   subdomain with SPF, DKIM, and DMARC before enabling it.
 - Keep app-owned customer email sending disabled until the sender is verified and exactly-once email
   tests pass. Stripe-hosted receipts/refund messages remain the MVP payment-email surface.
-- Update the production `VITE_SUPPORT_EMAIL` only after the mailbox works from an external address.
+- Update production `VITE_SUPPORT_EMAIL` and `SUPPORT_EMAIL` only after the mailbox works from an
+  external address. Keep app-owned transactional sending disabled during that promotion.
 
 ## 7. Make The Branded Origin Discoverable
+
+The branded origin remains intentionally `noindex`. Prepare crawl mechanics without opening that gate:
+
+- Retain the HTML robots directive and `X-Robots-Tag` noindex response header.
+- Let `robots.txt` expose the canonical sitemap so crawlers can observe page-level noindex directives.
+- Limit the sitemap to the studio and approved policy/support routes.
+- Use absolute `https://openmerchstudio.com/` canonical and Open Graph URLs.
+- Confirm random unknown routes return a real HTTP 404 and are not included in the sitemap.
 
 Only after apex HTTPS, redirects, legal/support routes, and production content pass review:
 
 - Change the HTML robots directive from `noindex,nofollow,noarchive` to `index,follow`.
 - Remove the temporary `X-Robots-Tag` noindex header from `vercel.json`.
-- Replace the blocking `frontend/public/robots.txt` with an allow policy and a canonical sitemap URL.
-- Add a sitemap covering the studio and public policy/support routes.
-- Add `https://openmerchstudio.com/` as the HTML canonical and Open Graph URL; add an absolute branded
-  social-preview image.
 - Add an approved brand favicon/social asset, then verify it and the web manifest from the apex
   origin. Do not substitute a handcrafted placeholder.
 - Add and verify the domain in Google Search Console, submit the sitemap, and request indexing only
   after the final visual/content audit.
-- Confirm random unknown routes show the in-app not-found page and are not included in the sitemap.
 
 ## 8. Final Verification And Rollback
 

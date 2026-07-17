@@ -1,6 +1,6 @@
 # Launch Ticket Implementation Status
 
-**Status:** Fixture-mode implementation complete; guarded live-provider adapters ready for private testing  
+**Status:** Branded closed-gate production active; supervised commerce smoke pending
 **Visibility:** Public
 
 This file records what has been completed in the repo and what remains blocked by private provider credentials or manual business review.
@@ -19,16 +19,33 @@ This file records what has been completed in the repo and what remains blocked b
 - `OMS-080` through `OMS-082`: Fixture-mode clean setup, API/architecture docs, and GitHub issue taxonomy are documented.
 - `OMS-090` through `OMS-094`: Deployment gates, production migrations, fixture smoke test, credential/privacy scan path, and paid beta go/no-go checklist are implemented as docs, scripts, and runtime readiness checks. Supabase schema and Prisma migration-history checksums were reconciled and verified on 2026-07-14; paid-order behavior still requires the supervised live smoke.
 
+## Current Branded Production State
+
+- `https://openmerchstudio.com` is the canonical production origin; `www` redirects to the apex and
+  the Vercel alias is rollback-only.
+- Live OpenAI generation is active for the design flow; policy, moderation, spend alerts, and pause
+  behavior remain operational review items independent of payment/fulfillment authorization.
+- The branded Stripe webhook is active for completed, expired, and refunded events. Checkout and
+  payment authorization remain closed; signed real delivery and duplicate replay await the supervised
+  smoke.
+- The Printful store website is branded and the tee, tote, mug, sticker, and poster live mockup matrix
+  passed without creating an order. Fulfillment authorization remains closed and auto-confirm remains
+  disabled.
+- The Google Workspace alias domain is verified with Gmail, MX, and SPF active. DKIM, the intended
+  support group/user route, and an external inbound-and-reply test are still pending.
+- Search indexing remains disabled until legal/support content and the final design review are approved.
+
 ## Blocked Until Private Inputs
 
-- Live OpenAI generation: requires private OpenAI credentials, model policy approval, spend alert verification, and `ENABLE_LIVE_OPENAI=true`.
 - Live Stripe checkout: remains closed except for an explicit allowlisted smoke window. Signed completed/expired/refunded webhooks, Tax configuration, and durable reconciliation are implemented; `ALLOW_LIVE_PAYMENTS=true` is still an explicit real-charge decision.
 - Real Printful fulfillment: live draft creation remains closed except for the supervised smoke. Live price/shipping review, status sync, returns/support approval, and manual draft inspection remain before external beta. Auto-confirm stays disabled.
-- Production domain and Vercel environment promotion: requires private domain/team review and deployment settings.
 - App-owned transactional email: deferred until the branded sender domain, delivery provider,
   notification idempotency, and template review are complete. Do not add a frontend or repository
   email credential.
-- Tax, shipping, accounting, refund, and support policy sign-off: requires private operator review before real-money launch.
+- Tax, shipping, accounting, refund, and support policy sign-off: requires private operator review
+  before real-money launch. Customer policies still need approved seller/DBA identity, public mailing
+  address, dates, purchaser eligibility, jurisdiction/dispute terms, return/claim/refund rules,
+  artwork rights, and data-retention language.
 
 ## Verification
 
