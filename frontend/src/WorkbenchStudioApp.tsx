@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogPanel } from '@components/CatalogPanel';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
+import { OpenSourceAttribution } from '@components/OpenSourceAttribution';
 import { QuoteLedger } from '@components/QuoteLedger';
 import { ReadinessChecks } from '@components/ReadinessChecks';
 import { StatusNote } from '@components/StatusNote';
@@ -87,6 +88,7 @@ function Footer({ onStartFresh }: { onStartFresh: () => void }) {
           <button className="text-action" type="button" onClick={onStartFresh}>
             Start fresh
           </button>
+          <OpenSourceAttribution />
         </div>
       </details>
     </footer>

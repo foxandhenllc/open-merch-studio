@@ -46,7 +46,8 @@ for (const route of STATIC_ROUTES) {
   );
   assert.equal(occurrences(html, /rel="canonical"/g), 1, `${route.path} canonical count`);
   assert.equal(occurrences(html, /property="og:url"/g), 1, `${route.path} og:url count`);
-  assert.match(html, /<meta\s+name="robots"\s+content="[^"]*noindex[^"]*"\s*\/>/i);
+  assert.match(html, /<meta\s+name="robots"\s+content="index,follow"\s*\/>/i);
+  assert.doesNotMatch(html, /<meta\s+name="robots"\s+content="[^"]*noindex[^"]*"\s*\/>/i);
 }
 
 const notFoundHtml = await readFile(path.join(distDirectory, NOT_FOUND_ROUTE.output), 'utf8');
@@ -70,16 +71,25 @@ assert.deepEqual(
 const vercelConfig = JSON.parse(await readFile(path.join(repositoryDirectory, 'vercel.json'), 'utf8'));
 const rewrites = vercelConfig.rewrites ?? [];
 const globalHeaders = (vercelConfig.headers ?? []).find((rule) => rule.source === '/(.*)')?.headers;
+const apiHeaders = (vercelConfig.headers ?? []).find(
+  (rule) => rule.source === '/api/(.*)'
+)?.headers;
 assert.equal(
   vercelConfig.trailingSlash,
   false,
   'trailing-slash variants must redirect to the canonical extensionless route'
 );
 assert.ok(
-  globalHeaders?.some(
-    (header) => header.key.toLowerCase() === 'x-robots-tag' && header.value.includes('noindex')
+  !globalHeaders?.some((header) => header.key.toLowerCase() === 'x-robots-tag'),
+  'public open-source launch must not send a global X-Robots-Tag gate'
+);
+assert.ok(
+  apiHeaders?.some(
+    (header) =>
+      header.key.toLowerCase() === 'x-robots-tag' &&
+      header.value === 'noindex, nofollow, noarchive, noimageindex'
   ),
-  'global X-Robots-Tag noindex must remain in place before launch review'
+  'API responses and provider-accessible artwork must stay out of search and image indexes'
 );
 assert.ok(
   rewrites.some(
@@ -102,5 +112,5 @@ assert.ok(
 );
 
 console.log(
-  `Verified ${STATIC_ROUTES.length} canonical routes, sitemap, crawlable noindex controls, and custom 404 output.`
+  `Verified ${STATIC_ROUTES.length} indexable canonical routes, sitemap, and custom noindex 404 output.`
 );

@@ -7,6 +7,7 @@ import {
   dataUrlToBuffer,
   generateDesignImage,
   canUseLiveOpenAi,
+  supportsTransparentBackground,
 } from './openai-design-provider.js';
 import { getProductsByIds } from './catalog.service.js';
 import { describePrintfulError, generatePrintfulMockupPreview } from './printful.service.js';
@@ -19,6 +20,7 @@ import {
   findReusableMockup,
   getOrCreateDurableSession,
   recordDesignSpend,
+  reserveLiveDesignSpend,
   runtimeId,
   runtimeNow,
   saveDraft,
@@ -33,6 +35,7 @@ type DesignContext = {
   placementCodes?: string[];
   qualityTier?: 'rough' | 'final';
   skipAllowanceSpend?: boolean;
+  liveSpendReserved?: boolean;
 };
 
 type DesignArtwork = {
@@ -44,8 +47,20 @@ type DesignArtwork = {
 
 const blockedTerms = ['nike', 'disney', 'marvel', 'pokemon', 'supreme'];
 
+const estimatedBackgroundRemovalCostCents = () =>
+  canUseLiveOpenAi() &&
+  Boolean(env.removeBgApiKey) &&
+  !supportsTransparentBackground(env.openaiDesignModel)
+    ? Math.max(0, env.removeBgEstimatedCostCents)
+    : 0;
+
 const estimatedGenerationCostCents = (qualityTier: 'rough' | 'final') =>
-  canUseLiveOpenAi() ? (qualityTier === 'final' ? 36 : 6) : 1;
+  canUseLiveOpenAi()
+    ? (qualityTier === 'final' ? 36 : 6) + estimatedBackgroundRemovalCostCents()
+    : 1;
+
+const estimatedRevisionCostCents = () =>
+  canUseLiveOpenAi() ? 12 + estimatedBackgroundRemovalCostCents() : 1;
 
 function evaluatePolicy(prompt: string): DesignDraft['policy'] {
   const lowered = prompt.toLowerCase();
@@ -253,15 +268,32 @@ export async function createDesignDraft(
   const session = await getOrCreateDurableSession(context.sessionId);
   const normalizedPrompt = prompt.trim() || 'A clean, print-ready merch graphic';
   const qualityTier = context.qualityTier ?? 'rough';
-  const authorization = context.skipAllowanceSpend
-    ? { allowed: true, allowance: getAllowanceState(session.id) }
-    : await authorizeDesignAction(
-        session.id,
-        qualityTier === 'final' ? 'final' : 'rough_draft',
-        estimatedGenerationCostCents(qualityTier)
-      );
-  const provider = canUseLiveOpenAi() ? 'openai-ready' : 'mock';
+  const liveOpenAi = canUseLiveOpenAi();
+  const provider = liveOpenAi ? 'openai-ready' : 'mock';
   const policy = evaluatePolicy(normalizedPrompt);
+  if (liveOpenAi && context.skipAllowanceSpend && !context.liveSpendReserved) {
+    throw new HttpError(
+      'Live design generation requires a durable spend reservation.',
+      503,
+      'live_ai_spend_reservation_required'
+    );
+  }
+  const action = qualityTier === 'final' ? 'final' : 'rough_draft';
+  const authorization =
+    context.skipAllowanceSpend || policy.status === 'blocked'
+      ? { allowed: true, allowance: getAllowanceState(session.id) }
+      : liveOpenAi
+        ? await reserveLiveDesignSpend({
+            sessionId: session.id,
+            action,
+            provider: 'openai',
+            estimatedCostCents: estimatedGenerationCostCents(qualityTier),
+          })
+        : await authorizeDesignAction(
+            session.id,
+            action,
+            estimatedGenerationCostCents(qualityTier)
+          );
   if (!authorization.allowed || policy.status === 'blocked') {
     const blockedImage = createMockDesignImage('Generation unavailable');
     const draft: DesignDraft = {
@@ -340,7 +372,14 @@ export async function createDesignDraft(
           createdAt: runtimeNow(),
         });
       } catch {
-        // Fall through to the runtime-only failed draft.
+        if (liveOpenAi) {
+          throw new HttpError(
+            'Live artwork generation failed and its failure record could not be stored safely.',
+            503,
+            'live_design_persistence_failed'
+          );
+        }
+        // Fixture failures may fall through to the runtime-only failed draft.
       }
     }
     return {
@@ -394,6 +433,13 @@ export async function createDesignDraft(
   const preparedImageUrl = printPreparation.transparentUrl ?? printPreparation.imageUrl;
 
   if (!env.databaseUrl) {
+    if (liveOpenAi) {
+      throw new HttpError(
+        'Live artwork cannot be returned without durable PostgreSQL storage.',
+        503,
+        'live_design_durable_storage_required'
+      );
+    }
     const draft = saveDraft({
       id: runtimeId('draft'),
       sessionId: session.id,
@@ -433,7 +479,7 @@ export async function createDesignDraft(
         readinessReport: readiness,
       },
     });
-    if (!context.skipAllowanceSpend) {
+    if (!context.skipAllowanceSpend && !liveOpenAi) {
       await recordDesignSpend({
         sessionId: session.id,
         designAssetId: asset.id,
@@ -456,6 +502,13 @@ export async function createDesignDraft(
       createdAt: runtimeNow(),
     });
   } catch {
+    if (liveOpenAi) {
+      throw new HttpError(
+        'Generated artwork could not be stored safely. The reserved provider spend remains counted.',
+        503,
+        'live_design_persistence_failed'
+      );
+    }
     if (!context.skipAllowanceSpend) {
       await recordDesignSpend({
         sessionId: session.id,
@@ -487,11 +540,16 @@ export async function reviseDesignDraft(params: {
 }): Promise<DesignDraft> {
   const base = getDraft(params.draftId);
   const session = await getOrCreateDurableSession(params.sessionId ?? base?.sessionId);
-  const authorization = await authorizeDesignAction(
-    session.id,
-    'edit',
-    canUseLiveOpenAi() ? 12 : 1
-  );
+  const liveOpenAi = canUseLiveOpenAi();
+  const authorization = liveOpenAi
+    ? await reserveLiveDesignSpend({
+        sessionId: session.id,
+        designAssetId: base?.id ?? undefined,
+        action: 'edit',
+        provider: 'openai',
+        estimatedCostCents: estimatedRevisionCostCents(),
+      })
+    : await authorizeDesignAction(session.id, 'edit', estimatedRevisionCostCents());
   if (!authorization.allowed) {
     throw new HttpError(
       authorization.message ?? 'No more generated variations are available in this beta session.',
@@ -499,18 +557,21 @@ export async function reviseDesignDraft(params: {
       'revision_allowance_required'
     );
   }
-  await recordDesignSpend({
-    sessionId: session.id,
-    action: 'edit',
-    provider: canUseLiveOpenAi() ? 'openai-ready' : 'mock',
-    estimatedCostCents: canUseLiveOpenAi() ? 12 : 1,
-  });
+  if (!liveOpenAi) {
+    await recordDesignSpend({
+      sessionId: session.id,
+      action: 'edit',
+      provider: 'mock',
+      estimatedCostCents: estimatedRevisionCostCents(),
+    });
+  }
   return createDesignDraft(
     `${base?.prompt ?? 'Selected design'}; revision: ${params.instructions}`,
     {
       sessionId: session.id,
       qualityTier: 'rough',
       skipAllowanceSpend: true,
+      liveSpendReserved: liveOpenAi,
     }
   );
 }

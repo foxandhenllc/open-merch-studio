@@ -48,7 +48,8 @@
   no horizontal overflow, and no duplicated idle progress UI.
 - A durable existing design asset is retrievable unauthenticated from the branded `/api/design/assets`
   route as a valid RGBA PNG.
-- Search indexing remains blocked by the HTML robots directive and response header.
+- Search mechanics passed during cutover. The owner subsequently approved public open-source
+  indexing on July 17, 2026 while commerce remained closed.
 - Printful retrieved branded artwork for all five launch products without creating an order.
 - The Stripe endpoint configuration is active at the branded URL. One signed real delivery plus two
   duplicate replays returned HTTP 200 during the supervised purchase, while exactly one Printful draft
@@ -65,10 +66,11 @@
   approval of the deployed FoxAndHen LLC operator wording, email-only public contact, policy dates,
   purchaser eligibility, returns/claims/refunds, artwork rights, and data-retention language. The
   owner directed that the proposed Pennsylvania governing-law paragraph be omitted.
-- Search indexing remains intentionally disabled; approved favicon/social image and Search Console
-  are still pending, and crawl metadata/404 behavior must pass final verification before indexing.
+- Search indexing is approved for the public open-source studio; approved favicon/social image and
+  Search Console remain follow-up improvements. The custom 404 remains non-indexable.
 - Private operator sign-off for public paid beta.
 
 The allowlisted real-money smoke is recorded separately in
 [the supervised live-commerce audit](./2026-07-17-supervised-live-commerce-smoke.md). It did not
-authorize public checkout, fulfillment, or indexing.
+authorize public checkout or fulfillment. Indexing was authorized later as a separate open-source
+launch decision.

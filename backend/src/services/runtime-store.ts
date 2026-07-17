@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
+import { HttpError } from '../middleware.js';
 import type {
   AdminReport,
   AdminSettings,
@@ -22,6 +23,13 @@ type LedgerEvent = {
   provider: 'mock' | 'openai-ready' | 'openai' | 'fixture' | 'printful-ready' | 'printful';
   estimatedCostCents: number;
   createdAt: string;
+};
+
+type LiveDesignSpendReservation = {
+  allowed: boolean;
+  allowance: AllowanceState;
+  message?: string;
+  event?: LedgerEvent;
 };
 
 type RuntimeState = {
@@ -371,6 +379,263 @@ export async function authorizeDesignAction(
   }
 
   return { allowed: true, allowance };
+}
+
+const liveAiSpendLockName = 'open-merch-studio:live-ai-spend:v1';
+
+function syncDurableAllowanceState(params: {
+  session: {
+    id: string;
+    status: string;
+    freeDraftsUsed: number;
+    freeDraftLimit: number;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  pass?: {
+    id: string;
+    sessionId: string;
+    status: string;
+    priceCents: number;
+    creditCents: number;
+    includedRoughDrafts: number;
+    includedEdits: number;
+    includedFinals: number;
+    roughDraftsUsed: number;
+    editsUsed: number;
+    finalsUsed: number;
+    appliedOrderId: string | null;
+    createdAt: Date;
+    expiresAt: Date | null;
+  } | null;
+}): void {
+  state.sessions.set(params.session.id, {
+    id: params.session.id,
+    status: params.session.status as StudioSession['status'],
+    freeDraftsUsed: params.session.freeDraftsUsed,
+    freeDraftLimit: params.session.freeDraftLimit,
+    createdAt: params.session.createdAt.toISOString(),
+    updatedAt: params.session.updatedAt.toISOString(),
+  });
+
+  for (const [passId, pass] of state.passes.entries()) {
+    if (pass.sessionId === params.session.id && passId !== params.pass?.id) {
+      state.passes.delete(passId);
+    }
+  }
+  if (params.pass) {
+    state.passes.set(params.pass.id, {
+      id: params.pass.id,
+      sessionId: params.pass.sessionId,
+      status: params.pass.status as StudioPass['status'],
+      priceCents: params.pass.priceCents,
+      creditCents: params.pass.creditCents,
+      includedRoughDrafts: params.pass.includedRoughDrafts,
+      includedEdits: params.pass.includedEdits,
+      includedFinals: params.pass.includedFinals,
+      roughDraftsUsed: params.pass.roughDraftsUsed,
+      editsUsed: params.pass.editsUsed,
+      finalsUsed: params.pass.finalsUsed,
+      appliedOrderId: params.pass.appliedOrderId ?? undefined,
+      createdAt: params.pass.createdAt.toISOString(),
+      expiresAt: params.pass.expiresAt?.toISOString(),
+    });
+  }
+}
+
+/**
+ * Atomically reserves live provider spend before any provider call. One
+ * transaction-level PostgreSQL advisory lock serializes the daily and session
+ * total checks with the insert, preventing concurrent requests from both
+ * observing the same remaining budget. Reservations are intentionally retained
+ * when a provider later fails.
+ */
+export async function reserveLiveDesignSpend(
+  params: {
+    sessionId: string;
+    designAssetId?: string;
+    action: LedgerEvent['action'];
+    provider: 'openai';
+    estimatedCostCents: number;
+  },
+  db: typeof prisma = prisma
+): Promise<LiveDesignSpendReservation> {
+  if (!env.databaseUrl) {
+    throw new HttpError(
+      'Live design generation requires durable PostgreSQL spend controls.',
+      503,
+      'live_ai_durable_storage_required'
+    );
+  }
+
+  const estimatedCostCents = Math.max(0, Math.ceil(params.estimatedCostCents));
+  const eventId = createId('ledger');
+  const createdAt = new Date();
+  try {
+    const reserved = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${liveAiSpendLockName}, 0))`;
+
+      let durableSession = await tx.studioSession.upsert({
+        where: { id: params.sessionId },
+        update: {},
+        create: {
+          id: params.sessionId,
+          status: 'guest',
+          freeDraftsUsed: 0,
+          freeDraftLimit: state.settings.freeDraftLimit,
+        },
+      });
+      if (durableSession.freeDraftLimit < state.settings.freeDraftLimit) {
+        durableSession = await tx.studioSession.update({
+          where: { id: durableSession.id },
+          data: { freeDraftLimit: state.settings.freeDraftLimit },
+        });
+      }
+
+      let durablePass = await tx.studioPass.findFirst({
+        where: { sessionId: durableSession.id, status: { not: 'expired' } },
+        orderBy: { createdAt: 'desc' },
+      });
+      const today = startOfToday();
+      const sessionTotal = await tx.aiSpendEvent.aggregate({
+        where: { sessionId: durableSession.id, createdAt: { gte: today } },
+        _sum: { estimatedCostCents: true },
+      });
+      const dailyTotal = await tx.aiSpendEvent.aggregate({
+        where: { createdAt: { gte: today } },
+        _sum: { estimatedCostCents: true },
+      });
+      const sessionSpend = sessionTotal._sum.estimatedCostCents ?? 0;
+      const dailySpend = dailyTotal._sum.estimatedCostCents ?? 0;
+
+      if (dailySpend + estimatedCostCents > state.settings.dailyAiBudgetCents) {
+        return {
+          allowed: false as const,
+          message: 'Daily design budget is paused. Try again later or contact support.',
+          session: durableSession,
+          pass: durablePass,
+        };
+      }
+      if (sessionSpend + estimatedCostCents > state.settings.perSessionBudgetCents) {
+        return {
+          allowed: false as const,
+          message:
+            'This design session reached its generation budget. Checkout or contact support.',
+          session: durableSession,
+          pass: durablePass,
+        };
+      }
+
+      const freeDraftsRemaining = Math.max(
+        0,
+        durableSession.freeDraftLimit - durableSession.freeDraftsUsed
+      );
+      const roughDraftsRemaining = durablePass
+        ? Math.max(0, durablePass.includedRoughDrafts - durablePass.roughDraftsUsed)
+        : 0;
+      const editsRemaining = durablePass
+        ? Math.max(0, durablePass.includedEdits - durablePass.editsUsed)
+        : 0;
+      const finalsRemaining = durablePass
+        ? Math.max(0, durablePass.includedFinals - durablePass.finalsUsed)
+        : 0;
+      if (
+        (params.action === 'rough_draft' &&
+          freeDraftsRemaining <= 0 &&
+          roughDraftsRemaining <= 0) ||
+        (params.action === 'edit' && editsRemaining <= 0) ||
+        (params.action === 'final' && finalsRemaining <= 0)
+      ) {
+        return {
+          allowed: false as const,
+          message:
+            params.action === 'edit'
+              ? 'No generated edits remain for this design session.'
+              : params.action === 'final'
+                ? 'No final generations remain for this design session.'
+                : 'No more generated drafts remain for this design session.',
+          session: durableSession,
+          pass: durablePass,
+        };
+      }
+
+      await tx.aiSpendEvent.create({
+        data: {
+          id: eventId,
+          sessionId: durableSession.id,
+          designAssetId: params.designAssetId,
+          action: params.action,
+          provider: params.provider,
+          estimatedCostCents,
+          createdAt,
+        },
+      });
+
+      if (params.action === 'rough_draft') {
+        if (freeDraftsRemaining > 0) {
+          durableSession = await tx.studioSession.update({
+            where: { id: durableSession.id },
+            data: { freeDraftsUsed: { increment: 1 } },
+          });
+        } else if (durablePass) {
+          durablePass = await tx.studioPass.update({
+            where: { id: durablePass.id },
+            data: { roughDraftsUsed: { increment: 1 } },
+          });
+        }
+      } else if (params.action === 'edit' && durablePass) {
+        durablePass = await tx.studioPass.update({
+          where: { id: durablePass.id },
+          data: { editsUsed: { increment: 1 } },
+        });
+      } else if (params.action === 'final' && durablePass) {
+        durablePass = await tx.studioPass.update({
+          where: { id: durablePass.id },
+          data: { finalsUsed: { increment: 1 } },
+        });
+      }
+
+      return {
+        allowed: true as const,
+        session: durableSession,
+        pass: durablePass,
+      };
+    });
+
+    syncDurableAllowanceState({ session: reserved.session, pass: reserved.pass });
+    if (!reserved.allowed) {
+      return {
+        allowed: false,
+        allowance: getAllowanceState(reserved.session.id),
+        message: reserved.message,
+      };
+    }
+
+    const event: LedgerEvent = {
+      id: eventId,
+      sessionId: reserved.session.id,
+      designAssetId: params.designAssetId,
+      action: params.action,
+      provider: params.provider,
+      estimatedCostCents,
+      createdAt: createdAt.toISOString(),
+    };
+    if (!state.ledger.some((candidate) => candidate.id === event.id)) {
+      state.ledger.push(event);
+    }
+    return {
+      allowed: true,
+      allowance: getAllowanceState(reserved.session.id),
+      event,
+    };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(
+      'Live design generation is temporarily unavailable because spend could not be durably reserved.',
+      503,
+      'live_ai_spend_reservation_failed'
+    );
+  }
 }
 
 export async function recordDesignSpend(params: {

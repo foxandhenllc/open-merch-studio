@@ -13,8 +13,8 @@ products. The Google Workspace alias domain is verified and Gmail, MX, and SPF a
 `support@openmerchstudio.com` group routes to direct members Chris Fox and Chris Henrich, and an
 external inbound-and-reply test passed. A branded outbound test from
 `Open Merch Studio Support <support@openmerchstudio.com>` passed SPF, DKIM for
-`openmerchstudio.com`, and DMARC. Search indexing, public checkout, payment authorization, and
-fulfillment authorization remain closed.
+`openmerchstudio.com`, and DMARC. Public open-source indexing was approved on July 17, 2026; public
+checkout, payment authorization, and fulfillment authorization remain closed.
 Both support members use `Each email`; Chris Fox's first external member-delivery probe was marked
 `Not spam`, and Chris Henrich should do the same once if Gmail classifies his first group message as
 Spam. Production application defaults, Vercel support variables, and Stripe's public support email now
@@ -89,8 +89,9 @@ The backend fixture smoke test verifies the safe end-to-end path without live cr
 
 ## Remaining Business And Legal Inputs
 
-Do not open public checkout or remove `noindex` until the deployed policy set receives the separate
-paid-launch approval. The owner decisions use `Open Merch Studio` as the public brand, identify FoxAndHen LLC
+Public open-source browsing and indexing are approved independently of paid commerce. Do not open
+public checkout until the deployed policy set receives the separate paid-launch approval. The owner
+decisions use `Open Merch Studio` as the public brand, identify FoxAndHen LLC
 as the operator, publish `support@openmerchstudio.com` as the email-only contact, omit the proposed
 Pennsylvania governing-law paragraph, and assign applicable tax registration, filing, and remittance
 to FoxAndHen LLC using Stripe Tax reports with self- or accountant-managed filing. TaxJar is not a

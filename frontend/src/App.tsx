@@ -1,4 +1,5 @@
 import type { PolicyRoute } from './App.types';
+import { OpenSourceAttribution } from './components/OpenSourceAttribution';
 import { publicConfig } from './config';
 import { WorkbenchStudioApp } from './WorkbenchStudioApp';
 
@@ -220,7 +221,7 @@ function PolicyPage({ route }: { route: PolicyRoute }) {
           <a href="/content-policy">Content policy</a>
           <a href="/support">Support</a>
         </nav>
-        <span>Open Merch Studio</span>
+        <OpenSourceAttribution />
       </footer>
     </main>
   );
@@ -259,7 +260,7 @@ function NotFoundPage() {
           <a href="/content-policy">Content policy</a>
           <a href="/support">Support</a>
         </nav>
-        <span>Open Merch Studio</span>
+        <OpenSourceAttribution />
       </footer>
     </main>
   );

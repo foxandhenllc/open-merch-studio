@@ -2,6 +2,14 @@
 
 Open Merch Studio is an open-source, AI-first custom merch studio for curated Printful catalog fulfillment. It is product-neutral and designed for more than apparel.
 
+**Live studio:** [openmerchstudio.com](https://openmerchstudio.com)
+
+**Created by:** Fox & Hen
+
+**License:** [MIT](./LICENSE)
+
+The public studio currently supports product exploration and guarded AI-assisted design generation. Public payment and fulfillment remain independently disabled until the separate paid-launch review is complete.
+
 Open Merch Studio is the public project name. The code, docs, and environment templates avoid private customer data, production credentials, payment artifacts, and organization-specific claims.
 
 ## What It Does

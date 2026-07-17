@@ -18,7 +18,7 @@ Use this template before enabling production checkout, live OpenAI generation, o
 - Refund-versus-fulfillment terminal-state guard:
 - Protected admin authorization test:
 - Production dependency audit:
-- Branded origin remains `noindex` until legal/support/final-design approval:
+- Branded origin serves `index,follow` only after explicit open-source launch approval:
 - Branded-domain cutover checklist:
 
 ## Credential And Privacy Scan
@@ -58,7 +58,7 @@ Expected result: no live credentials, private provider values, private customer 
 - Stripe Tax report review and self/accountant filing calendar documented; no TaxJar dependency:
 - Complete policy proposal approved and deployed with effective/last-updated dates:
 - Checkout policy links and assent reviewed:
-- Search indexing remains disabled until the approved text is deployed:
+- Public open-source indexing verified independently of closed checkout and fulfillment:
 
 ## Operations And Recovery
 

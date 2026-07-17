@@ -39,7 +39,8 @@ This file records what has been completed in the repo and what remains blocked b
 - The one supervised payment reconciled to OMS order `OMS-2026-655AFL` for $16.94 total, including
   $0.96 Pennsylvania tax. Production health now reports checkout and fulfillment as `available`, not
   `live`, after the smoke gates were closed.
-- Search indexing remains disabled until legal/support content and the final design review are approved.
+- Public open-source indexing was approved on July 17, 2026 after legal/support content and the
+  supervised commerce path were verified; checkout and fulfillment remain closed.
 
 ## Blocked Until Private Inputs
 
@@ -57,9 +58,10 @@ This file records what has been completed in the repo and what remains blocked b
   `support@openmerchstudio.com` as the email-only public contact, omit the proposed Pennsylvania
   governing-law paragraph, and assign applicable tax registration, filing, and remittance to
   FoxAndHen LLC using Stripe Tax reports with self- or accountant-managed filing. TaxJar is not a
-  dependency. The coordinated policy set and versioned Checkout assent are implemented for the
-  closed-checkout, `noindex` preview, and the nullable policy-audit migration was applied and checksum
-  verified on July 17, 2026. Public launch remains blocked until the `Open Merch Studio` Pennsylvania
+  dependency. The coordinated policy set and versioned Checkout assent are implemented, and the
+  nullable policy-audit migration was applied and checksum verified on July 17, 2026. Public
+  open-source indexing was approved separately while checkout and fulfillment remain closed. Paid
+  launch remains blocked until the `Open Merch Studio` Pennsylvania
   fictitious-name registration is independently confirmed and the deployed policy set receives final
   paid-launch approval.
 

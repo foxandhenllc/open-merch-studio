@@ -4,9 +4,9 @@
 **Prepared:** July 17, 2026  
 **Scope:** United States paid-MVP physical merchandise  
 **Current effect:** Coordinated customer-facing copy and versioned Checkout assent are implemented
-behind closed Checkout and `noindex`. This record does not authorize payment, fulfillment, or search
-indexing. The policy URLs remain publicly reachable; `noindex` is a crawler directive, not an access
-control.
+behind closed Checkout. This record does not authorize payment or fulfillment. Public open-source
+indexing was approved separately on July 17, 2026 after the branded pages and supervised commerce
+smoke were verified; indexing is not payment or fulfillment authorization.
 
 This is conservative operating copy, not legal advice. The owner decisions below were recorded on
 July 17, 2026 and implemented as one coordinated set for closed-checkout review. Do not open public
@@ -325,8 +325,8 @@ an order or Stripe Session can be created.
 
 ## Publication Implementation Notes
 
-- Deploy this set only with Checkout closed and `noindex` retained until the fictitious-name
-  registration is confirmed and the owner gives the separate public paid-launch approval.
+- Keep Checkout closed until the fictitious-name registration is confirmed and the owner gives the
+  separate public paid-launch approval. Public open-source indexing is governed independently.
 - Replace the existing policy copy as one coordinated change; do not mix approved and baseline
   versions.
 - Use `July 17, 2026` as both effective and last-updated date for this owner-reviewed closed-checkout
@@ -337,8 +337,9 @@ an order or Stripe Session can be created.
   `support@openmerchstudio.com`.
 - Keep payment-card collection on Stripe-hosted Checkout.
 - Keep the Printful order as an unconfirmed draft until the manual review is complete.
-- Do not remove `noindex` as part of the legal-copy implementation. Search indexing is a separate,
-  explicit launch decision after the published pages and paid-order smoke are verified.
+- Search indexing is a separate, explicit launch decision from legal-copy publication and paid
+  commerce. The owner made that open-source indexing decision after the published pages and paid-order
+  smoke were verified; checkout and fulfillment remain closed.
 - Record the operational filing calendar, registration details, assigned preparer, and remittance
   evidence in private operations material, not in customer-facing policy copy. The approved operating
   model is FoxAndHen LLC ownership with Stripe Tax reports and self- or accountant-managed filing and

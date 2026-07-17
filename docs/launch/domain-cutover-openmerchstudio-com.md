@@ -1,6 +1,6 @@
 # openmerchstudio.com Domain Cutover Checklist
 
-**Status:** Branded origin, provider URLs, authenticated support sending, and supervised commerce smoke verified; indexing remains gated
+**Status:** Branded origin, provider URLs, authenticated support sending, and supervised commerce smoke verified; public open-source indexing approved for release
 **Visibility:** Public-safe  
 **Intended canonical origin:** `https://openmerchstudio.com`
 
@@ -125,22 +125,21 @@ deployed and verified; redeploy and repeat the checks after any future environme
 
 ## 7. Make The Branded Origin Discoverable
 
-The branded origin remains intentionally `noindex`. Prepare crawl mechanics without opening that gate:
+On July 17, 2026, the owner approved public indexing for the open-source studio while checkout and
+fulfillment remain independently closed:
 
-- Retain the HTML robots directive and `X-Robots-Tag` noindex response header.
-- Let `robots.txt` expose the canonical sitemap so crawlers can observe page-level noindex directives.
+- Use the HTML robots directive `index,follow` on canonical public routes.
+- Do not send the temporary global `X-Robots-Tag` noindex response header.
+- Let `robots.txt` expose the canonical sitemap.
 - Limit the sitemap to the studio and approved policy/support routes.
 - Use absolute `https://openmerchstudio.com/` canonical and Open Graph URLs.
-- Confirm random unknown routes return a real HTTP 404 and are not included in the sitemap.
-
-Only after apex HTTPS, redirects, legal/support routes, and production content pass review:
-
-- Change the HTML robots directive from `noindex,nofollow,noarchive` to `index,follow`.
-- Remove the temporary `X-Robots-Tag` noindex header from `vercel.json`.
+- Confirm random unknown routes return a real HTTP 404, retain a page-level `noindex`, and are not
+  included in the sitemap.
 - Add an approved brand favicon/social asset, then verify it and the web manifest from the apex
   origin. Do not substitute a handcrafted placeholder.
 - Add and verify the domain in Google Search Console, submit the sitemap, and request indexing only
-  after the final visual/content audit.
+  after the final visual/content audit. Search Console is not required for crawlers to discover the
+  public sitemap.
 
 ## 8. Final Verification And Rollback
 
@@ -154,5 +153,5 @@ Only after apex HTTPS, redirects, legal/support routes, and production content p
 
 Passing this checklist establishes the branded origin. The one-time allowlisted real-money smoke
 passed on July 17, 2026 and production returned to closed checkout and fulfillment gates. Public paid
-beta still requires approved legal content and a separate explicit indexing and launch decision under
-the paid-beta runbook.
+beta still requires its separate legal and operator go/no-go under the paid-beta runbook; public
+open-source indexing does not authorize payment or fulfillment.

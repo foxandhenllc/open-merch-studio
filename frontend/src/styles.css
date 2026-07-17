@@ -1605,6 +1605,18 @@ input:focus {
 .site-footer a:hover {
   color: var(--ink);
 }
+.open-source-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
+  margin: 0;
+  text-align: right;
+}
+.open-source-attribution a {
+  font-weight: 650;
+}
 .sheet-backdrop,
 .mobile-action {
   display: none;
@@ -2024,6 +2036,10 @@ input:focus {
   .site-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .site-footer .open-source-attribution {
+    justify-content: flex-start;
+    text-align: left;
   }
   .mobile-action {
     position: fixed;
@@ -2979,6 +2995,10 @@ input:focus {
 }
 .workspace-menu__content .text-action {
   justify-self: start;
+}
+.workspace-menu__content .open-source-attribution {
+  justify-content: flex-start;
+  text-align: left;
 }
 .task-panel .compact-footer .text-action {
   color: var(--ink-soft);

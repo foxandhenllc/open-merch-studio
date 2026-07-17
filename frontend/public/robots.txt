@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-# The HTML and response headers retain noindex until the final paid-beta launch review.
+# Public open-source routes are indexable; checkout and fulfillment use separate server-side gates.
 Sitemap: https://openmerchstudio.com/sitemap.xml

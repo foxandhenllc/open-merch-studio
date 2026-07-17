@@ -42,6 +42,11 @@ const renderDocument = ({ title, description, canonicalUrl }) => {
     /<meta\s+[^>]*property=["']og:description["'][^>]*>/i,
     `<meta property="og:description" content="${safeDescription}" />`
   );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*name=["']robots["'][^>]*>/i,
+    `<meta name="robots" content="${canonicalUrl ? 'index,follow' : 'noindex,follow'}" />`
+  );
 
   if (canonicalUrl) {
     html = replaceOrInsertHeadTag(

@@ -100,6 +100,7 @@ export const env = {
   freeDraftLimit: numberFromEnv('FREE_DRAFT_LIMIT', 3),
   dailyAiBudgetCents: numberFromEnv('DAILY_AI_BUDGET_CENTS', 2500),
   perSessionBudgetCents: numberFromEnv('PER_SESSION_AI_BUDGET_CENTS', 800),
+  removeBgEstimatedCostCents: numberFromEnv('REMOVE_BG_ESTIMATED_COST_CENTS', 200),
   enableLiveOpenAi: booleanFromEnv('ENABLE_LIVE_OPENAI', false),
   enableLiveStripe: booleanFromEnv('ENABLE_LIVE_STRIPE', false),
   enableLivePrintful: booleanFromEnv('ENABLE_LIVE_PRINTFUL', false),

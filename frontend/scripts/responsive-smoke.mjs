@@ -527,6 +527,16 @@ async function exercisePolicyPages(browser) {
           /governing law|arbitration|class[- ]action|exclusive venue|taxjar|d\/b\/a/i,
           `${route} should omit unapproved legal and tax-service language`
         );
+        assert.equal(
+          await page.getByRole('link', { name: 'Source on GitHub' }).count(),
+          1,
+          `${route} should expose the public source repository once`
+        );
+        assert.equal(
+          await page.getByRole('link', { name: 'MIT license' }).count(),
+          1,
+          `${route} should identify the open-source license once`
+        );
       }
       await page.goto(`${origin}/support`, { waitUntil: 'networkidle' });
       assert.equal(

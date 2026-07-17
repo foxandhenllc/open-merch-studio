@@ -25,8 +25,9 @@ External testing confirmed the branded support From identity passes SPF, DKIM, a
 policy decisions identify FoxAndHen LLC as the operator of `Open Merch Studio`, use email-only public
 contact, omit the proposed Pennsylvania governing-law paragraph, and assign tax filing/remittance to
 FoxAndHen LLC using Stripe Tax reports without a TaxJar dependency. Pennsylvania fictitious-name
-registration confirmation, final paid-launch review of the deployed policy set, private operator
-sign-off, and an explicit decision to remove the intentional `noindex` gate remain incomplete.
+registration confirmation, final paid-launch review of the deployed policy set, and private operator
+sign-off remain incomplete. The owner separately approved public open-source indexing on July 17,
+2026; that decision does not authorize payment or fulfillment.
 
 ## Requirements
 
@@ -60,7 +61,8 @@ sign-off, and an explicit decision to remove the intentional `noindex` gate rema
   group; verify DKIM reaches an active/pass state and approve the outbound From identity separately.
 - Confirmed Pennsylvania fictitious-name registration, approved operator identity, email-only contact,
   policy dates, purchaser eligibility, returns/refunds, artwork-rights, and retention language are
-  deployed before indexing or public checkout.
+  deployed before public checkout. Public open-source indexing remains a separate, non-commerce
+  decision.
 
 ## Supervised Smoke Evidence — July 17, 2026
 

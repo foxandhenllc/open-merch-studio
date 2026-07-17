@@ -49,8 +49,8 @@ opening public checkout or confirming a physical Printful order.
 - Operationalize the approved FoxAndHen LLC tax ownership path with Stripe Tax reports and a private
   self/accountant-managed filing and remittance calendar; TaxJar is not required.
 - Complete the final content/visual review and private operator go/no-go.
-- Make a separate explicit decision to remove the HTML and response-header `noindex` controls. This
-  audit does not authorize that change.
+- Public open-source indexing was authorized separately later on July 17, 2026. That indexing decision
+  did not authorize public checkout or fulfillment.
 
 No customer email, shipping address, card details, payment identifier, provider account identifier,
 or secret is included in this audit.
