@@ -1,6 +1,6 @@
 # OMS-090: Vercel Domain And Environment Readiness
 
-**Status:** Prepared; blocked on domain ownership and cutover
+**Status:** In progress; domain owned and attached, DNS and environment cutover pending
 **Visibility:** Public  
 **Epic:** EPIC-09: Deployment And Paid Beta Launch  
 **Critical path:** Yes
@@ -15,7 +15,9 @@ Customers reach a stable branded shop instead of a temporary deployment URL.
 
 ## Current State
 
-The app is technically live on Vercel, but domain and production configuration are still transitional.
+The app is live on Vercel. The branded apex and `www` hostnames are attached to the production
+project with a permanent `www` to apex redirect, while registrar DNS, canonical environment values,
+and branded-origin verification remain transitional.
 
 ## Requirements
 

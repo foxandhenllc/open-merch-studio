@@ -32,6 +32,8 @@ export const checkoutAllowedEmailsFromEnv = (value?: string): string[] =>
 export const emailProviderFromEnv = (value?: string): EmailProvider =>
   value?.trim().toLowerCase() === 'resend' ? 'resend' : 'fixture';
 
+const normalizedOrigin = (value: string): string => value.trim().replace(/\/+$/, '');
+
 export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => ({
   enabled: booleanFromValue(source.TRANSACTIONAL_EMAILS_ENABLED, false),
   provider: emailProviderFromEnv(source.EMAIL_PROVIDER),
@@ -43,17 +45,20 @@ export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => 
 });
 
 export const backendUrlFromEnv = (source: NodeJS.ProcessEnv): string => {
-  if (source.BACKEND_URL) return source.BACKEND_URL;
+  if (source.BACKEND_URL) return normalizedOrigin(source.BACKEND_URL);
   const vercelHost = source.VERCEL_PROJECT_PRODUCTION_URL || source.VERCEL_URL;
   return vercelHost ? `https://${vercelHost}` : 'http://localhost:5000';
 };
+
+export const frontendUrlFromEnv = (source: NodeJS.ProcessEnv): string =>
+  normalizedOrigin(source.FRONTEND_URL || 'http://localhost:5173');
 
 const transactionalEmail = transactionalEmailSettingsFromEnv(process.env);
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: numberFromEnv('PORT', 5000),
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  frontendUrl: frontendUrlFromEnv(process.env),
   backendUrl: backendUrlFromEnv(process.env),
   databaseUrl: process.env.DATABASE_URL,
   printfulApiKey: process.env.PRINTFUL_API_KEY,

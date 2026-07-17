@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   backendUrlFromEnv,
   emailProviderFromEnv,
+  frontendUrlFromEnv,
   transactionalEmailSettingsFromEnv,
 } from '../config/env.js';
 
@@ -18,6 +19,18 @@ test('production asset URLs use the canonical Vercel host when BACKEND_URL is om
     }),
     'https://merch.example.com'
   );
+  assert.equal(
+    backendUrlFromEnv({ BACKEND_URL: ' https://openmerchstudio.com/// ' }),
+    'https://openmerchstudio.com'
+  );
+});
+
+test('browser origins remove trailing slashes before CORS and Stripe return URLs', () => {
+  assert.equal(
+    frontendUrlFromEnv({ FRONTEND_URL: ' https://openmerchstudio.com/ ' }),
+    'https://openmerchstudio.com'
+  );
+  assert.equal(frontendUrlFromEnv({}), 'http://localhost:5173');
 });
 
 test('transactional email configuration is disabled and fixture-only by default', () => {

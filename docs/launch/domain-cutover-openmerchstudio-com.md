@@ -1,6 +1,6 @@
 # openmerchstudio.com Domain Cutover Checklist
 
-**Status:** Prepared; blocked on domain ownership  
+**Status:** In progress; domain owned and attached to the Vercel project, DNS cutover pending
 **Visibility:** Public-safe  
 **Intended canonical origin:** `https://openmerchstudio.com`
 
@@ -24,6 +24,10 @@ Never place DNS credentials, provider keys, database values, or webhook signing 
   `/support`.
 - Keep the existing Vercel URL available for rollback, but stop presenting it as canonical after the
   branded origin passes verification.
+
+As of July 17, 2026, both hostnames are attached to the RatBenetar production project and Vercel is
+configured to redirect `www` to the apex with HTTP 308. The registrar DNS records and resulting HTTPS
+certificate remain the active cutover gate.
 
 ## 3. Promote The URL Contract With Gates Closed
 
