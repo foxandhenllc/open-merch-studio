@@ -25,6 +25,7 @@ import type {
   CheckoutSession,
   AdminOrderDetail,
   AdminOrderListItem,
+  DesignDraft,
   MoneyLine,
   OperatorReviewStatus,
   OrderSummary,
@@ -48,6 +49,7 @@ import {
   checkoutPolicyAcceptanceIssue,
   CURRENT_CHECKOUT_POLICY_VERSION,
 } from '../config/policies.js';
+import { productionPrintReadiness } from '../utils/print-readiness.js';
 
 type CheckoutInput = {
   quoteId?: string | null;
@@ -352,6 +354,7 @@ type CheckoutDesignState = {
   generationStatus: string;
   policyStatus: string;
   readinessStatus: string;
+  readinessReport?: DesignDraft['readiness'];
 };
 
 async function loadDesignForCheckout(
@@ -366,6 +369,7 @@ async function loadDesignForCheckout(
       generationStatus: asset.generationStatus,
       policyStatus: asset.policyStatus,
       readinessStatus: asset.readinessStatus,
+      readinessReport: asset.readinessReport as DesignDraft['readiness'] | undefined,
     };
   }
 
@@ -377,6 +381,7 @@ async function loadDesignForCheckout(
     generationStatus: draft.id ? 'complete' : 'failed',
     policyStatus: draft.policy.status,
     readinessStatus: draft.readiness.status,
+    readinessReport: draft.readiness,
   };
 }
 
@@ -389,7 +394,10 @@ function checkoutDesignIssue(design: CheckoutDesignState | undefined): string | 
   if (design.policyStatus !== 'pass') {
     return 'Selected artwork needs policy review before checkout.';
   }
-  if (design.readinessStatus !== 'pass') {
+  const readiness = design.readinessReport
+    ? productionPrintReadiness(design.readinessReport)
+    : null;
+  if (readiness ? readiness.status !== 'pass' : design.readinessStatus !== 'pass') {
     return 'Selected artwork must pass print-readiness checks before checkout.';
   }
   return null;

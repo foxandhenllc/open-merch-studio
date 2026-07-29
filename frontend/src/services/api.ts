@@ -178,7 +178,7 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         signal
       ),
-      () => createLocalDesignDraft(body.prompt, body.sessionId)
+      () => createLocalDesignDraft(body.prompt, body.sessionId, body.placementCodes)
     ),
   designDraftById: (draftId: string, sessionId?: string) => {
     const search = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';

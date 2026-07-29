@@ -23,6 +23,7 @@ import {
   writeStudioResumeState,
 } from './studio-persistence';
 import { productType, revisionBand, totalBand, trackEvent } from './utils/analytics';
+import { customerPrintReadiness } from './utils/print-readiness';
 
 export type FlowState =
   | 'booting'
@@ -246,13 +247,14 @@ export function useStudioViewModel() {
     [selectedProduct, selectedVariantId]
   );
   const quoteExpired = Boolean(quote && new Date(quote.expiresAt).getTime() <= Date.now());
+  const printReadiness = design ? customerPrintReadiness(design.readiness) : null;
   const artworkReady = Boolean(
-    design?.id && design.policy.status === 'pass' && design.readiness.status === 'pass'
+    design?.id && design.policy.status === 'pass' && printReadiness?.status === 'pass'
   );
   const artworkQuoteEligible = Boolean(
     design?.id &&
     design.policy.status === 'pass' &&
-    (design.readiness.status === 'pass' || design.readiness.status === 'warning')
+    (printReadiness?.status === 'pass' || printReadiness?.status === 'warning')
   );
   const emailValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const checkoutReadiness = useMemo(() => {

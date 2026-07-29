@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { DesignDraft } from '@app-types/catalog';
+import { customerPrintReadiness } from '../utils/print-readiness';
 
 export function ReadinessChecks({ draft }: { draft: DesignDraft }) {
-  const [open, setOpen] = useState(draft.readiness.status !== 'pass');
-  useEffect(() => setOpen(draft.readiness.status !== 'pass'), [draft.id, draft.readiness.status]);
+  const readiness = customerPrintReadiness(draft.readiness);
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [draft.id]);
   return (
     <details
       className="readiness"
@@ -17,13 +19,13 @@ export function ReadinessChecks({ draft }: { draft: DesignDraft }) {
           <h3>Print readiness</h3>
         </div>
         <span
-          className={`status-pill status-pill--${draft.readiness.status === 'blocked' ? 'bad' : draft.readiness.status === 'warning' || draft.readiness.status === 'needs_review' ? 'warn' : 'ok'}`}
+          className={`status-pill status-pill--${readiness.status === 'blocked' ? 'bad' : readiness.status === 'warning' || readiness.status === 'needs_review' ? 'warn' : 'ok'}`}
         >
-          {draft.readiness.status.replace('_', ' ')}
+          {readiness.status.replace('_', ' ')}
         </span>
       </summary>
       <div className="readiness__list">
-        {draft.readiness.checks.map((check) => (
+        {readiness.checks.map((check) => (
           <div key={check.label} className={`readiness__item is-${check.severity ?? 'pass'}`}>
             <span aria-hidden="true">
               {check.severity === 'block' ? '×' : check.severity === 'warning' ? '!' : '✓'}

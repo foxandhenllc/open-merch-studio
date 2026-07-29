@@ -82,7 +82,7 @@ function evaluatePolicy(prompt: string): DesignDraft['policy'] {
   return { status: 'pass', reasons: [] };
 }
 
-function buildReadiness(prompt: string, placementCodes: string[]): DesignDraft['readiness'] {
+function buildReadiness(placementCodes: string[]): DesignDraft['readiness'] {
   const checks: DesignDraft['readiness']['checks'] = [
     {
       label: 'Placement fit',
@@ -90,14 +90,6 @@ function buildReadiness(prompt: string, placementCodes: string[]): DesignDraft['
         ? `Prepared for ${placementCodes.join(', ')}.`
         : 'Select a product placement before production.',
       severity: placementCodes.length ? 'pass' : 'warning',
-    },
-    {
-      label: 'Prompt specificity',
-      result:
-        prompt.length < 24
-          ? 'Add subject, style, and text details before final production.'
-          : 'Prompt has enough detail for a first-pass artwork draft.',
-      severity: prompt.length < 24 ? 'warning' : 'pass',
     },
     {
       label: 'Private data',
@@ -411,7 +403,7 @@ export async function createDesignDraft(
           imageUrl: generated.imageUrl,
           model: env.openaiDesignModel,
         });
-  const baseReadiness = buildReadiness(normalizedPrompt, context.placementCodes ?? []);
+  const baseReadiness = buildReadiness(context.placementCodes ?? []);
   const preparationReady = ['transparent', 'removed'].includes(printPreparation.status);
   const readiness: DesignDraft['readiness'] = {
     status:
@@ -622,7 +614,7 @@ export function checkReadiness(params: {
   prompt: string;
   placementCodes?: string[];
 }): DesignDraft['readiness'] {
-  return buildReadiness(params.prompt, params.placementCodes ?? []);
+  return buildReadiness(params.placementCodes ?? []);
 }
 
 export async function createDesignMockup(params: {

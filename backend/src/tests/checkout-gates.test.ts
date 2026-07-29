@@ -8,7 +8,7 @@ import {
   createStudioPassCheckout,
   getOrderByCheckoutSession,
 } from '../services/order.service.js';
-import { getOrCreateSession, saveOrder } from '../services/runtime-store.js';
+import { getOrCreateSession, saveDraft, saveOrder } from '../services/runtime-store.js';
 import {
   checkoutPolicyAcceptanceIssue,
   CURRENT_CHECKOUT_POLICY_VERSION,
@@ -149,6 +149,55 @@ test('checkout blocks artwork that has not passed print-readiness checks', async
 
   assert.equal(checkout.status, 'blocked');
   assert.match(checkout.message, /print-readiness/i);
+});
+
+test('checkout ignores the retired prompt-specificity warning on saved artwork', async () => {
+  const session = getOrCreateSession();
+  const { product, variant, placement } = await firstProductSelection();
+  const draft = await createDesignDraft('Small badge', {
+    sessionId: session.id,
+    productId: product.id,
+    variantId: variant.id,
+    placementCodes: [placement.code],
+  });
+  assert.equal(draft.readiness.status, 'pass');
+  assert.ok(draft.id);
+
+  const legacyDraft = saveDraft({
+    ...draft,
+    readiness: {
+      status: 'warning',
+      checks: [
+        ...draft.readiness.checks,
+        {
+          label: 'Prompt specificity',
+          result: 'Add subject, style, and text details before final production.',
+          severity: 'warning',
+        },
+      ],
+    },
+  });
+  const quote = await createQuote(
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: [placement.code],
+        designAssetId: legacyDraft.id ?? undefined,
+      },
+    ],
+    { sessionId: session.id }
+  );
+  const checkout = await createCheckoutSession({
+    ...acceptedCheckoutPolicies,
+    quoteId: quote.id,
+    sessionId: session.id,
+    designAssetId: legacyDraft.id ?? undefined,
+  });
+
+  assert.notEqual(checkout.status, 'blocked');
+  assert.doesNotMatch(checkout.message, /print-readiness/i);
 });
 
 test('checkout return lookup restores the order from its Stripe session ID', async () => {

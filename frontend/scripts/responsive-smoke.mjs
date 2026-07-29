@@ -492,7 +492,7 @@ async function exerciseFixtureJourney(browser) {
   }
 }
 
-async function exerciseWarningReadinessJourney(browser) {
+async function exerciseConcisePromptJourney(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   let quoteRequests = 0;
   const page = await context.newPage();
@@ -512,20 +512,25 @@ async function exerciseWarningReadinessJourney(browser) {
     await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
     assert.ok(
       quoteRequests > 0,
-      'warning artwork should still request an automatic price estimate'
+      'concise prompts should still receive an automatic price estimate'
     );
-    await page.getByText('Needs a quick review', { exact: true }).waitFor();
+    await page.getByText('Print ready', { exact: true }).waitFor();
     await page.getByText('Estimated total before tax', { exact: true }).waitFor();
     assert.equal(
       await page.getByRole('button', { name: 'Review and checkout', exact: true }).isDisabled(),
-      true,
-      'checkout should remain blocked until warning artwork passes readiness checks'
+      false,
+      'prompt length should not block an otherwise print-ready design'
     );
     assert.equal(
-      await page.getByRole('button', { name: 'Make changes', exact: true }).isEnabled(),
-      true,
-      'warning artwork should expose a recovery action instead of an indefinite spinner'
+      await page.locator('.readiness').getAttribute('open'),
+      null,
+      'print details should be collapsed by default'
     );
+    await page.getByText('Print details', { exact: true }).click();
+    assert.equal(await page.getByText('Prompt specificity', { exact: true }).count(), 0);
+    for (const label of ['Placement fit', 'Private data', 'Transparent print file']) {
+      await page.getByText(label, { exact: true }).waitFor();
+    }
   } finally {
     await context.close();
   }
@@ -802,7 +807,7 @@ try {
     }
     await exerciseProductMatrix(browser);
     await exerciseFixtureJourney(browser);
-    await exerciseWarningReadinessJourney(browser);
+    await exerciseConcisePromptJourney(browser);
     await exerciseCheckoutUrlCleanup(browser);
     await exerciseKeyboardAndReducedMotion(browser);
     await exerciseCheckoutReloadRecovery(browser);
