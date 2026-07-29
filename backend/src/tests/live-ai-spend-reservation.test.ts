@@ -52,7 +52,12 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
     async $transaction<T>(callback: (tx: unknown) => Promise<T>): Promise<T> {
       let release: (() => void) | undefined;
       const tx = {
-        async $queryRaw() {
+        async $queryRaw(query: TemplateStringsArray) {
+          assert.match(
+            query.join(''),
+            /pg_advisory_xact_lock[\s\S]*::text AS locked/,
+            'the advisory lock must return a Prisma-supported scalar type'
+          );
           advisoryLockCalls += 1;
           const previous = lockTail;
           lockTail = new Promise<void>((resolve) => {

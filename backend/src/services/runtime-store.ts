@@ -473,7 +473,14 @@ export async function reserveLiveDesignSpend(
   const createdAt = new Date();
   try {
     const reserved = await db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${liveAiSpendLockName}, 0))`;
+      // PostgreSQL returns `void` from pg_advisory_xact_lock, which Prisma
+      // cannot deserialize. Casting preserves the transaction-scoped lock
+      // while returning a supported scalar type.
+      await tx.$queryRaw<Array<{ locked: string }>>`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${liveAiSpendLockName}, 0)
+        )::text AS locked
+      `;
 
       let durableSession = await tx.studioSession.upsert({
         where: { id: params.sessionId },

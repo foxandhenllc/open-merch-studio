@@ -12,6 +12,58 @@ import {
   listAdminOrderRecords,
   reviewAdminOrder,
 } from '../services/order.service.js';
+import {
+  getRuntimeSettings,
+  reserveLiveDesignSpend,
+  updateRuntimeSettings,
+} from '../services/runtime-store.js';
+
+test(
+  'PostgreSQL live AI spend reservation acquires a Prisma-compatible advisory lock',
+  { skip: !env.databaseUrl },
+  async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sessionId = `integration-ai-spend-${suffix}`;
+    const before = getRuntimeSettings();
+
+    try {
+      updateRuntimeSettings({
+        dailyAiBudgetCents: 100_000,
+        perSessionBudgetCents: 100_000,
+        freeDraftLimit: 3,
+      });
+
+      const reservation = await reserveLiveDesignSpend(
+        {
+          sessionId,
+          action: 'rough_draft',
+          provider: 'openai',
+          estimatedCostCents: 6,
+        },
+        prisma
+      );
+
+      assert.equal(reservation.allowed, true);
+      assert.equal(reservation.allowance.freeDraftsRemaining, 2);
+
+      const [session, spendEvents] = await Promise.all([
+        prisma.studioSession.findUniqueOrThrow({ where: { id: sessionId } }),
+        prisma.aiSpendEvent.findMany({ where: { sessionId } }),
+      ]);
+      assert.equal(session.freeDraftsUsed, 1);
+      assert.equal(spendEvents.length, 1);
+      assert.equal(spendEvents[0]?.provider, 'openai');
+      assert.equal(spendEvents[0]?.estimatedCostCents, 6);
+    } finally {
+      updateRuntimeSettings({
+        dailyAiBudgetCents: before.dailyAiBudgetCents,
+        perSessionBudgetCents: before.perSessionBudgetCents,
+        freeDraftLimit: before.freeDraftLimit,
+      });
+      await prisma.studioSession.deleteMany({ where: { id: sessionId } });
+    }
+  }
+);
 
 test(
   'PostgreSQL recovery keeps refunds monotonic and enriches refund-first payment facts',
