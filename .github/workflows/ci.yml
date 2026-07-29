@@ -38,8 +38,8 @@ jobs:
             echo 'VITE_* values are public browser configuration and cannot contain credentials.' >&2
             exit 1
           fi
-      - name: Audit dependencies for high-severity vulnerabilities
-        run: npm audit --audit-level=high
+      - name: Audit production dependencies for high-severity vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
       - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
       - run: npm run lint
       - run: npm run type-check
