@@ -249,6 +249,11 @@ export function useStudioViewModel() {
   const artworkReady = Boolean(
     design?.id && design.policy.status === 'pass' && design.readiness.status === 'pass'
   );
+  const artworkQuoteEligible = Boolean(
+    design?.id &&
+    design.policy.status === 'pass' &&
+    (design.readiness.status === 'pass' || design.readiness.status === 'warning')
+  );
   const emailValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const checkoutReadiness = useMemo(() => {
     const quoteReady = Boolean(quote && !quoteStale && !quoteExpired);
@@ -996,7 +1001,7 @@ export function useStudioViewModel() {
     });
   };
   const createQuote = async (options: { automatic?: boolean } = {}) => {
-    if (!selectedProduct || !selectedVariant || !artworkReady || !design?.id) return;
+    if (!selectedProduct || !selectedVariant || !artworkQuoteEligible || !design?.id) return;
     const requestId = ++quoteRequestId.current;
     quoteController.current?.abort();
     const controller = new AbortController();
@@ -1045,7 +1050,7 @@ export function useStudioViewModel() {
     }
   };
   useEffect(() => {
-    if (!artworkReady || !design?.id || !selectedProduct || !selectedVariant) {
+    if (!artworkQuoteEligible || !design?.id || !selectedProduct || !selectedVariant) {
       quoteController.current?.abort();
       setQuote(null);
       setQuoteStale(false);
@@ -1058,7 +1063,7 @@ export function useStudioViewModel() {
     }, 450);
     return () => window.clearTimeout(timer);
   }, [
-    artworkReady,
+    artworkQuoteEligible,
     design?.id,
     quote,
     quoteExpired,
@@ -1292,6 +1297,7 @@ export function useStudioViewModel() {
     online,
     quoteExpired,
     artworkReady,
+    artworkQuoteEligible,
     checkoutReadiness,
     canGenerateAnother,
     canRevise,

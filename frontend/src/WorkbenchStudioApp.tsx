@@ -246,9 +246,8 @@ export function WorkbenchStudioApp() {
     vm.workbenchMode === 'review' &&
     (vm.busy.mockup ||
       vm.busy.quoting ||
-      (!vm.quote && !vm.errors.mockup && !vm.errors.quote));
-  const hasDesignOptions =
-    vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother;
+      (vm.artworkQuoteEligible && !vm.quote && !vm.errors.mockup && !vm.errors.quote));
+  const hasDesignOptions = vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother;
   const showEmailError =
     vm.workbenchMode === 'checkout' &&
     (emailTouched || checkoutSubmitted) &&
@@ -300,7 +299,10 @@ export function WorkbenchStudioApp() {
               checkoutReturn.state === 'processing'
                 ? checkoutPolling
                   ? undefined
-                  : { label: 'Check again', onClick: () => setCheckoutAttempt((value) => value + 1) }
+                  : {
+                      label: 'Check again',
+                      onClick: () => setCheckoutAttempt((value) => value + 1),
+                    }
                 : { label: 'Dismiss', onClick: () => setCheckoutReturn(null) }
             }
           >
@@ -526,7 +528,11 @@ export function WorkbenchStudioApp() {
                     <span aria-hidden="true">{vm.artworkReady ? '✓' : '!'}</span>
                     <div>
                       <b>{vm.artworkReady ? 'Print ready' : 'Needs a quick review'}</b>
-                      <p>Your artwork is saved and ready to order.</p>
+                      <p>
+                        {vm.artworkReady
+                          ? 'Your artwork is saved and ready to order.'
+                          : 'Review the checks below before checkout.'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -691,9 +697,7 @@ export function WorkbenchStudioApp() {
                     }
                   }}
                   disabled={
-                    !vm.checkoutReadiness.canOpen ||
-                    !checkoutPoliciesAccepted ||
-                    vm.busy.checkout
+                    !vm.checkoutReadiness.canOpen || !checkoutPoliciesAccepted || vm.busy.checkout
                   }
                   aria-describedby="checkout-readiness-message"
                 >

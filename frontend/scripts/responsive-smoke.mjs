@@ -492,6 +492,45 @@ async function exerciseFixtureJourney(browser) {
   }
 }
 
+async function exerciseWarningReadinessJourney(browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  let quoteRequests = 0;
+  const page = await context.newPage();
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/catalog/quotes') quoteRequests += 1;
+  });
+  try {
+    await openProduct(page);
+    await page
+      .getByRole('button', { name: /Heavyweight Cotton Tee/ })
+      .first()
+      .click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('textbox', { name: /What should we make/ }).fill('Tiny badge');
+    await page.getByRole('button', { name: 'Generate my design', exact: true }).click();
+
+    await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
+    assert.ok(
+      quoteRequests > 0,
+      'warning artwork should still request an automatic price estimate'
+    );
+    await page.getByText('Needs a quick review', { exact: true }).waitFor();
+    await page.getByText('Estimated total before tax', { exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole('button', { name: 'Review and checkout', exact: true }).isDisabled(),
+      true,
+      'checkout should remain blocked until warning artwork passes readiness checks'
+    );
+    assert.equal(
+      await page.getByRole('button', { name: 'Make changes', exact: true }).isEnabled(),
+      true,
+      'warning artwork should expose a recovery action instead of an indefinite spinner'
+    );
+  } finally {
+    await context.close();
+  }
+}
+
 async function exercisePolicyPages(browser) {
   const routes = [
     ['/privacy', 'Privacy Policy'],
@@ -515,9 +554,11 @@ async function exercisePolicyPages(browser) {
         await page.getByRole('heading', { name: heading, exact: true }).waitFor();
         await assertNoHorizontalOverflow(page, `${label} ${route}`);
         assert.equal(
-          await page.getByText('Effective July 17, 2026. Last updated July 17, 2026.', {
-            exact: true,
-          }).count(),
+          await page
+            .getByText('Effective July 17, 2026. Last updated July 17, 2026.', {
+              exact: true,
+            })
+            .count(),
           route === '/support' ? 0 : 1,
           `${route} should expose the approved policy date where applicable`
         );
@@ -540,9 +581,11 @@ async function exercisePolicyPages(browser) {
       }
       await page.goto(`${origin}/support`, { waitUntil: 'networkidle' });
       assert.equal(
-        await page.getByText('Open Merch Studio is operated by FoxAndHen LLC.', {
-          exact: false,
-        }).count(),
+        await page
+          .getByText('Open Merch Studio is operated by FoxAndHen LLC.', {
+            exact: false,
+          })
+          .count(),
         1,
         'support should identify the approved legal operator'
       );
@@ -759,6 +802,7 @@ try {
     }
     await exerciseProductMatrix(browser);
     await exerciseFixtureJourney(browser);
+    await exerciseWarningReadinessJourney(browser);
     await exerciseCheckoutUrlCleanup(browser);
     await exerciseKeyboardAndReducedMotion(browser);
     await exerciseCheckoutReloadRecovery(browser);
