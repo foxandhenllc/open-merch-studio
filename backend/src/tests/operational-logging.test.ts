@@ -5,6 +5,7 @@ import { env } from '../config/env.js';
 import { errorHandler, HttpError, requestContext } from '../middleware.js';
 import {
   buildOperationalRecord,
+  classifyOperationalError,
   redactRequestUrl,
   setOperationalSink,
   type OperationalContext,
@@ -156,4 +157,12 @@ test('known operational failures retain their safe recovery code', () => {
   } finally {
     setOperationalSink();
   }
+});
+
+test('provider 429 errors are classified for quota and rate-limit alerting', () => {
+  assert.deepEqual(classifyOperationalError({ status: 429 }), {
+    errorType: 'UnknownError',
+    failureCode: 'provider_rate_limited',
+    statusCode: 429,
+  });
 });

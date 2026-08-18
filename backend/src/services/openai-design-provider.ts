@@ -102,7 +102,11 @@ export async function generateDesignImage(params: {
     return createMockDesignImage(params.prompt);
   }
 
-  const client = new OpenAI({ apiKey: env.openaiApiKey });
+  const client = new OpenAI({
+    apiKey: env.openaiApiKey,
+    organization: env.openaiOrganizationId,
+    project: env.openaiProjectId,
+  });
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
   const finalPrompt = buildPrintReadyPrompt(params.prompt, env.openaiDesignModel);
   await assertPromptAllowed(client, finalPrompt);

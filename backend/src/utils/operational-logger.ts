@@ -97,10 +97,16 @@ export function classifyOperationalError(
     response?: { status?: unknown };
   };
   const status = candidate?.response?.status ?? candidate?.status;
+  const statusCode = typeof status === 'number' ? status : undefined;
   return {
     errorType,
-    failureCode: typeof candidate?.code === 'string' ? candidate.code : 'provider_operation_failed',
-    statusCode: typeof status === 'number' ? status : undefined,
+    failureCode:
+      typeof candidate?.code === 'string'
+        ? candidate.code
+        : statusCode === 429
+          ? 'provider_rate_limited'
+          : 'provider_operation_failed',
+    statusCode,
   };
 }
 import { createHash } from 'node:crypto';

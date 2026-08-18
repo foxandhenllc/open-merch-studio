@@ -71,6 +71,9 @@ export const env = {
   printfulMaxLaunchProducts: numberFromEnv('PRINTFUL_MAX_LAUNCH_PRODUCTS', 6),
   printfulMockupTimeoutMs: numberFromEnv('PRINTFUL_MOCKUP_TIMEOUT_MS', 180000),
   openaiApiKey: process.env.OPENAI_API_KEY,
+  openaiOrganizationId:
+    process.env.OPENAI_ORG_ID?.trim() || process.env.OPENAI_ORGANIZATION_ID?.trim() || undefined,
+  openaiProjectId: process.env.OPENAI_PROJECT_ID?.trim() || undefined,
   openaiDesignModel: process.env.OPENAI_DESIGN_MODEL || 'gpt-image-2',
   openaiTextModel: process.env.OPENAI_TEXT_MODEL || 'gpt-5-nano',
   removeBgApiKey: process.env.REMOVE_BG_API_KEY,
