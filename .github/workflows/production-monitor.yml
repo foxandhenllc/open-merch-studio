@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Exercise incident open and recovery handling without changing production.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,6 +31,8 @@ jobs:
       - name: Probe production
         id: monitor
         continue-on-error: true
+        env:
+          OMS_EXPECTED_CHECKOUT_CAPABILITY: ${{ inputs.simulate_failure && 'offline' || 'live' }}
         run: node scripts/production-monitor.mjs 2>&1 | tee production-monitor-output.txt
       - name: Open or update production incident
         if: steps.monitor.outcome == 'failure'
