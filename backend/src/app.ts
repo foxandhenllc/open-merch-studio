@@ -24,7 +24,11 @@ export function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+  );
   app.use(
     cors({
       origin: [env.frontendUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],

@@ -162,7 +162,8 @@ function mapError(error: unknown, surface: Surface): SurfaceError {
       cause: 'provider_failed',
       title: 'The draft was not generated',
       message,
-      recovery: 'Retry with the same prompt. A failed request does not consume a draft credit.',
+      recovery:
+        'Retry with the same prompt. Failed provider requests are reconciled automatically.',
       retryable: true,
     };
   return {
@@ -249,10 +250,14 @@ export function useStudioViewModel() {
   const quoteExpired = Boolean(quote && new Date(quote.expiresAt).getTime() <= Date.now());
   const printReadiness = design ? customerPrintReadiness(design.readiness) : null;
   const artworkReady = Boolean(
-    design?.id && design.policy.status === 'pass' && printReadiness?.status === 'pass'
+    design?.id &&
+    design.generationStatus === 'complete' &&
+    design.policy.status === 'pass' &&
+    printReadiness?.status === 'pass'
   );
   const artworkQuoteEligible = Boolean(
     design?.id &&
+    design.generationStatus === 'complete' &&
     design.policy.status === 'pass' &&
     (printReadiness?.status === 'pass' || printReadiness?.status === 'warning')
   );
@@ -831,6 +836,7 @@ export function useStudioViewModel() {
     });
     const phaseOne = window.setTimeout(() => setGenerationPhase('Generating artwork'), 1000);
     const phaseTwo = window.setTimeout(() => setGenerationPhase('Preparing the print file'), 10000);
+    let completionSource = capabilities.ai === 'live' ? 'api' : 'fixture';
     try {
       const [result] = await Promise.all([
         api.designDraft(
@@ -845,12 +851,19 @@ export function useStudioViewModel() {
         ),
         delay(1500, controller.signal),
       ]);
+      completionSource = result.source === 'live' ? 'api' : 'fixture';
       const draft = consumeSource(result);
       if (draft.policy.status === 'blocked')
         throw new ApiError(
           draft.policy.reasons[0] || 'The prompt was blocked by content policy.',
           400,
           'policy_blocked'
+        );
+      if (draft.generationStatus === 'failed')
+        throw new ApiError(
+          draft.policy.reasons[0] || 'Artwork generation did not complete. Please retry.',
+          503,
+          'design_generation_failed'
         );
       if (design?.id) {
         setDesignHistory((current) =>
@@ -881,17 +894,17 @@ export function useStudioViewModel() {
       if (error instanceof DOMException && error.name === 'AbortError') {
         trackEvent('design_generation_completed', {
           result: 'cancelled',
-          source: dataSource === 'live' ? 'api' : 'fixture',
+          source: completionSource,
         });
         setFlow('configuring');
         setWorkbenchMode('describe');
         setAnnouncement(
-          'Generation cancelled. Your prompt is unchanged and no draft credit was used.'
+          'Generation cancelled on this screen. Your prompt is unchanged. If provider processing already started, a draft may still be counted.'
         );
       } else {
         trackEvent('design_generation_completed', {
           result: 'failed',
-          source: dataSource === 'live' ? 'api' : 'fixture',
+          source: completionSource,
         });
         fail('generation', error);
         setFlow('configuring');

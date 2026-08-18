@@ -47,7 +47,7 @@ export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => 
 export const backendUrlFromEnv = (source: NodeJS.ProcessEnv): string => {
   if (source.BACKEND_URL) return normalizedOrigin(source.BACKEND_URL);
   const vercelHost = source.VERCEL_PROJECT_PRODUCTION_URL || source.VERCEL_URL;
-  return vercelHost ? `https://${vercelHost}` : 'http://localhost:5000';
+  return vercelHost ? `https://${vercelHost}` : 'http://localhost:5001';
 };
 
 export const frontendUrlFromEnv = (source: NodeJS.ProcessEnv): string =>
@@ -57,7 +57,7 @@ const transactionalEmail = transactionalEmailSettingsFromEnv(process.env);
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: numberFromEnv('PORT', 5000),
+  port: numberFromEnv('PORT', 5001),
   frontendUrl: frontendUrlFromEnv(process.env),
   backendUrl: backendUrlFromEnv(process.env),
   databaseUrl: process.env.DATABASE_URL,

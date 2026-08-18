@@ -14,6 +14,7 @@ import {
 } from '../services/order.service.js';
 import {
   getRuntimeSettings,
+  releaseLiveDesignSpend,
   reserveLiveDesignSpend,
   updateRuntimeSettings,
 } from '../services/runtime-store.js';
@@ -54,6 +55,52 @@ test(
       assert.equal(spendEvents.length, 1);
       assert.equal(spendEvents[0]?.provider, 'openai');
       assert.equal(spendEvents[0]?.estimatedCostCents, 6);
+    } finally {
+      updateRuntimeSettings({
+        dailyAiBudgetCents: before.dailyAiBudgetCents,
+        perSessionBudgetCents: before.perSessionBudgetCents,
+        freeDraftLimit: before.freeDraftLimit,
+      });
+      await prisma.studioSession.deleteMany({ where: { id: sessionId } });
+    }
+  }
+);
+
+test(
+  'PostgreSQL live AI provider failure reconciliation restores allowance idempotently',
+  { skip: !env.databaseUrl },
+  async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sessionId = `integration-ai-release-${suffix}`;
+    const before = getRuntimeSettings();
+
+    try {
+      updateRuntimeSettings({
+        dailyAiBudgetCents: 100_000,
+        perSessionBudgetCents: 100_000,
+        freeDraftLimit: 3,
+      });
+      const reservation = await reserveLiveDesignSpend({
+        sessionId,
+        action: 'rough_draft',
+        provider: 'openai',
+        estimatedCostCents: 6,
+      });
+      const firstRelease = await releaseLiveDesignSpend(reservation);
+      const secondRelease = await releaseLiveDesignSpend(reservation);
+
+      const [session, spendEvents] = await Promise.all([
+        prisma.studioSession.findUniqueOrThrow({ where: { id: sessionId } }),
+        prisma.aiSpendEvent.findMany({ where: { sessionId }, orderBy: { createdAt: 'asc' } }),
+      ]);
+      assert.equal(firstRelease.freeDraftsRemaining, 3);
+      assert.equal(secondRelease.freeDraftsRemaining, 3);
+      assert.equal(session.freeDraftsUsed, 0);
+      assert.equal(spendEvents.length, 2);
+      assert.equal(
+        spendEvents.reduce((total, event) => total + event.estimatedCostCents, 0),
+        0
+      );
     } finally {
       updateRuntimeSettings({
         dailyAiBudgetCents: before.dailyAiBudgetCents,

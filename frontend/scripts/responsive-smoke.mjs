@@ -492,6 +492,123 @@ async function exerciseFixtureJourney(browser) {
   }
 }
 
+async function exercisePersistedGenerationFailure(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    window.__omsAnalyticsEvents = [];
+    window.va = (...args) => window.__omsAnalyticsEvents.push(args);
+  });
+  await context.route('**/_vercel/insights/**', (route) => route.abort('blockedbyclient'));
+  await context.route('**/api/design/drafts', async (route) => {
+    const body = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: 'asset_persisted_generation_failure',
+          sessionId: body.sessionId,
+          provider: 'openai-ready',
+          generationStatus: 'failed',
+          prompt: body.prompt,
+          imageUrl: 'data:image/png;base64,',
+          qualityTier: 'rough',
+          allowance: {
+            sessionId: body.sessionId,
+            studioPassStatus: 'not_required',
+            freeDraftsRemaining: 3,
+            roughDraftsRemaining: 0,
+            editsRemaining: 0,
+            finalsRemaining: 0,
+            nextAction: 'continue_free',
+            message: '3 beta drafts remaining.',
+          },
+          policy: {
+            status: 'needs_review',
+            reasons: ['Artwork generation did not complete. Please retry.'],
+          },
+          readiness: {
+            status: 'blocked',
+            checks: [
+              {
+                label: 'Live generation',
+                result: 'OpenAI generation was requested but did not complete.',
+                severity: 'block',
+              },
+            ],
+          },
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    });
+  });
+  let mockupRequests = 0;
+  context.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/design/mockups') mockupRequests += 1;
+  });
+
+  const page = await context.newPage();
+  try {
+    await openProduct(page);
+    await page
+      .getByRole('button', { name: /Heavyweight Cotton Tee/ })
+      .first()
+      .click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    const promptText = 'A cheerful original fox badge with wildflowers and no words';
+    const prompt = page.getByRole('textbox', { name: /What should we make/ });
+    await prompt.fill(promptText);
+    await page.getByRole('button', { name: 'Generate my design', exact: true }).click();
+
+    const alert = page.getByRole('alert');
+    await alert.getByText('The draft was not generated', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Try again', exact: true }).waitFor();
+    assert.equal(
+      await prompt.inputValue(),
+      promptText,
+      'a failed generation must preserve the prompt'
+    );
+    assert.equal(mockupRequests, 0, 'a failed generation must not request a product mockup');
+    assert.equal(
+      await page.getByRole('button', { name: 'Cancel generation', exact: true }).count(),
+      0,
+      'a failed generation must leave generating mode'
+    );
+
+    const generateButton = page.getByRole('button', { name: 'Generate my design', exact: true });
+    assert.equal(
+      await generateButton.evaluate((element) => getComputedStyle(element).position),
+      'static',
+      'mobile recovery should return Generate to document flow'
+    );
+    const [alertBox, generateBox] = await Promise.all([
+      alert.boundingBox(),
+      generateButton.boundingBox(),
+    ]);
+    assert.ok(alertBox && generateBox, 'mobile recovery controls should remain visible');
+    assert.ok(
+      alertBox.y + alertBox.height <= generateBox.y,
+      `the mobile Generate action must not obscure recovery copy: ${JSON.stringify({ alertBox, generateBox })}`
+    );
+
+    const analyticsEvents = await page.evaluate(() => window.__omsAnalyticsEvents || []);
+    const completionEvents = analyticsEvents.filter(
+      ([kind, payload]) => kind === 'event' && payload?.name === 'design_generation_completed'
+    );
+    assert.equal(completionEvents.length, 1, 'generation should record one completion event');
+    assert.equal(completionEvents[0]?.[1]?.data?.result, 'failed');
+    assert.equal(
+      completionEvents.some((event) => event[1]?.data?.result === 'success'),
+      false,
+      'a persisted failed asset must never record analytics success'
+    );
+    await assertNoHorizontalOverflow(page, '390x844 persisted generation failure');
+  } finally {
+    await context.close();
+  }
+}
+
 async function exerciseConcisePromptJourney(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   let quoteRequests = 0;
@@ -807,6 +924,7 @@ try {
     }
     await exerciseProductMatrix(browser);
     await exerciseFixtureJourney(browser);
+    await exercisePersistedGenerationFailure(browser);
     await exerciseConcisePromptJourney(browser);
     await exerciseCheckoutUrlCleanup(browser);
     await exerciseKeyboardAndReducedMotion(browser);
@@ -814,7 +932,7 @@ try {
     await exerciseLegacyRecoveryExpiry(browser);
     await exercisePolicyPages(browser);
     process.stdout.write(
-      'Responsive browser smoke passed across 11 viewports, five products, and the recoverable fixture checkout flow.\n'
+      'Responsive browser smoke passed across 11 viewports, five products, the persisted generation-failure contract, and the recoverable fixture checkout flow.\n'
     );
   } finally {
     await browser.close();

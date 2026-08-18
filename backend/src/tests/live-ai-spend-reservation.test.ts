@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 
 process.env.DATABASE_URL ||= 'postgresql://test:test@localhost:5432/open_merch_studio_test';
 
-const { getRuntimeSettings, reserveLiveDesignSpend, updateRuntimeSettings } =
-  await import('../services/runtime-store.js');
+const {
+  getRuntimeSettings,
+  releaseLiveDesignSpend,
+  reserveLiveDesignSpend,
+  updateRuntimeSettings,
+} = await import('../services/runtime-store.js');
 const { HttpError } = await import('../middleware.js');
 
 type ReservationDb = Parameters<typeof reserveLiveDesignSpend>[1];
@@ -42,6 +46,9 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
   const events: Array<{
     id: string;
     sessionId: string;
+    designAssetId?: string;
+    action: string;
+    provider: string;
     estimatedCostCents: number;
     createdAt: Date;
   }> = [];
@@ -82,7 +89,7 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
             where: { id: string };
             data: {
               freeDraftLimit?: number;
-              freeDraftsUsed?: { increment: number };
+              freeDraftsUsed?: { increment?: number; decrement?: number };
             };
           }) {
             const existing = sessions.get(args.where.id);
@@ -90,11 +97,19 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
             const updated: StoredSession = {
               ...existing,
               freeDraftLimit: args.data.freeDraftLimit ?? existing.freeDraftLimit,
-              freeDraftsUsed: existing.freeDraftsUsed + (args.data.freeDraftsUsed?.increment ?? 0),
+              freeDraftsUsed:
+                existing.freeDraftsUsed +
+                (args.data.freeDraftsUsed?.increment ?? 0) -
+                (args.data.freeDraftsUsed?.decrement ?? 0),
               updatedAt: new Date(),
             };
             sessions.set(updated.id, updated);
             return { ...updated };
+          },
+          async findUniqueOrThrow(args: { where: { id: string } }) {
+            const existing = sessions.get(args.where.id);
+            assert.ok(existing);
+            return { ...existing };
           },
         },
         studioPass: {
@@ -108,9 +123,9 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
           async update(args: {
             where: { id: string };
             data: {
-              roughDraftsUsed?: { increment: number };
-              editsUsed?: { increment: number };
-              finalsUsed?: { increment: number };
+              roughDraftsUsed?: { increment?: number; decrement?: number };
+              editsUsed?: { increment?: number; decrement?: number };
+              finalsUsed?: { increment?: number; decrement?: number };
             };
           }) {
             const existing = passes.get(args.where.id);
@@ -118,9 +133,17 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
             const updated: StoredPass = {
               ...existing,
               roughDraftsUsed:
-                existing.roughDraftsUsed + (args.data.roughDraftsUsed?.increment ?? 0),
-              editsUsed: existing.editsUsed + (args.data.editsUsed?.increment ?? 0),
-              finalsUsed: existing.finalsUsed + (args.data.finalsUsed?.increment ?? 0),
+                existing.roughDraftsUsed +
+                (args.data.roughDraftsUsed?.increment ?? 0) -
+                (args.data.roughDraftsUsed?.decrement ?? 0),
+              editsUsed:
+                existing.editsUsed +
+                (args.data.editsUsed?.increment ?? 0) -
+                (args.data.editsUsed?.decrement ?? 0),
+              finalsUsed:
+                existing.finalsUsed +
+                (args.data.finalsUsed?.increment ?? 0) -
+                (args.data.finalsUsed?.decrement ?? 0),
             };
             passes.set(updated.id, updated);
             return { ...updated };
@@ -141,12 +164,24 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
             data: {
               id: string;
               sessionId: string;
+              designAssetId?: string;
+              action: string;
+              provider: string;
               estimatedCostCents: number;
-              createdAt: Date;
+              createdAt?: Date;
             };
           }) {
-            events.push({ ...args.data });
+            events.push({ ...args.data, createdAt: args.data.createdAt ?? new Date() });
             return args.data;
+          },
+          async findUnique(args: { where: { id: string } }) {
+            return events.find((event) => event.id === args.where.id) ?? null;
+          },
+          async update(args: { where: { id: string }; data: { designAssetId?: string } }) {
+            const event = events.find((candidate) => candidate.id === args.where.id);
+            assert.ok(event);
+            Object.assign(event, args.data);
+            return event;
           },
         },
       };
@@ -267,6 +302,50 @@ test('a durable reservation consumes one revision allowance and one spend event'
     assert.equal(fixture.passes.get(pass.id)?.editsUsed, 1);
     assert.equal(fixture.events.length, 1);
     assert.equal(fixture.events[0]?.estimatedCostCents, 212);
+  } finally {
+    updateRuntimeSettings({
+      dailyAiBudgetCents: before.dailyAiBudgetCents,
+      perSessionBudgetCents: before.perSessionBudgetCents,
+    });
+  }
+});
+
+test('a failed provider request restores allowance and offsets spend exactly once', async () => {
+  const before = getRuntimeSettings();
+  try {
+    updateRuntimeSettings({ dailyAiBudgetCents: 1000, perSessionBudgetCents: 1000 });
+    const fixture = createReservationDb();
+    const reservation = await reserveLiveDesignSpend(
+      {
+        sessionId: 'sess_failed_provider',
+        action: 'rough_draft',
+        provider: 'openai',
+        estimatedCostCents: 206,
+      },
+      fixture.db
+    );
+    assert.equal(reservation.allowed, true);
+    assert.equal(reservation.allowance.freeDraftsRemaining, 2);
+
+    const firstRelease = await releaseLiveDesignSpend(
+      reservation,
+      { designAssetId: 'asset_failed_provider' },
+      fixture.db
+    );
+    const secondRelease = await releaseLiveDesignSpend(
+      reservation,
+      { designAssetId: 'asset_failed_provider' },
+      fixture.db
+    );
+
+    assert.equal(firstRelease.freeDraftsRemaining, 3);
+    assert.equal(secondRelease.freeDraftsRemaining, 3);
+    assert.equal(fixture.sessions.get('sess_failed_provider')?.freeDraftsUsed, 0);
+    assert.deepEqual(
+      fixture.events.map((event) => event.estimatedCostCents),
+      [206, -206]
+    );
+    assert.ok(fixture.events.every((event) => event.designAssetId === 'asset_failed_provider'));
   } finally {
     updateRuntimeSettings({
       dailyAiBudgetCents: before.dailyAiBudgetCents,

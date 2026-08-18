@@ -50,6 +50,9 @@ The example environment permits simulated local checkout while every live-paymen
 gate remains disabled. Production must override `CHECKOUT_ENABLED=false` until an explicitly
 supervised checkout window.
 
+Local development uses the API on `127.0.0.1:5001` because macOS commonly reserves port 5000.
+Leave `VITE_API_URL` empty locally so Vite proxies `/api/*` to that backend.
+
 ## Useful Commands
 
 ```bash

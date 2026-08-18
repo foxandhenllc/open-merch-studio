@@ -1,6 +1,7 @@
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
 import { HttpError } from '../middleware.js';
+import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
 import type {
   AdminReport,
   AdminSettings,
@@ -25,11 +26,12 @@ type LedgerEvent = {
   createdAt: string;
 };
 
-type LiveDesignSpendReservation = {
+export type LiveDesignSpendReservation = {
   allowed: boolean;
   allowance: AllowanceState;
   message?: string;
   event?: LedgerEvent;
+  allowanceSource?: 'free_draft' | 'rough_draft' | 'edit' | 'final' | 'none';
 };
 
 type RuntimeState = {
@@ -447,8 +449,8 @@ function syncDurableAllowanceState(params: {
  * Atomically reserves live provider spend before any provider call. One
  * transaction-level PostgreSQL advisory lock serializes the daily and session
  * total checks with the insert, preventing concurrent requests from both
- * observing the same remaining budget. Reservations are intentionally retained
- * when a provider later fails.
+ * observing the same remaining budget. Provider failures release the matching
+ * reservation through `releaseLiveDesignSpend`.
  */
 export async function reserveLiveDesignSpend(
   params: {
@@ -566,6 +568,17 @@ export async function reserveLiveDesignSpend(
         };
       }
 
+      const allowanceSource: NonNullable<LiveDesignSpendReservation['allowanceSource']> =
+        params.action === 'rough_draft'
+          ? freeDraftsRemaining > 0
+            ? 'free_draft'
+            : 'rough_draft'
+          : params.action === 'edit'
+            ? 'edit'
+            : params.action === 'final'
+              ? 'final'
+              : 'none';
+
       await tx.aiSpendEvent.create({
         data: {
           id: eventId,
@@ -578,24 +591,22 @@ export async function reserveLiveDesignSpend(
         },
       });
 
-      if (params.action === 'rough_draft') {
-        if (freeDraftsRemaining > 0) {
-          durableSession = await tx.studioSession.update({
-            where: { id: durableSession.id },
-            data: { freeDraftsUsed: { increment: 1 } },
-          });
-        } else if (durablePass) {
-          durablePass = await tx.studioPass.update({
-            where: { id: durablePass.id },
-            data: { roughDraftsUsed: { increment: 1 } },
-          });
-        }
-      } else if (params.action === 'edit' && durablePass) {
+      if (allowanceSource === 'free_draft') {
+        durableSession = await tx.studioSession.update({
+          where: { id: durableSession.id },
+          data: { freeDraftsUsed: { increment: 1 } },
+        });
+      } else if (allowanceSource === 'rough_draft' && durablePass) {
+        durablePass = await tx.studioPass.update({
+          where: { id: durablePass.id },
+          data: { roughDraftsUsed: { increment: 1 } },
+        });
+      } else if (allowanceSource === 'edit' && durablePass) {
         durablePass = await tx.studioPass.update({
           where: { id: durablePass.id },
           data: { editsUsed: { increment: 1 } },
         });
-      } else if (params.action === 'final' && durablePass) {
+      } else if (allowanceSource === 'final' && durablePass) {
         durablePass = await tx.studioPass.update({
           where: { id: durablePass.id },
           data: { finalsUsed: { increment: 1 } },
@@ -606,6 +617,7 @@ export async function reserveLiveDesignSpend(
         allowed: true as const,
         session: durableSession,
         pass: durablePass,
+        allowanceSource,
       };
     });
 
@@ -634,13 +646,127 @@ export async function reserveLiveDesignSpend(
       allowed: true,
       allowance: getAllowanceState(reserved.session.id),
       event,
+      allowanceSource: reserved.allowanceSource,
     };
   } catch (error) {
     if (error instanceof HttpError) throw error;
+    logOperationalEvent('error', 'openai_spend_reservation_failed', {
+      ...classifyOperationalError(error),
+      outcome: 'generation_blocked',
+    });
     throw new HttpError(
       'Live design generation is temporarily unavailable because spend could not be durably reserved.',
       503,
       'live_ai_spend_reservation_failed'
+    );
+  }
+}
+
+/**
+ * Reconciles a provider request that failed after its durable reservation was
+ * created. The negative ledger event preserves the spend audit trail while the
+ * exact allowance bucket is restored. The deterministic release id makes this
+ * safe to retry.
+ */
+export async function releaseLiveDesignSpend(
+  reservation: LiveDesignSpendReservation,
+  params: { designAssetId?: string } = {},
+  db: typeof prisma = prisma
+): Promise<AllowanceState> {
+  const event = reservation.event;
+  const allowanceSource = reservation.allowanceSource;
+  if (!reservation.allowed || !event || !allowanceSource || allowanceSource === 'none') {
+    return reservation.allowance;
+  }
+  if (!env.databaseUrl) {
+    throw new HttpError(
+      'Failed design generation could not restore its durable allowance.',
+      503,
+      'live_ai_spend_release_failed'
+    );
+  }
+
+  const releaseEventId = `${event.id}:released`;
+  try {
+    const released = await db.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ locked: string }>>`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${liveAiSpendLockName}, 0)
+        )::text AS locked
+      `;
+
+      const existingRelease = await tx.aiSpendEvent.findUnique({
+        where: { id: releaseEventId },
+      });
+      let durableSession = await tx.studioSession.findUniqueOrThrow({
+        where: { id: event.sessionId },
+      });
+      let durablePass = await tx.studioPass.findFirst({
+        where: { sessionId: event.sessionId, status: { not: 'expired' } },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!existingRelease) {
+        await tx.aiSpendEvent.update({
+          where: { id: event.id },
+          data: { designAssetId: params.designAssetId },
+        });
+        await tx.aiSpendEvent.create({
+          data: {
+            id: releaseEventId,
+            sessionId: event.sessionId,
+            designAssetId: params.designAssetId,
+            action: event.action,
+            provider: event.provider,
+            estimatedCostCents: -Math.abs(event.estimatedCostCents),
+          },
+        });
+
+        if (allowanceSource === 'free_draft' && durableSession.freeDraftsUsed > 0) {
+          durableSession = await tx.studioSession.update({
+            where: { id: durableSession.id },
+            data: { freeDraftsUsed: { decrement: 1 } },
+          });
+        } else if (durablePass) {
+          const counter =
+            allowanceSource === 'rough_draft'
+              ? 'roughDraftsUsed'
+              : allowanceSource === 'edit'
+                ? 'editsUsed'
+                : 'finalsUsed';
+          if (durablePass[counter] > 0) {
+            durablePass = await tx.studioPass.update({
+              where: { id: durablePass.id },
+              data: { [counter]: { decrement: 1 } },
+            });
+          }
+        }
+      }
+
+      return { session: durableSession, pass: durablePass };
+    });
+
+    syncDurableAllowanceState(released);
+    if (!state.ledger.some((candidate) => candidate.id === releaseEventId)) {
+      state.ledger.push({
+        ...event,
+        id: releaseEventId,
+        designAssetId: params.designAssetId,
+        estimatedCostCents: -Math.abs(event.estimatedCostCents),
+        createdAt: nowIso(),
+      });
+    }
+    return getAllowanceState(event.sessionId);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    logOperationalEvent('error', 'openai_spend_release_failed', {
+      ...classifyOperationalError(error),
+      outcome: 'manual_reconciliation_required',
+    });
+    throw new HttpError(
+      'Failed design generation could not restore its durable allowance.',
+      503,
+      'live_ai_spend_release_failed'
     );
   }
 }

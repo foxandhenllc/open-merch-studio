@@ -13,6 +13,7 @@ import { getProductsByIds } from './catalog.service.js';
 import { describePrintfulError, generatePrintfulMockupPreview } from './printful.service.js';
 import { prepareArtworkForPrint } from './background-removal.service.js';
 import { resolveDesignAssetProviderUrl } from '../utils/design-asset-url.js';
+import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
 import {
   authorizeDesignAction,
   getAllowanceState,
@@ -20,12 +21,14 @@ import {
   findReusableMockup,
   getOrCreateDurableSession,
   recordDesignSpend,
+  releaseLiveDesignSpend,
   reserveLiveDesignSpend,
   runtimeId,
   runtimeNow,
   saveDraft,
   saveIdea,
   saveMockup,
+  type LiveDesignSpendReservation,
 } from './runtime-store.js';
 
 type DesignContext = {
@@ -35,7 +38,7 @@ type DesignContext = {
   placementCodes?: string[];
   qualityTier?: 'rough' | 'final';
   skipAllowanceSpend?: boolean;
-  liveSpendReserved?: boolean;
+  liveSpendReservation?: LiveDesignSpendReservation;
 };
 
 type DesignArtwork = {
@@ -263,7 +266,11 @@ export async function createDesignDraft(
   const liveOpenAi = canUseLiveOpenAi();
   const provider = liveOpenAi ? 'openai-ready' : 'mock';
   const policy = evaluatePolicy(normalizedPrompt);
-  if (liveOpenAi && context.skipAllowanceSpend && !context.liveSpendReserved) {
+  if (
+    liveOpenAi &&
+    context.skipAllowanceSpend &&
+    (!context.liveSpendReservation?.allowed || !context.liveSpendReservation.event)
+  ) {
     throw new HttpError(
       'Live design generation requires a durable spend reservation.',
       503,
@@ -271,8 +278,9 @@ export async function createDesignDraft(
     );
   }
   const action = qualityTier === 'final' ? 'final' : 'rough_draft';
-  const authorization =
-    context.skipAllowanceSpend || policy.status === 'blocked'
+  const authorization: LiveDesignSpendReservation =
+    context.liveSpendReservation ??
+    (context.skipAllowanceSpend || policy.status === 'blocked'
       ? { allowed: true, allowance: getAllowanceState(session.id) }
       : liveOpenAi
         ? await reserveLiveDesignSpend({
@@ -285,13 +293,14 @@ export async function createDesignDraft(
             session.id,
             action,
             estimatedGenerationCostCents(qualityTier)
-          );
+          ));
   if (!authorization.allowed || policy.status === 'blocked') {
     const blockedImage = createMockDesignImage('Generation unavailable');
     const draft: DesignDraft = {
       id: null,
       sessionId: session.id,
       provider,
+      generationStatus: 'failed',
       prompt: normalizedPrompt,
       imageUrl: blockedImage.imageUrl,
       qualityTier,
@@ -332,6 +341,9 @@ export async function createDesignDraft(
       ],
     };
     const failureReason = error instanceof Error ? error.message : 'OpenAI generation failed.';
+    const failureContext = classifyOperationalError(error);
+    const publicFailureReason = 'Artwork generation did not complete. Please retry.';
+    let failedAssetId: string | undefined;
     if (env.databaseUrl) {
       try {
         const failedAsset = await prisma.designAsset.create({
@@ -348,23 +360,16 @@ export async function createDesignDraft(
             readinessReport: failedReadiness,
           },
         });
-        return saveDraft({
-          id: failedAsset.id,
-          sessionId: session.id,
-          provider: 'openai-ready',
-          prompt: normalizedPrompt,
-          imageUrl: `${env.backendUrl}/api/design/assets/${failedAsset.id}.png`,
-          qualityTier,
-          allowance: authorization.allowance,
-          policy: {
-            status: 'needs_review',
-            reasons: [failureReason],
-          },
-          readiness: failedReadiness,
-          createdAt: runtimeNow(),
-        });
+        failedAssetId = failedAsset.id;
       } catch {
         if (liveOpenAi) {
+          if (authorization.allowed && authorization.event) {
+            await releaseLiveDesignSpend(authorization);
+          }
+          logOperationalEvent('error', 'openai_generation_failed', {
+            ...failureContext,
+            outcome: 'allowance_released_persistence_failed',
+          });
           throw new HttpError(
             'Live artwork generation failed and its failure record could not be stored safely.',
             503,
@@ -374,21 +379,34 @@ export async function createDesignDraft(
         // Fixture failures may fall through to the runtime-only failed draft.
       }
     }
-    return {
-      id: null,
+    const allowance =
+      liveOpenAi && authorization.allowed && authorization.event
+        ? await releaseLiveDesignSpend(authorization, { designAssetId: failedAssetId })
+        : authorization.allowance;
+    if (liveOpenAi) {
+      logOperationalEvent('error', 'openai_generation_failed', {
+        ...failureContext,
+        outcome: 'allowance_released',
+      });
+    }
+    return saveDraft({
+      id: failedAssetId ?? null,
       sessionId: session.id,
       provider: 'openai-ready',
+      generationStatus: 'failed',
       prompt: normalizedPrompt,
-      imageUrl: createMockDesignImage('Generation paused').imageUrl,
+      imageUrl: failedAssetId
+        ? `${env.backendUrl}/api/design/assets/${failedAssetId}.png`
+        : createMockDesignImage('Generation paused').imageUrl,
       qualityTier,
-      allowance: authorization.allowance,
+      allowance,
       policy: {
         status: 'needs_review',
-        reasons: [failureReason],
+        reasons: [publicFailureReason],
       },
       readiness: failedReadiness,
       createdAt: runtimeNow(),
-    };
+    });
   }
   const printPreparation =
     generated.provider === 'mock'
@@ -436,6 +454,7 @@ export async function createDesignDraft(
       id: runtimeId('draft'),
       sessionId: session.id,
       provider: generated.provider,
+      generationStatus: 'complete',
       prompt: normalizedPrompt,
       imageUrl: preparedImageUrl,
       qualityTier,
@@ -484,6 +503,7 @@ export async function createDesignDraft(
       id: asset.id,
       sessionId: session.id,
       provider: generated.provider,
+      generationStatus: 'complete',
       prompt: normalizedPrompt,
       imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
       qualityTier,
@@ -513,6 +533,7 @@ export async function createDesignDraft(
       id: runtimeId('draft'),
       sessionId: session.id,
       provider: generated.provider,
+      generationStatus: 'complete',
       prompt: normalizedPrompt,
       imageUrl: preparedImageUrl,
       qualityTier,
@@ -563,7 +584,7 @@ export async function reviseDesignDraft(params: {
       sessionId: session.id,
       qualityTier: 'rough',
       skipAllowanceSpend: true,
-      liveSpendReserved: liveOpenAi,
+      liveSpendReservation: liveOpenAi ? authorization : undefined,
     }
   );
 }
@@ -597,6 +618,7 @@ export async function getDesignDraftById(
       id: asset.id,
       sessionId: session.id,
       provider: asset.provider as DesignDraft['provider'],
+      generationStatus: 'complete',
       prompt: asset.prompt,
       imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
       qualityTier: 'rough',

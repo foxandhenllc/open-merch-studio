@@ -474,7 +474,7 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'describe' && selected && (
-              <div className="panel-stack">
+              <div className={`panel-stack${vm.errors.generation ? 'has-generation-error' : ''}`}>
                 <button className="selection-summary" type="button" onClick={vm.showConfigure}>
                   <span>{vm.selectedProduct!.title}</span>
                   <b>{vm.selectedVariant!.name}</b>

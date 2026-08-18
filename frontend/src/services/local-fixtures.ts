@@ -533,6 +533,7 @@ export function createLocalDesignDraft(
     id: localId('draft'),
     sessionId: sessionId ?? session.id,
     provider: 'mock',
+    generationStatus: 'complete',
     prompt: normalizedPrompt,
     imageUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
     qualityTier: 'rough',

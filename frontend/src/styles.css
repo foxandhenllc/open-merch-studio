@@ -2807,6 +2807,11 @@ input:focus {
     width: auto;
     box-shadow: 0 10px 28px rgb(24 27 31 / 18%);
   }
+  .mode-describe .panel-stack.has-generation-error > .button--primary {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+  }
   .mode-product .focused-workbench__canvas {
     display: none;
   }

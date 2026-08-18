@@ -147,6 +147,7 @@ export type DesignDraft = {
   id: string | null;
   sessionId?: string;
   provider: 'mock' | 'openai-ready' | 'openai';
+  generationStatus: 'complete' | 'failed';
   prompt: string;
   imageUrl: string;
   qualityTier: 'rough' | 'final';
