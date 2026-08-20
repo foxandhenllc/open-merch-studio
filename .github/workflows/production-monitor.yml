@@ -2,7 +2,8 @@ name: Production monitor
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Once daily at 13:00 UTC (09:00 EDT / 08:00 EST).
+    - cron: '0 13 * * *'
   workflow_dispatch:
     inputs:
       simulate_failure:
