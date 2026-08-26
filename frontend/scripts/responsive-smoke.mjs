@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
+import sharp from 'sharp';
 
 const frontendDirectory = fileURLToPath(new URL('..', import.meta.url));
 const viteBinary = fileURLToPath(new URL('../../node_modules/vite/bin/vite.js', import.meta.url));
 const port = Number(process.env.OMS_BROWSER_TEST_PORT || 4178);
 const origin = `http://127.0.0.1:${port}`;
+const artifactDirectory = process.env.OMS_BROWSER_ARTIFACT_DIR;
 const server = spawn(
   process.execPath,
   [viteBinary, 'preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
@@ -896,7 +900,298 @@ async function exerciseLegacyRecoveryExpiry(browser) {
       JSON.parse(window.localStorage.getItem('open-merch-studio:guest-workbench:v1') || 'null')
     );
     assert.notEqual(saved?.sessionId, 'sess_legacy_unknown_age');
-    assert.equal(saved?.version, 2);
+    assert.equal(saved?.version, 3);
+  } finally {
+    await context.close();
+  }
+}
+
+async function exerciseUploadedArtworkAndReferences(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const artworkBuffer = await sharp({
+    create: { width: 1800, height: 1800, channels: 4, background: '#f3a642' },
+  })
+    .composite([
+      {
+        input: Buffer.from(
+          '<svg width="1800" height="1800"><circle cx="900" cy="760" r="520" fill="#17324d"/><path d="M500 720 L900 330 L1300 720 L1180 1260 L620 1260 Z" fill="#f7efe0"/><text x="900" y="1510" text-anchor="middle" font-family="Arial" font-size="170" font-weight="700" fill="#17324d">ORIGINAL</text></svg>'
+        ),
+      },
+    ])
+    .png()
+    .toBuffer();
+  const artworkDataUrl = `data:image/png;base64,${artworkBuffer.toString('base64')}`;
+  let uploadCount = 0;
+  const quoteBodies = [];
+  await context.route('**/api/design/uploads/authorize', async (route) => {
+    uploadCount += 1;
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          assetId: `uploaded_asset_${uploadCount}`,
+          transport: 'inline',
+          maxBytes: 2 * 1024 * 1024,
+          expiresInSeconds: 900,
+        },
+      }),
+    });
+  });
+  await context.route('**/api/design/uploads/*/complete', async (route) => {
+    const body = route.request().postDataJSON();
+    const assetId = new URL(route.request().url()).pathname.split('/').at(-2);
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: assetId,
+          sessionId: body.sessionId,
+          provider: 'upload',
+          sourceType: 'uploaded',
+          purpose: body.purpose,
+          generationStatus: 'complete',
+          prompt: `Uploaded artwork: ${body.filename}`,
+          imageUrl: artworkDataUrl,
+          qualityTier: 'final',
+          printPreparation: {
+            status: 'prepared',
+            provider: 'sharp',
+            message: 'A transparent print PNG was prepared without generative changes.',
+          },
+          asset: {
+            originalFilename: body.filename,
+            mimeType: body.contentType,
+            byteSize: 70,
+            width: 1800,
+            height: 1800,
+            hasAlpha: true,
+          },
+          allowance: {
+            sessionId: body.sessionId,
+            studioPassStatus: 'not_required',
+            freeDraftsRemaining: 3,
+            roughDraftsRemaining: 0,
+            editsRemaining: 0,
+            finalsRemaining: 0,
+            nextAction: 'continue_free',
+            message: '3 drafts remaining.',
+          },
+          policy: { status: 'pass', reasons: ['Reproduction rights confirmed.'] },
+          readiness:
+            body.purpose === 'reference'
+              ? {
+                  status: 'needs_review',
+                  checks: [
+                    {
+                      label: 'Reference only',
+                      result: 'This image can guide a new design.',
+                      severity: 'warning',
+                    },
+                  ],
+                }
+              : {
+                  status: 'pass',
+                  checks: [
+                    {
+                      label: 'Image resolution',
+                      result: '1800 × 1800px is suitable for printing.',
+                      severity: 'pass',
+                    },
+                  ],
+                },
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    });
+  });
+  await context.route('**/api/design/drafts/from-references', async (route) => {
+    const body = route.request().postDataJSON();
+    assert.ok(body.referenceAssetIds.length >= 2, 'reference generation should submit every image');
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: 'reference_generated_asset',
+          sessionId: body.sessionId,
+          provider: 'fixture',
+          sourceType: 'reference_generated',
+          purpose: 'print',
+          parentAssetIds: body.referenceAssetIds,
+          generationStatus: 'complete',
+          prompt: body.prompt,
+          imageUrl: artworkDataUrl,
+          qualityTier: 'rough',
+          allowance: {
+            sessionId: body.sessionId,
+            studioPassStatus: 'not_required',
+            freeDraftsRemaining: 2,
+            roughDraftsRemaining: 0,
+            editsRemaining: 0,
+            finalsRemaining: 0,
+            nextAction: 'continue_free',
+            message: '2 drafts remaining.',
+          },
+          policy: { status: 'pass', reasons: [] },
+          readiness: {
+            status: 'pass',
+            checks: [{ label: 'Resolution', result: 'Ready.', severity: 'pass' }],
+          },
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    });
+  });
+  await context.route('**/api/design/mockups', async (route) => {
+    const body = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: `mockup_${body.designAssetId}`,
+          status: 'complete',
+          provider: 'fixture',
+          productId: body.productId,
+          variantId: body.variantId,
+          placementCodes: body.placementCodes,
+          designAssetId: body.designAssetId,
+          imageUrl: artworkDataUrl,
+          views: [{ label: 'Product view', imageUrl: artworkDataUrl }],
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    });
+  });
+  await context.route('**/api/catalog/quotes', async (route) => {
+    const body = route.request().postDataJSON();
+    quoteBodies.push(body);
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          id: `quote_${quoteBodies.length}`,
+          subtotalCents: 3000,
+          shippingCents: 500,
+          taxCents: 0,
+          totalCents: 3500,
+          currency: 'USD',
+          aiDesignFeeCents: body.items[0].designAssetId?.startsWith('uploaded_') ? 0 : 300,
+          targetMarginCents: 1000,
+          items: [
+            {
+              ...body.items[0],
+              title: 'Heavyweight Cotton Tee',
+              variantName: 'White · L',
+              unitPriceCents: 3000,
+              lineTotalCents: 3000,
+              designFeeCents: body.items[0].designAssetId?.startsWith('uploaded_') ? 0 : 300,
+            },
+          ],
+          costLines: [],
+          expiresAt: new Date(Date.now() + 900_000).toISOString(),
+        },
+      }),
+    });
+  });
+
+  const page = await context.newPage();
+  const assertNoPageErrors = watchPageErrors(page, 'uploaded artwork and references');
+  const chooseTeeAndContinue = async () => {
+    await openProduct(page);
+    await page.getByRole('button', { name: /Heavyweight Cotton Tee/ }).first().click();
+    await page.getByRole('button', { name: 'White', exact: true }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  };
+  const sampleFile = {
+    name: 'original-artwork.png',
+    mimeType: 'image/png',
+    buffer: artworkBuffer,
+  };
+
+  try {
+    await chooseTeeAndContinue();
+    await page.getByRole('button', { name: /Use my artwork/ }).click();
+    const prepare = page.getByRole('button', { name: 'Prepare my artwork', exact: true });
+    assert.equal(await prepare.isDisabled(), true, 'direct upload should require a file and rights');
+    await page.locator('.upload-drop input[type=file]').setInputFiles(sampleFile);
+    assert.equal(await prepare.isDisabled(), true, 'a selected file should still require rights');
+    await page.getByRole('checkbox', { name: /permission to reproduce/i }).check();
+    assert.equal(await prepare.isEnabled(), true, 'rights confirmation should unlock preparation');
+    if (artifactDirectory) {
+      await mkdir(artifactDirectory, { recursive: true });
+      await page.screenshot({ path: join(artifactDirectory, 'upload-selection-desktop.png') });
+    }
+    await prepare.click();
+    await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 15_000 });
+    await page.getByText('Print ready', { exact: true }).waitFor();
+    assert.ok(
+      quoteBodies.some((body) => body.items[0]?.designAssetId === 'uploaded_asset_1'),
+      'the uploaded asset should reach quote creation'
+    );
+    if (artifactDirectory) {
+      await mkdir(artifactDirectory, { recursive: true });
+      await page.screenshot({ path: join(artifactDirectory, 'uploaded-artwork-desktop.png') });
+    }
+
+    await page.goto(origin, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /^Step 1: Product/ }).click();
+    await page.getByRole('button', { name: /Heavyweight Cotton Tee/ }).first().click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: /Use references/ }).click();
+    const referenceInput = page.locator('.reference-add input[type=file]');
+    assert.equal(await referenceInput.isDisabled(), true, 'reference input should require rights');
+    await page.getByRole('checkbox', { name: /creative input/i }).check();
+    await referenceInput.setInputFiles([
+      sampleFile,
+      { ...sampleFile, name: 'palette-reference.png' },
+    ]);
+    await page.locator('.reference-strip figure').filter({ visible: true }).first().waitFor();
+    assert.equal(await page.locator('.reference-strip figure').count(), 2);
+    await page.getByRole('textbox', { name: /What new design/ }).fill(
+      'Use the warm palette and hand-drawn texture to make a new original fox mechanic badge.'
+    );
+    if (artifactDirectory) {
+      await page.screenshot({ path: join(artifactDirectory, 'reference-selection-desktop.png') });
+    }
+    await page.getByRole('button', { name: 'Create from references', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 15_000 });
+    assert.equal(
+      await page.getByRole('button', { name: 'Remove reference' }).count(),
+      0,
+      'review should leave reference controls behind'
+    );
+    await assertNoHorizontalOverflow(page, '1440x900 uploaded artwork review');
+    if (artifactDirectory) {
+      await page.screenshot({ path: join(artifactDirectory, 'reference-generated-desktop.png') });
+    }
+
+    await page.evaluate(() => window.localStorage.clear());
+    await page.setViewportSize({ width: 390, height: 844 });
+    await chooseTeeAndContinue();
+    await page.getByRole('button', { name: /Use my artwork/ }).click();
+    await page.locator('.upload-drop input[type=file]').setInputFiles(sampleFile);
+    await page.getByRole('checkbox', { name: /permission to reproduce/i }).check();
+    await assertNoHorizontalOverflow(page, '390x844 upload selection');
+    const mobilePrepare = page.getByRole('button', { name: 'Prepare my artwork', exact: true });
+    const mobilePrepareBox = await mobilePrepare.boundingBox();
+    assert.ok(mobilePrepareBox, 'mobile upload should expose the preparation action');
+    assert.ok(
+      mobilePrepareBox.y + mobilePrepareBox.height <= 836,
+      `mobile upload action should clear browser chrome: ${JSON.stringify(mobilePrepareBox)}`
+    );
+    if (artifactDirectory) {
+      await page.screenshot({ path: join(artifactDirectory, 'upload-selection-mobile.png') });
+    }
+    assertNoPageErrors();
   } finally {
     await context.close();
   }
@@ -930,9 +1225,10 @@ try {
     await exerciseKeyboardAndReducedMotion(browser);
     await exerciseCheckoutReloadRecovery(browser);
     await exerciseLegacyRecoveryExpiry(browser);
+    await exerciseUploadedArtworkAndReferences(browser);
     await exercisePolicyPages(browser);
     process.stdout.write(
-      'Responsive browser smoke passed across 11 viewports, five products, the persisted generation-failure contract, and the recoverable fixture checkout flow.\n'
+      'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, and the recoverable fixture checkout flow.\n'
     );
   } finally {
     await browser.close();

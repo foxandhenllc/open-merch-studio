@@ -1,6 +1,7 @@
 import type {
   CatalogCategory,
   CatalogProduct,
+  AssetUploadAuthorization,
   CheckoutSession,
   CheckoutConfirmation,
   CustomerOrderConfirmation,
@@ -180,6 +181,25 @@ export const api = {
       ),
       () => createLocalDesignDraft(body.prompt, body.sessionId, body.placementCodes)
     ),
+  designFromReferences: (
+    body: {
+      prompt: string;
+      referenceAssetIds: string[];
+      sessionId?: string;
+      productId?: string;
+      variantId?: string;
+      placementCodes?: string[];
+    },
+    signal?: AbortSignal
+  ) =>
+    withFallback(
+      request<DesignDraft>(
+        '/api/design/drafts/from-references',
+        { method: 'POST', body: JSON.stringify(body) },
+        signal
+      ),
+      () => createLocalDesignDraft(body.prompt, body.sessionId, body.placementCodes)
+    ),
   designDraftById: (draftId: string, sessionId?: string) => {
     const search = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
     return withFallback(
@@ -189,6 +209,104 @@ export const api = {
       }
     );
   },
+  uploadArtwork: async (body: {
+    file: File;
+    sessionId?: string;
+    purpose: 'print' | 'reference';
+    rightsConfirmed: boolean;
+    placementCodes?: string[];
+    removeBackground?: boolean;
+  }): Promise<Sourced<DesignDraft>> => {
+    const authorization = await withFallback(
+      request<AssetUploadAuthorization>('/api/design/uploads/authorize', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: body.sessionId,
+          filename: body.file.name,
+          contentType: body.file.type,
+          byteSize: body.file.size,
+          purpose: body.purpose,
+        }),
+      }),
+      () => ({
+        assetId: crypto.randomUUID(),
+        transport: 'inline' as const,
+        maxBytes: 2 * 1024 * 1024,
+        expiresInSeconds: 15 * 60,
+      })
+    );
+
+    if (body.file.size > authorization.data.maxBytes) {
+      throw new ApiError(
+        `This image exceeds the ${Math.floor(authorization.data.maxBytes / 1024 / 1024)} MB upload limit.`,
+        413,
+        'upload_too_large'
+      );
+    }
+
+    let inlineDataUrl: string | undefined;
+    if (authorization.data.transport === 'supabase') {
+      if (!authorization.data.signedUrl) {
+        throw new ApiError('The upload destination is unavailable.', 503, 'upload_unavailable');
+      }
+      const form = new FormData();
+      form.append('cacheControl', '3600');
+      form.append('', body.file);
+      const uploaded = await fetch(authorization.data.signedUrl, {
+        method: 'PUT',
+        headers: { 'x-upsert': 'false' },
+        body: form,
+      });
+      if (!uploaded.ok) {
+        throw new ApiError('The image could not be transferred to secure storage.', uploaded.status);
+      }
+    } else {
+      inlineDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(new ApiError('The local image could not be read.', 400));
+        reader.readAsDataURL(body.file);
+      });
+    }
+
+    const completed = await request<DesignDraft>(
+      `/api/design/uploads/${encodeURIComponent(authorization.data.assetId)}/complete`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: body.sessionId,
+          rightsConfirmed: body.rightsConfirmed,
+          placementCodes: body.placementCodes ?? [],
+          removeBackground: body.removeBackground,
+          inlineDataUrl,
+          filename: body.file.name,
+          contentType: body.file.type,
+          purpose: body.purpose,
+        }),
+      }
+    );
+    return {
+      data: completed,
+      source: authorization.source,
+      fallbackReason: authorization.fallbackReason,
+    };
+  },
+  deleteUploadAsset: (assetId: string, sessionId: string) =>
+    withFallback(
+      request<{ deleted: boolean }>(
+        `/api/design/uploads/${encodeURIComponent(assetId)}?sessionId=${encodeURIComponent(sessionId)}`,
+        { method: 'DELETE', keepalive: true }
+      ),
+      () => ({ deleted: true })
+    ),
+  cleanupSessionUploads: (sessionId: string) =>
+    withFallback(
+      request<{ deletedCount: number }>(
+        `/api/design/sessions/${encodeURIComponent(sessionId)}/uploads`,
+        { method: 'DELETE', keepalive: true }
+      ),
+      () => ({ deletedCount: 0 })
+    ),
   reviseDraft: (body: { draftId: string; instructions: string; sessionId?: string }) =>
     withFallback(
       request<DesignDraft>(`/api/design/drafts/${encodeURIComponent(body.draftId)}/revisions`, {

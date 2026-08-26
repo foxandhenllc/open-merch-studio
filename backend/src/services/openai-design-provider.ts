@@ -1,11 +1,17 @@
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import { env } from '../config/env.js';
 
-type GeneratedDesignImage = {
+export type GeneratedDesignImage = {
   provider: 'mock' | 'openai';
   imageUrl: string;
   revisedPrompt?: string;
   estimatedCostCents: number;
+};
+
+export type ReferenceImageInput = {
+  buffer: Buffer;
+  contentType: string;
+  filename: string;
 };
 
 const svgDataUrl = (prompt: string): string => {
@@ -134,6 +140,67 @@ export async function generateDesignImage(params: {
     imageUrl,
     revisedPrompt: image?.revised_prompt ?? finalPrompt,
     estimatedCostCents: params.qualityTier === 'final' ? 36 : 6,
+  };
+}
+
+export async function editDesignImage(params: {
+  prompt: string;
+  sessionId: string;
+  qualityTier: 'rough' | 'final';
+  images: ReferenceImageInput[];
+  mode: 'reference' | 'edit';
+}): Promise<GeneratedDesignImage> {
+  if (!params.images.length) throw new Error('At least one reference image is required.');
+  if (!canUseLiveOpenAi()) {
+    return createMockDesignImage(`${params.mode}: ${params.prompt}`);
+  }
+
+  const client = new OpenAI({
+    apiKey: env.openaiApiKey,
+    organization: env.openaiOrganizationId,
+    project: env.openaiProjectId,
+  });
+  const instruction =
+    params.mode === 'edit'
+      ? [
+          params.prompt,
+          'Edit the first supplied image according to these instructions.',
+          'Preserve recognizable details that were not requested to change.',
+        ]
+      : [
+          params.prompt,
+          'Create one new, original merchandise graphic using the supplied images only as visual references.',
+          'Borrow general mood, palette, texture, and composition cues without copying protected logos, characters, or exact artwork.',
+        ];
+  const finalPrompt = [
+    ...instruction,
+    'Return artwork only, not a product mockup.',
+    'Use a centered, isolated subject, strong silhouette, readable shapes, and a plain background that can be removed cleanly.',
+    'Do not add unrequested words, signatures, watermarks, brands, celebrities, or protected characters.',
+  ].join(' ');
+  await assertPromptAllowed(client, finalPrompt);
+  const uploads = await Promise.all(
+    params.images.map((image) => toFile(image.buffer, image.filename, { type: image.contentType }))
+  );
+  const response = await client.images.edit({
+    model: env.openaiDesignModel,
+    image: uploads,
+    prompt: finalPrompt,
+    n: 1,
+    size: '1024x1024',
+    quality: params.qualityTier === 'final' ? 'high' : 'low',
+    background: supportsTransparentBackground(env.openaiDesignModel) ? 'transparent' : 'auto',
+    output_format: 'png',
+    input_fidelity: params.mode === 'edit' ? 'high' : 'low',
+    user: params.sessionId,
+  });
+  const image = response.data?.[0];
+  const imageUrl = image?.b64_json ? `data:image/png;base64,${image.b64_json}` : (image?.url ?? '');
+  if (!imageUrl) throw new Error('OpenAI image editing did not return an image.');
+  return {
+    provider: 'openai',
+    imageUrl,
+    estimatedCostCents: params.qualityTier === 'final' ? 40 : 14,
   };
 }
 

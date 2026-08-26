@@ -27,6 +27,8 @@
     "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test",
     "test:browser": "node frontend/scripts/responsive-smoke.mjs",
     "smoke:fixture": "node --import tsx backend/src/tests/fixture-smoke.test.ts",
+    "smoke:live-upload": "node scripts/verify-live-upload.mjs",
+    "smoke:deployed-upload": "node scripts/verify-deployed-upload-ui.mjs",
     "db:generate": "node \"$npm_execpath\" --workspace open-merch-studio-backend run db:generate",
     "verify:static-routes": "node \"$npm_execpath\" --workspace open-merch-studio-frontend run verify:static-routes"
   },

@@ -6,12 +6,14 @@ import {
   createMockDesignImage,
   dataUrlToBuffer,
   generateDesignImage,
+  editDesignImage,
   canUseLiveOpenAi,
   supportsTransparentBackground,
 } from './openai-design-provider.js';
 import { getProductsByIds } from './catalog.service.js';
 import { describePrintfulError, generatePrintfulMockupPreview } from './printful.service.js';
 import { prepareArtworkForPrint } from './background-removal.service.js';
+import { createPrivatePreviewUrl, downloadPrivateAsset } from './asset-storage.service.js';
 import { resolveDesignAssetProviderUrl } from '../utils/design-asset-url.js';
 import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
 import {
@@ -39,6 +41,8 @@ type DesignContext = {
   qualityTier?: 'rough' | 'final';
   skipAllowanceSpend?: boolean;
   liveSpendReservation?: LiveDesignSpendReservation;
+  referenceAssetIds?: string[];
+  editMode?: 'reference' | 'edit';
 };
 
 type DesignArtwork = {
@@ -65,7 +69,7 @@ const estimatedGenerationCostCents = (qualityTier: 'rough' | 'final') =>
 const estimatedRevisionCostCents = () =>
   canUseLiveOpenAi() ? 12 + estimatedBackgroundRemovalCostCents() : 1;
 
-function evaluatePolicy(prompt: string): DesignDraft['policy'] {
+export function evaluatePolicy(prompt: string): DesignDraft['policy'] {
   const lowered = prompt.toLowerCase();
   const blocked = blockedTerms.filter((term) => lowered.includes(term));
   if (blocked.length) {
@@ -83,6 +87,65 @@ function evaluatePolicy(prompt: string): DesignDraft['policy'] {
     };
   }
   return { status: 'pass', reasons: [] };
+}
+
+async function loadReferenceImages(assetIds: string[], sessionId: string) {
+  if (!assetIds.length || assetIds.length > 5) {
+    throw new HttpError('Choose between one and five reference images.', 400, 'reference_count');
+  }
+  return Promise.all(
+    assetIds.map(async (assetId, index) => {
+      const runtime = getDraft(assetId);
+      if (runtime?.imageUrl) {
+        if (runtime.sessionId && runtime.sessionId !== sessionId) {
+          throw new HttpError(
+            'A reference image belongs to another session.',
+            403,
+            'asset_forbidden'
+          );
+        }
+        const decoded = dataUrlToBuffer(runtime.imageUrl);
+        if (decoded) {
+          return {
+            buffer: decoded.buffer,
+            contentType: decoded.contentType,
+            filename: `reference-${index + 1}.png`,
+          };
+        }
+      }
+      if (!env.databaseUrl) throw new HttpError('Reference artwork is unavailable.', 404);
+      const asset = await prisma.designAsset.findUnique({ where: { id: assetId } });
+      if (!asset || (asset.studioSessionId && asset.studioSessionId !== sessionId)) {
+        throw new HttpError('Reference artwork is unavailable for this session.', 404);
+      }
+      if (asset.originalStoragePath) {
+        return {
+          buffer: await downloadPrivateAsset(asset.originalStoragePath),
+          contentType: asset.mimeType ?? 'image/png',
+          filename: asset.originalFilename ?? `reference-${index + 1}.png`,
+        };
+      }
+      const storedUrl = asset.transparentUrl ?? asset.imageUrl;
+      const decoded = storedUrl ? dataUrlToBuffer(storedUrl) : null;
+      if (decoded) {
+        return {
+          buffer: decoded.buffer,
+          contentType: decoded.contentType,
+          filename: `reference-${index + 1}.png`,
+        };
+      }
+      if (storedUrl?.startsWith('http')) {
+        const response = await fetch(storedUrl);
+        if (!response.ok) throw new HttpError('Reference artwork could not be retrieved.', 502);
+        return {
+          buffer: Buffer.from(await response.arrayBuffer()),
+          contentType: response.headers.get('content-type') ?? 'image/png',
+          filename: `reference-${index + 1}.png`,
+        };
+      }
+      throw new HttpError('Reference artwork has no usable image.', 404);
+    })
+  );
 }
 
 function buildReadiness(placementCodes: string[]): DesignDraft['readiness'] {
@@ -323,11 +386,19 @@ export async function createDesignDraft(
 
   let generated = createMockDesignImage(normalizedPrompt);
   try {
-    generated = await generateDesignImage({
-      prompt: normalizedPrompt,
-      sessionId: session.id,
-      qualityTier,
-    });
+    generated = context.referenceAssetIds?.length
+      ? await editDesignImage({
+          prompt: normalizedPrompt,
+          sessionId: session.id,
+          qualityTier,
+          images: await loadReferenceImages(context.referenceAssetIds, session.id),
+          mode: context.editMode ?? 'reference',
+        })
+      : await generateDesignImage({
+          prompt: normalizedPrompt,
+          sessionId: session.id,
+          qualityTier,
+        });
   } catch (error) {
     const failedReadiness: DesignDraft['readiness'] = {
       status: 'blocked',
@@ -348,8 +419,16 @@ export async function createDesignDraft(
       try {
         const failedAsset = await prisma.designAsset.create({
           data: {
+            studioSessionId: session.id,
             prompt: normalizedPrompt,
             provider: 'openai-ready',
+            sourceType:
+              context.editMode === 'edit'
+                ? 'edited'
+                : context.referenceAssetIds?.length
+                  ? 'reference_generated'
+                  : 'generated',
+            parentAssetIds: context.referenceAssetIds ?? undefined,
             imageUrl: createMockDesignImage('Generation paused').imageUrl,
             transparentUrl: null,
             generationStatus: 'failed',
@@ -454,6 +533,13 @@ export async function createDesignDraft(
       id: runtimeId('draft'),
       sessionId: session.id,
       provider: generated.provider,
+      sourceType:
+        context.editMode === 'edit'
+          ? 'edited'
+          : context.referenceAssetIds?.length
+            ? 'reference_generated'
+            : 'generated',
+      purpose: 'print',
       generationStatus: 'complete',
       prompt: normalizedPrompt,
       imageUrl: preparedImageUrl,
@@ -479,8 +565,17 @@ export async function createDesignDraft(
   try {
     const asset = await prisma.designAsset.create({
       data: {
+        studioSessionId: session.id,
         prompt: normalizedPrompt,
         provider: generated.provider,
+        sourceType:
+          context.editMode === 'edit'
+            ? 'edited'
+            : context.referenceAssetIds?.length
+              ? 'reference_generated'
+              : 'generated',
+        purpose: 'print',
+        parentAssetIds: context.referenceAssetIds ?? undefined,
         imageUrl: generated.imageUrl,
         transparentUrl: printPreparation.transparentUrl ?? null,
         generationStatus: 'complete',
@@ -503,6 +598,13 @@ export async function createDesignDraft(
       id: asset.id,
       sessionId: session.id,
       provider: generated.provider,
+      sourceType:
+        context.editMode === 'edit'
+          ? 'edited'
+          : context.referenceAssetIds?.length
+            ? 'reference_generated'
+            : 'generated',
+      purpose: 'print',
       generationStatus: 'complete',
       prompt: normalizedPrompt,
       imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
@@ -533,6 +635,13 @@ export async function createDesignDraft(
       id: runtimeId('draft'),
       sessionId: session.id,
       provider: generated.provider,
+      sourceType:
+        context.editMode === 'edit'
+          ? 'edited'
+          : context.referenceAssetIds?.length
+            ? 'reference_generated'
+            : 'generated',
+      purpose: 'print',
       generationStatus: 'complete',
       prompt: normalizedPrompt,
       imageUrl: preparedImageUrl,
@@ -546,23 +655,46 @@ export async function createDesignDraft(
   }
 }
 
+export async function createDesignFromReferences(params: {
+  prompt: string;
+  sessionId?: string;
+  productId?: string;
+  variantId?: string;
+  placementCodes?: string[];
+  referenceAssetIds: string[];
+}): Promise<DesignDraft> {
+  return createDesignDraft(params.prompt, {
+    sessionId: params.sessionId,
+    productId: params.productId,
+    variantId: params.variantId,
+    placementCodes: params.placementCodes,
+    qualityTier: 'rough',
+    referenceAssetIds: params.referenceAssetIds,
+    editMode: 'reference',
+  });
+}
+
 export async function reviseDesignDraft(params: {
   draftId: string;
   instructions: string;
   sessionId?: string;
 }): Promise<DesignDraft> {
-  const base = getDraft(params.draftId);
+  const base =
+    getDraft(params.draftId) ?? (await getDesignDraftById(params.draftId, params.sessionId));
+  if (!base?.id) throw new HttpError('The selected artwork is no longer available.', 404);
   const session = await getOrCreateDurableSession(params.sessionId ?? base?.sessionId);
   const liveOpenAi = canUseLiveOpenAi();
+  const currentAllowance = getAllowanceState(session.id);
+  const revisionAction = currentAllowance.editsRemaining > 0 ? 'edit' : 'rough_draft';
   const authorization = liveOpenAi
     ? await reserveLiveDesignSpend({
         sessionId: session.id,
         designAssetId: base?.id ?? undefined,
-        action: 'edit',
+        action: revisionAction,
         provider: 'openai',
         estimatedCostCents: estimatedRevisionCostCents(),
       })
-    : await authorizeDesignAction(session.id, 'edit', estimatedRevisionCostCents());
+    : await authorizeDesignAction(session.id, revisionAction, estimatedRevisionCostCents());
   if (!authorization.allowed) {
     throw new HttpError(
       authorization.message ?? 'No more generated variations are available in this beta session.',
@@ -573,20 +705,19 @@ export async function reviseDesignDraft(params: {
   if (!liveOpenAi) {
     await recordDesignSpend({
       sessionId: session.id,
-      action: 'edit',
+      action: revisionAction,
       provider: 'mock',
       estimatedCostCents: estimatedRevisionCostCents(),
     });
   }
-  return createDesignDraft(
-    `${base?.prompt ?? 'Selected design'}; revision: ${params.instructions}`,
-    {
-      sessionId: session.id,
-      qualityTier: 'rough',
-      skipAllowanceSpend: true,
-      liveSpendReservation: liveOpenAi ? authorization : undefined,
-    }
-  );
+  return createDesignDraft(params.instructions, {
+    sessionId: session.id,
+    qualityTier: 'rough',
+    skipAllowanceSpend: true,
+    liveSpendReservation: liveOpenAi ? authorization : undefined,
+    referenceAssetIds: base?.id ? [base.id] : undefined,
+    editMode: base?.id ? 'edit' : undefined,
+  });
 }
 
 export async function getDesignDraftById(
@@ -604,7 +735,16 @@ export async function getDesignDraftById(
   if (!env.databaseUrl) return null;
   try {
     const asset = await prisma.designAsset.findUnique({ where: { id: draftId } });
-    if (!asset || !asset.imageUrl || asset.generationStatus !== 'complete') return null;
+    if (!asset || asset.generationStatus !== 'complete') return null;
+    if (asset.studioSessionId && sessionId && asset.studioSessionId !== sessionId) return null;
+    const displayImageUrl = asset.imageUrl
+      ? asset.imageUrl.startsWith('data:')
+        ? `${env.backendUrl}/api/design/assets/${asset.id}.png`
+        : asset.imageUrl
+      : asset.previewStoragePath
+        ? await createPrivatePreviewUrl(asset.previewStoragePath)
+        : null;
+    if (!displayImageUrl) return null;
     const session = await getOrCreateDurableSession(sessionId);
     const policy = (asset.policyReport as DesignDraft['policy'] | null) ?? {
       status: asset.policyStatus as DesignDraft['policy']['status'],
@@ -618,10 +758,23 @@ export async function getDesignDraftById(
       id: asset.id,
       sessionId: session.id,
       provider: asset.provider as DesignDraft['provider'],
+      sourceType: asset.sourceType as DesignDraft['sourceType'],
+      purpose: asset.purpose as DesignDraft['purpose'],
       generationStatus: 'complete',
       prompt: asset.prompt,
-      imageUrl: `${env.backendUrl}/api/design/assets/${asset.id}.png`,
+      imageUrl: displayImageUrl,
       qualityTier: 'rough',
+      asset: {
+        originalFilename: asset.originalFilename ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+        byteSize: asset.byteSize ?? undefined,
+        width: asset.width ?? undefined,
+        height: asset.height ?? undefined,
+        hasAlpha: asset.hasAlpha ?? undefined,
+        parentAssetIds: Array.isArray(asset.parentAssetIds)
+          ? (asset.parentAssetIds as string[])
+          : undefined,
+      },
       allowance: getAllowanceState(session.id),
       policy,
       readiness,

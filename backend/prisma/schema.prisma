@@ -147,23 +147,43 @@ model CatalogSyncRun {
 }
 
 model DesignAsset {
-  id               String         @id @default(uuid())
-  prompt           String
-  provider         String         @default("mock")
-  imageUrl         String?
-  transparentUrl   String?
-  generationStatus String         @default("complete")
-  policyStatus     String         @default("pass")
-  policyReport     Json?
-  failureReason    String?
-  readinessStatus  String         @default("pending")
-  readinessReport  Json?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  quoteItems       QuoteItem[]
-  orderItems       OrderItem[]
-  spendEvents      AiSpendEvent[]
+  id                  String         @id @default(uuid())
+  studioSessionId     String?
+  prompt              String
+  provider            String         @default("mock")
+  sourceType          String         @default("generated")
+  purpose             String         @default("print")
+  imageUrl            String?
+  transparentUrl      String?
+  originalStoragePath String?
+  previewStoragePath  String?
+  printStoragePath    String?
+  mimeType            String?
+  originalFilename    String?
+  byteSize            Int?
+  width               Int?
+  height              Int?
+  hasAlpha            Boolean?
+  checksumSha256      String?
+  parentAssetIds      Json?
+  rightsConfirmedAt   DateTime?
+  retentionUntil      DateTime?
+  generationStatus    String         @default("complete")
+  policyStatus        String         @default("pass")
+  policyReport        Json?
+  failureReason       String?
+  readinessStatus     String         @default("pending")
+  readinessReport     Json?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  studioSession       StudioSession? @relation(fields: [studioSessionId], references: [id], onDelete: SetNull)
+  quoteItems          QuoteItem[]
+  orderItems          OrderItem[]
+  spendEvents         AiSpendEvent[]
 
+  @@index([studioSessionId, createdAt])
+  @@index([sourceType, generationStatus, createdAt])
+  @@index([retentionUntil])
   @@map("design_assets")
 }
 
@@ -176,6 +196,7 @@ model StudioSession {
   updatedAt      DateTime       @updatedAt
   passes         StudioPass[]
   spendEvents    AiSpendEvent[]
+  designAssets   DesignAsset[]
 
   @@index([status, createdAt])
   @@map("studio_sessions")

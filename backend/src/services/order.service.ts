@@ -350,6 +350,7 @@ async function loadOrder(orderId: string): Promise<OrderSummary | undefined> {
 
 type CheckoutDesignState = {
   id: string;
+  purpose?: string;
   imageUrl?: string | null;
   generationStatus: string;
   policyStatus: string;
@@ -365,6 +366,7 @@ async function loadDesignForCheckout(
     if (!asset) return undefined;
     return {
       id: asset.id,
+      purpose: asset.purpose,
       imageUrl: asset.transparentUrl ?? asset.imageUrl,
       generationStatus: asset.generationStatus,
       policyStatus: asset.policyStatus,
@@ -377,6 +379,7 @@ async function loadDesignForCheckout(
   if (!draft) return undefined;
   return {
     id: designAssetId,
+    purpose: draft.purpose,
     imageUrl: draft.imageUrl,
     generationStatus: draft.id ? 'complete' : 'failed',
     policyStatus: draft.policy.status,
@@ -387,6 +390,8 @@ async function loadDesignForCheckout(
 
 function checkoutDesignIssue(design: CheckoutDesignState | undefined): string | null {
   if (!design) return 'Selected artwork could not be verified for checkout.';
+  if (design.purpose === 'reference')
+    return 'Reference images must be turned into print artwork first.';
   if (!design.imageUrl) return 'Selected artwork is missing a generated or uploaded image.';
   if (design.generationStatus !== 'complete') {
     return 'Selected artwork has not completed generation successfully.';

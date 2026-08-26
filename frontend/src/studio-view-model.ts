@@ -65,6 +65,7 @@ export type SurfaceError = {
   retryable: boolean;
 };
 export type PreviewOrientation = 'portrait' | 'landscape' | 'square';
+export type CreationPath = 'generate' | 'upload' | 'reference';
 
 const firstVariant = (product: CatalogProduct): CatalogVariant | null =>
   product.variants.find((variant) => variant.isAvailable) ?? product.variants[0] ?? null;
@@ -208,6 +209,8 @@ export function useStudioViewModel() {
     PreviewOrientation | undefined
   >();
   const [prompt, setPrompt] = useState('');
+  const [creationPath, setCreationPath] = useState<CreationPath>('generate');
+  const [referenceAssets, setReferenceAssets] = useState<DesignDraft[]>([]);
   const [revision, setRevision] = useState('');
   const [email, setEmail] = useState('');
   const [idea, setIdea] = useState<DesignIdea | null>(null);
@@ -292,7 +295,13 @@ export function useStudioViewModel() {
   const canGenerateAnother = Boolean(
     !design || design.allowance.freeDraftsRemaining + design.allowance.roughDraftsRemaining > 0
   );
-  const canRevise = Boolean(design?.id && design.allowance.editsRemaining > 0);
+  const canRevise = Boolean(
+    design?.id &&
+      design.allowance.editsRemaining +
+        design.allowance.freeDraftsRemaining +
+        design.allowance.roughDraftsRemaining >
+        0
+  );
 
   const consumeSource = useCallback(<T>(result: Sourced<T>): T => {
     setDataSource(result.source);
@@ -325,6 +334,23 @@ export function useStudioViewModel() {
       setCapabilities(consumeSource(capabilityResult));
       setSession(nextSession);
       setStudioPass(nextSession.studioPass ?? null);
+
+      if (saved?.referenceAssetIds.length) {
+        const restoredReferences = await Promise.all(
+          saved.referenceAssetIds.map(async (assetId) => {
+            try {
+              return consumeSource(await api.designDraftById(assetId, nextSession.id));
+            } catch {
+              return null;
+            }
+          })
+        );
+        const availableReferences = restoredReferences.filter(
+          (asset): asset is DesignDraft => Boolean(asset?.id)
+        );
+        setReferenceAssets(availableReferences);
+        if (availableReferences.length) setCreationPath('reference');
+      }
 
       if (!saved) {
         setFlow('configuring');
@@ -470,7 +496,7 @@ export function useStudioViewModel() {
   useEffect(() => {
     if (startingFresh.current || !session || flow === 'booting' || flow === 'boot_failed') return;
     writeStudioResumeState({
-      version: 2,
+      version: 3,
       sessionId: session.id,
       selectedCategory,
       productId: selectedProductId,
@@ -479,6 +505,9 @@ export function useStudioViewModel() {
       orientation: selectedOrientation,
       prompt,
       designId: design?.id ?? undefined,
+      referenceAssetIds: referenceAssets
+        .map((asset) => asset.id)
+        .filter((id): id is string => Boolean(id)),
       mockup: mockup?.status === 'complete' ? mockup : undefined,
       mockupViewIndex: activeMockupViewIndex,
       quoteId: quote?.id ?? undefined,
@@ -490,6 +519,7 @@ export function useStudioViewModel() {
     prompt,
     mockup,
     quote?.id,
+    referenceAssets,
     selectedCategory,
     selectedOrientation,
     selectedPlacements,
@@ -789,6 +819,94 @@ export function useStudioViewModel() {
     if (idea) setIdea(null);
   };
 
+  const uploadArtwork = async (file: File, removeBackground = false) => {
+    if (!selectedProduct || !selectedVariant) return;
+    setRecoveryMessage('');
+    setAction('generating', true);
+    setFlow('generating');
+    setWorkbenchMode('generating');
+    setGenerationPhase('Uploading artwork');
+    setOperationStartedAt(Date.now());
+    clearError('generation');
+    try {
+      const result = await api.uploadArtwork({
+        file,
+        sessionId: session?.id,
+        purpose: 'print',
+        rightsConfirmed: true,
+        placementCodes: selectedPlacements,
+        removeBackground,
+      });
+      const draft = consumeSource(result);
+      if (design?.id) {
+        setDesignHistory((current) =>
+          current.some((item) => item.id === design.id) ? current : [...current, design]
+        );
+      }
+      setPrompt(draft.prompt);
+      setDesign(draft);
+      setMockup(null);
+      setQuote(null);
+      setMockupStale(false);
+      setQuoteStale(false);
+      setFlow('drafted');
+      setAnnouncement('Your artwork is prepared. Building the product preview now.');
+      trackEvent('design_generation_completed', {
+        result: 'success',
+        source: 'upload',
+      });
+      setAction('generating', false);
+      setOperationStartedAt(null);
+      await requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: selectedPlacements,
+        draft,
+        orientation: selectedOrientation,
+      });
+    } catch (error) {
+      fail('generation', error);
+      setFlow('configuring');
+      setWorkbenchMode('describe');
+    } finally {
+      setAction('generating', false);
+      setOperationStartedAt(null);
+    }
+  };
+
+  const addReferenceImages = async (files: File[]) => {
+    const remaining = Math.max(0, 5 - referenceAssets.length);
+    const selectedFiles = files.slice(0, remaining);
+    if (!selectedFiles.length) return;
+    setAction('generating', true);
+    setGenerationPhase('Uploading references');
+    clearError('generation');
+    try {
+      const results: DesignDraft[] = [];
+      for (const file of selectedFiles) {
+        const result = await api.uploadArtwork({
+          file,
+          sessionId: session?.id,
+          purpose: 'reference',
+          rightsConfirmed: true,
+          placementCodes: selectedPlacements,
+        });
+        results.push(consumeSource(result));
+      }
+      setReferenceAssets((current) => [...current, ...results].slice(0, 5));
+      setAnnouncement(`${results.length} reference image${results.length === 1 ? '' : 's'} ready.`);
+    } catch (error) {
+      fail('generation', error);
+    } finally {
+      setAction('generating', false);
+    }
+  };
+
+  const removeReferenceAsset = (assetId: string | null) => {
+    setReferenceAssets((current) => current.filter((asset) => asset.id !== assetId));
+    if (assetId && session?.id) void api.deleteUploadAsset(assetId, session.id);
+  };
+
   const refineIdea = async () => {
     if (!prompt.trim()) return;
     setFlow('refining');
@@ -821,6 +939,7 @@ export function useStudioViewModel() {
   };
   const generate = async () => {
     if (!selectedProduct || !selectedVariant || !prompt.trim()) return;
+    if (creationPath === 'reference' && !referenceAssets.some((asset) => asset.id)) return;
     setRecoveryMessage('');
     const controller = new AbortController();
     generationController.current = controller;
@@ -839,16 +958,30 @@ export function useStudioViewModel() {
     let completionSource = capabilities.ai === 'live' ? 'api' : 'fixture';
     try {
       const [result] = await Promise.all([
-        api.designDraft(
-          {
-            prompt: idea?.refinedPrompt ?? prompt,
-            sessionId: session?.id,
-            productId: selectedProduct.id,
-            variantId: selectedVariant.id,
-            placementCodes: selectedPlacements,
-          },
-          controller.signal
-        ),
+        creationPath === 'reference'
+          ? api.designFromReferences(
+              {
+                prompt,
+                referenceAssetIds: referenceAssets
+                  .map((asset) => asset.id)
+                  .filter((id): id is string => Boolean(id)),
+                sessionId: session?.id,
+                productId: selectedProduct.id,
+                variantId: selectedVariant.id,
+                placementCodes: selectedPlacements,
+              },
+              controller.signal
+            )
+          : api.designDraft(
+              {
+                prompt: idea?.refinedPrompt ?? prompt,
+                sessionId: session?.id,
+                productId: selectedProduct.id,
+                variantId: selectedVariant.id,
+                placementCodes: selectedPlacements,
+              },
+              controller.signal
+            ),
         delay(1500, controller.signal),
       ]);
       completionSource = result.source === 'live' ? 'api' : 'fixture';
@@ -1270,6 +1403,7 @@ export function useStudioViewModel() {
     generationController.current?.abort();
     quoteController.current?.abort();
     clearStudioResumeState();
+    if (session?.id) void api.cleanupSessionUploads(session.id);
     window.location.replace(window.location.pathname);
   };
 
@@ -1289,6 +1423,8 @@ export function useStudioViewModel() {
     selectedPlacements,
     selectedOrientation,
     prompt,
+    creationPath,
+    referenceAssets,
     revision,
     email,
     idea,
@@ -1318,6 +1454,7 @@ export function useStudioViewModel() {
     canRevise,
     stepStates,
     setPrompt: updatePrompt,
+    setCreationPath,
     setRevision,
     setEmail,
     setSelectedCategory,
@@ -1327,6 +1464,9 @@ export function useStudioViewModel() {
     togglePlacement,
     refineIdea,
     generate,
+    uploadArtwork,
+    addReferenceImages,
+    removeReferenceAsset,
     cancelGeneration,
     reviseDraft,
     undoDraft,

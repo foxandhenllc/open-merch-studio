@@ -8,13 +8,15 @@ Open Merch Studio is an open-source, AI-first custom merch studio for curated Pr
 
 **License:** [MIT](./LICENSE)
 
-The public studio currently supports product exploration and guarded AI-assisted design generation. Public payment and fulfillment remain independently disabled until the separate paid-launch review is complete.
+The public studio supports product exploration, direct customer-artwork uploads, reference-led and AI-assisted design generation, print preparation, and live Printful mockups. Public payment and fulfillment remain independently disabled until the separate paid-launch review is complete.
 
 Open Merch Studio is the public project name. The code, docs, and environment templates avoid private customer data, production credentials, payment artifacts, and organization-specific claims.
 
 ## What It Does
 
 - Browses a curated multi-category Printful launch catalog.
+- Accepts PNG, JPEG, and WebP artwork for direct non-generative use, keeps originals private, prepares normalized print PNG derivatives, and records dimensions, provenance, rights confirmation, and retention metadata.
+- Accepts up to five private reference images for new bespoke artwork, and supports true image-based revisions while retaining the prior draft.
 - Creates fixture design drafts by default, with a guarded OpenAI image-generation adapter, prompt moderation, and print-ready prompt shaping available only when live generation is explicitly enabled.
 - Runs basic print-readiness checks before quoting.
 - Produces transparent cost-plus quotes with product cost, design allocation, margin, shipping estimate, payment fee estimate, and total.
@@ -61,6 +63,8 @@ npm run lint
 npm run type-check
 npm test
 npm run smoke:fixture
+npm run smoke:live-upload -- http://127.0.0.1:5001
+npm run smoke:deployed-upload -- https://your-deployment.example
 npm run build
 npm run test:browser
 npm run dev:backend
@@ -76,7 +80,12 @@ npm run dev:frontend
 - `POST /api/design/sessions`
 - `POST /api/design/ideas`
 - `POST /api/design/drafts`
+- `POST /api/design/drafts/from-references`
 - `POST /api/design/drafts/:id/revisions`
+- `POST /api/design/uploads/authorize`
+- `POST /api/design/uploads/:assetId/complete`
+- `DELETE /api/design/uploads/:assetId`
+- `DELETE /api/design/sessions/:sessionId/uploads`
 - `GET /api/design/assets/:assetId.png`
 - `POST /api/design/readiness`
 - `POST /api/design/mockups`
@@ -102,6 +111,11 @@ npm run dev:frontend
 - Domain cutover: [docs/launch/domain-cutover-openmerchstudio-com.md](./docs/launch/domain-cutover-openmerchstudio-com.md)
 - Supervised live-commerce evidence: [docs/launch/audits/2026-07-17-supervised-live-commerce-smoke.md](./docs/launch/audits/2026-07-17-supervised-live-commerce-smoke.md)
 - Policy copy and owner decisions; closed-preview implementation with fictitious-name confirmation pending: [docs/launch/legal-policy-copy-proposal-2026-07-17.md](./docs/launch/legal-policy-copy-proposal-2026-07-17.md)
+
+## Product Roadmap
+
+- Uploaded/reference artwork architecture: [docs/architecture/uploaded-artwork-flow.md](./docs/architecture/uploaded-artwork-flow.md)
+- Themed saved products and embeddable mini-stores: [docs/roadmap/themed-mini-stores.md](./docs/roadmap/themed-mini-stores.md)
 
 ## Printful References
 

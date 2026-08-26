@@ -1,7 +1,7 @@
 import type { DesignMockup } from './types/catalog';
 
 export type StudioResumeState = {
-  version: 2;
+  version: 3;
   savedAt: string;
   sessionId: string;
   selectedCategory: string;
@@ -11,6 +11,7 @@ export type StudioResumeState = {
   orientation?: 'portrait' | 'landscape' | 'square';
   prompt: string;
   designId?: string;
+  referenceAssetIds: string[];
   mockup?: DesignMockup;
   mockupViewIndex: number;
   quoteId?: string;
@@ -21,7 +22,7 @@ const RESUME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 type PersistableStudioResumeState = Omit<StudioResumeState, 'savedAt'>;
 type StoredStudioResumeState = Omit<Partial<StudioResumeState>, 'version' | 'savedAt'> & {
-  version?: 2;
+  version?: 2 | 3;
   savedAt?: unknown;
 };
 
@@ -47,7 +48,7 @@ export function readStudioResumeState(): StudioResumeState | null {
     if (!value) return null;
     const parsed = JSON.parse(value) as StoredStudioResumeState;
     if (
-      parsed.version !== 2 ||
+      ![2, 3].includes(Number(parsed.version)) ||
       typeof parsed.sessionId !== 'string' ||
       !parsed.sessionId
     ) {
@@ -59,7 +60,7 @@ export function readStudioResumeState(): StudioResumeState | null {
       return null;
     }
     const restored: StudioResumeState = {
-      version: 2,
+      version: 3,
       savedAt: parsed.savedAt,
       sessionId: parsed.sessionId,
       selectedCategory: typeof parsed.selectedCategory === 'string' ? parsed.selectedCategory : '',
@@ -73,6 +74,9 @@ export function readStudioResumeState(): StudioResumeState | null {
         : undefined,
       prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
       designId: typeof parsed.designId === 'string' ? parsed.designId : undefined,
+      referenceAssetIds: Array.isArray(parsed.referenceAssetIds)
+        ? parsed.referenceAssetIds.filter((value): value is string => typeof value === 'string').slice(0, 5)
+        : [],
       mockup:
         parsed.mockup &&
         typeof parsed.mockup === 'object' &&

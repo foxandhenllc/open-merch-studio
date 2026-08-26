@@ -1,6 +1,6 @@
 # Launch Ticket Implementation Status
 
-**Status:** Branded closed-gate production active; supervised commerce smoke passed
+**Status:** Public design studio active; checkout and fulfillment closed
 **Visibility:** Public
 
 This file records what has been completed in the repo and what remains blocked by private provider credentials or manual business review.
@@ -18,6 +18,7 @@ This file records what has been completed in the repo and what remains blocked b
 - `OMS-070` through `OMS-072`: Admin settings guard, fixture AI spend reporting, launch readiness gates, request IDs, privacy-safe structured operational events, protected operator recovery APIs, and launch audit template are implemented. Automated external paging remains a pre-unattended-beta task.
 - `OMS-080` through `OMS-082`: Fixture-mode clean setup, API/architecture docs, and GitHub issue taxonomy are documented.
 - `OMS-090` through `OMS-094`: Deployment gates, production migrations, fixture smoke test, credential/privacy scan path, and paid beta go/no-go checklist are implemented as docs, scripts, and runtime readiness checks. Supabase schema and Prisma migration-history checksums were reconciled and verified on 2026-07-14; the supervised live payment and draft-order smoke passed on 2026-07-17.
+- Customer-provided artwork is live: direct non-generative upload, private multi-image references, true image editing, print normalization, source-aware pricing, cleanup/retention, and live Printful mockup verification passed on August 26, 2026.
 
 ## Current Branded Production State
 
@@ -41,6 +42,10 @@ This file records what has been completed in the repo and what remains blocked b
   `live`, after the smoke gates were closed.
 - Public open-source indexing was approved on July 17, 2026 after legal/support content and the
   supervised commerce path were verified; checkout and fulfillment remain closed.
+- On August 26, 2026, the canonical production UI passed a signed Supabase upload of a temporary
+  1600×1400 PNG, Sharp print preparation, a decoded Printful mockup, responsive review, and cleanup.
+  Both apex and `www` are public and indexable. Checkout and fulfillment report `available`, not
+  `live`, and the frontend reports secure checkout as temporarily unavailable.
 
 ## Blocked Until Private Inputs
 
@@ -67,7 +72,7 @@ This file records what has been completed in the repo and what remains blocked b
 
 ## Verification
 
-Last local verification run: July 17, 2026, from `e74c50d` with production commerce gates closed.
+Last local and deployed verification run: August 26, 2026, with production commerce gates closed.
 
 ```bash
 npm run lint
@@ -79,9 +84,10 @@ npm run test:browser
 npm audit --audit-level=high
 ```
 
-Result: all passed. The backend suite reported 57 passes and one intentional database-only skip; the
-responsive browser smoke passed across 11 viewports and all five products; the dependency audit found
-zero vulnerabilities at the configured high-severity threshold.
+Result: all passed. The backend suite reported 67 passes and three intentional database-only skips;
+the responsive browser smoke passed across 11 viewports, all five fixture products, and the direct
+upload plus multi-reference paths. Production additionally passed real Supabase and Printful upload
+smokes with cleanup.
 
 ## Launch Rule
 

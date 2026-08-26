@@ -11,7 +11,12 @@ import type {
   QuoteLineInput,
 } from '../types/catalog.js';
 import { buildQuoteBreakdown, estimateRetailTotalCents } from './pricing.service.js';
-import { getStudioPassById, getStudioPassForSession, saveQuote } from './runtime-store.js';
+import {
+  getDraft,
+  getStudioPassById,
+  getStudioPassForSession,
+  saveQuote,
+} from './runtime-store.js';
 
 const launchCategorySlugs = new Set(sampleCatalog.categories.map((category) => category.slug));
 const curatedPosterVariants: CatalogVariantDto[] = [
@@ -292,8 +297,32 @@ export async function createQuote(
       ? (getStudioPassForSession(options.sessionId ?? '') ??
         getStudioPassById(options.studioPassId))
       : undefined;
+  const designAssetIds = Array.from(
+    new Set(inputItems.map((item) => item.designAssetId).filter(Boolean) as string[])
+  );
+  const designFeeCentsByAssetId: Record<string, number> = {};
+  if (designAssetIds.length) {
+    for (const assetId of designAssetIds) {
+      if (getDraft(assetId)?.sourceType === 'uploaded') designFeeCentsByAssetId[assetId] = 0;
+    }
+    if (env.databaseUrl) {
+      try {
+        const assets = await prisma.designAsset.findMany({
+          where: { id: { in: designAssetIds } },
+          select: { id: true, sourceType: true },
+        });
+        for (const asset of assets) {
+          designFeeCentsByAssetId[asset.id] =
+            asset.sourceType === 'uploaded' ? 0 : env.aiDesignFeeCents;
+        }
+      } catch {
+        // Fall back to the configured design fee if source metadata is unavailable.
+      }
+    }
+  }
   const quote = buildQuoteBreakdown(products, inputItems, undefined, {
     studioPassCreditCents: pass && pass.status !== 'applied' ? pass.creditCents : 0,
+    designFeeCentsByAssetId,
   });
   const runtimeQuote = saveQuote(quote);
 
@@ -327,6 +356,7 @@ export async function createQuote(
             options: {
               orientation: item.orientation,
               placementTechniques: item.placementTechniques,
+              designFeeCents: item.designFeeCents,
             },
             unitCostCents: item.unitCostCents,
             unitRetailCents: item.unitRetailCents,

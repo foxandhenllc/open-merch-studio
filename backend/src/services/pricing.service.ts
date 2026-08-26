@@ -77,7 +77,10 @@ export function buildQuoteBreakdown(
   products: CatalogProductDto[],
   inputItems: QuoteLineInput[],
   settings = pricingSettingsFromEnv(),
-  options: { studioPassCreditCents?: number } = {}
+  options: {
+    studioPassCreditCents?: number;
+    designFeeCentsByAssetId?: Record<string, number>;
+  } = {}
 ): QuoteBreakdown {
   const productMap = new Map(products.map((product) => [product.id, product]));
   const items = inputItems.map((input) => {
@@ -120,7 +123,10 @@ export function buildQuoteBreakdown(
     );
 
     const unitMarginCents = calculateTargetMarginCents(unitCostCents, product.type, settings);
-    const unitRetailCents = unitCostCents + unitMarginCents + settings.aiDesignFeeCents;
+    const designFeeCents = input.designAssetId
+      ? (options.designFeeCentsByAssetId?.[input.designAssetId] ?? settings.aiDesignFeeCents)
+      : settings.aiDesignFeeCents;
+    const unitRetailCents = unitCostCents + unitMarginCents + designFeeCents;
 
     return {
       productId: product.id,
@@ -133,6 +139,7 @@ export function buildQuoteBreakdown(
       placementTechniques,
       orientation: input.orientation,
       designAssetId: input.designAssetId,
+      designFeeCents,
       unitCostCents,
       unitRetailCents,
     };
@@ -147,7 +154,7 @@ export function buildQuoteBreakdown(
     0
   );
   const aiDesignFeeCents = items.reduce(
-    (total, item) => total + settings.aiDesignFeeCents * item.quantity,
+    (total, item) => total + item.designFeeCents * item.quantity,
     0
   );
   const shippingEstimateCents = estimateShippingCents(
@@ -185,7 +192,7 @@ export function buildQuoteBreakdown(
     },
     {
       code: 'design-allocation',
-      label: 'Design work',
+      label: aiDesignFeeCents > 0 ? 'Design work' : 'Customer-supplied artwork',
       amountCents: aiDesignFeeCents,
       kind: 'fee',
     },

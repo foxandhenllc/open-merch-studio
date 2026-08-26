@@ -93,6 +93,7 @@ export type QuoteBreakdown = {
     placementTechniques: Record<string, string>;
     orientation?: 'portrait' | 'landscape' | 'square';
     designAssetId?: string;
+    designFeeCents?: number;
     unitCostCents: number;
     unitRetailCents: number;
   }>;
@@ -153,15 +154,26 @@ export type DesignIdea = {
 export type DesignDraft = {
   id: string | null;
   sessionId?: string;
-  provider: 'mock' | 'openai-ready' | 'openai';
+  provider: 'mock' | 'openai-ready' | 'openai' | 'upload';
+  sourceType?: 'generated' | 'uploaded' | 'reference_generated' | 'edited';
+  purpose?: 'print' | 'reference';
   generationStatus: 'complete' | 'failed';
   prompt: string;
   imageUrl: string;
   qualityTier: 'rough' | 'final';
   printPreparation?: {
-    status: 'transparent' | 'removed' | 'required' | 'failed';
-    provider: 'openai' | 'remove-bg' | 'none';
+    status: 'transparent' | 'removed' | 'prepared' | 'required' | 'failed';
+    provider: 'openai' | 'remove-bg' | 'sharp' | 'none';
     message: string;
+  };
+  asset?: {
+    originalFilename?: string;
+    mimeType?: string;
+    byteSize?: number;
+    width?: number;
+    height?: number;
+    hasAlpha?: boolean;
+    parentAssetIds?: string[];
   };
   allowance: AllowanceState;
   policy: {
@@ -173,6 +185,14 @@ export type DesignDraft = {
     checks: Array<{ label: string; result: string; severity?: 'pass' | 'warning' | 'block' }>;
   };
   createdAt: string;
+};
+
+export type AssetUploadAuthorization = {
+  assetId: string;
+  transport: 'supabase' | 'inline';
+  signedUrl?: string;
+  maxBytes: number;
+  expiresInSeconds: number;
 };
 
 export type DesignMockup = {
