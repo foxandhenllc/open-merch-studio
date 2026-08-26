@@ -5,6 +5,7 @@ import {
   createMockDesignImage,
   dataUrlToBuffer,
   normalizePromptForPrint,
+  supportsInputFidelity,
   supportsTransparentBackground,
 } from '../services/openai-design-provider.js';
 
@@ -28,4 +29,11 @@ test('transparent output is requested only from compatible GPT Image models', ()
   assert.equal(supportsTransparentBackground('gpt-image-1'), true);
   assert.equal(supportsTransparentBackground('gpt-image-2'), false);
   assert.equal(supportsTransparentBackground('gpt-image-2-2026-04-21'), false);
+});
+
+test('input fidelity is omitted for GPT Image 2 edit requests', () => {
+  assert.equal(supportsInputFidelity('gpt-image-1.5'), true);
+  assert.equal(supportsInputFidelity('gpt-image-1'), true);
+  assert.equal(supportsInputFidelity('gpt-image-2'), false);
+  assert.equal(supportsInputFidelity('gpt-image-2-2026-04-21'), false);
 });

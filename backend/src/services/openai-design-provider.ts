@@ -43,6 +43,10 @@ export function supportsTransparentBackground(model: string): boolean {
   return !/^gpt-image-2(?:-|$)/i.test(model);
 }
 
+export function supportsInputFidelity(model: string): boolean {
+  return !/^gpt-image-2(?:-|$)/i.test(model);
+}
+
 function detectTextIntent(prompt: string): boolean {
   return (
     prompt.includes('"') ||
@@ -191,7 +195,9 @@ export async function editDesignImage(params: {
     quality: params.qualityTier === 'final' ? 'high' : 'low',
     background: supportsTransparentBackground(env.openaiDesignModel) ? 'transparent' : 'auto',
     output_format: 'png',
-    input_fidelity: params.mode === 'edit' ? 'high' : 'low',
+    ...(supportsInputFidelity(env.openaiDesignModel)
+      ? { input_fidelity: params.mode === 'edit' ? ('high' as const) : ('low' as const) }
+      : {}),
     user: params.sessionId,
   });
   const image = response.data?.[0];
