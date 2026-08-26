@@ -697,7 +697,7 @@ export async function reviseDesignDraft(params: {
     : await authorizeDesignAction(session.id, revisionAction, estimatedRevisionCostCents());
   if (!authorization.allowed) {
     throw new HttpError(
-      authorization.message ?? 'No more generated variations are available in this beta session.',
+      authorization.message ?? 'No more generated variations are available in this studio session.',
       409,
       'revision_allowance_required'
     );

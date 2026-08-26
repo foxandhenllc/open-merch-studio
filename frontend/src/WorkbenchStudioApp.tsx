@@ -297,7 +297,10 @@ export function WorkbenchStudioApp() {
           <span className="brand-symbol" aria-hidden="true">
             OM
           </span>
-          <b>Open Merch Studio</b>
+          <span>
+            <b>Open Merch Studio</b>
+            {publicConfig.enablePublicCheckout && <small>Now accepting orders</small>}
+          </span>
         </a>
         <a href="/support">Support</a>
       </header>
@@ -881,7 +884,7 @@ export function WorkbenchStudioApp() {
                 </button>
                 {!publicConfig.enablePublicCheckout && (
                   <p className="disabled-reason">
-                    Checkout is currently closed. Your design and price stay saved.
+                    Secure checkout is temporarily unavailable. Your design and price stay saved.
                   </p>
                 )}
                 <ErrorNote

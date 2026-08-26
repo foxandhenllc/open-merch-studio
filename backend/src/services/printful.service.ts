@@ -317,7 +317,7 @@ export async function syncPrintfulCatalog(): Promise<{
         ? (existingProduct?.curatedBy ?? 'PRINTFUL_CURATED_PRODUCT_IDS')
         : existingProduct?.curatedBy;
       const curationNotes = isExplicitlyCurated
-        ? (existingProduct?.curationNotes ?? 'Selected for the paid-beta curated launch catalog.')
+        ? (existingProduct?.curationNotes ?? 'Selected for the curated launch catalog.')
         : existingProduct?.curationNotes;
       const metadata = {
         printfulCategories: productCategories.map((category) => category.title),
@@ -801,7 +801,7 @@ export async function submitPrintfulDraftOrder(
   }
   if (env.printfulAutoConfirmOrders) {
     throw new Error(
-      'Printful auto-confirm is disabled for paid beta. Set PRINTFUL_AUTO_CONFIRM_ORDERS=false and review draft orders manually.'
+      'Printful auto-confirm is disabled. Keep PRINTFUL_AUTO_CONFIRM_ORDERS=false and review draft orders manually.'
     );
   }
   return submitPrintfulDraftOrderWithClient(createPrintfulClient(), params);

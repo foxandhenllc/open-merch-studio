@@ -112,7 +112,7 @@ function mapError(error: unknown, surface: Surface): SurfaceError {
   if (code === 'revision_allowance_required')
     return {
       cause: 'revision_allowance_required',
-      title: 'No more variations are available in this beta session',
+      title: 'No more variations are available in this studio session',
       message,
       recovery: 'Your current artwork, mockup, and price are unchanged.',
       retryable: false,
@@ -1060,7 +1060,7 @@ export function useStudioViewModel() {
         ...current,
         generation: {
           cause: 'revision_allowance_required',
-          title: 'No more variations are available in this beta session',
+          title: 'No more variations are available in this studio session',
           message: 'This session has no revision allowance remaining.',
           recovery: 'Your current artwork, product preview, and price are unchanged.',
           retryable: false,

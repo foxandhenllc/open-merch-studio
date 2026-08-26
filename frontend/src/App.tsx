@@ -175,7 +175,7 @@ const policies: Record<string, PolicyRoute> = {
       ),
       section(
         'Checkout availability',
-        'If secure checkout is closed, your design and estimated subtotal remain saved in your guest session.'
+        'If secure checkout is temporarily unavailable, your design and estimated subtotal remain saved in your guest session.'
       ),
       section(
         'Seller and policy contact',

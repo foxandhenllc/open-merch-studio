@@ -552,8 +552,8 @@ export function createLocalDesignDraft(
       message: localPass
         ? 'You can keep designing within the current allowance.'
         : localDraftCount >= 3
-          ? 'You have used the three drafts included with this beta session.'
-          : `${Math.max(0, 3 - localDraftCount)} beta drafts remaining.`,
+          ? 'You have used the three free drafts included with this studio session.'
+          : `${Math.max(0, 3 - localDraftCount)} free drafts remaining.`,
     },
     policy: {
       status: /nike|disney|marvel|pokemon/i.test(normalizedPrompt) ? 'blocked' : 'pass',

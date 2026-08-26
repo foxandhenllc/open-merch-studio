@@ -290,12 +290,12 @@ export function getAllowanceState(sessionId: string): AllowanceState {
       studioPassStatus === 'required'
         ? env.studioPassEnabled
           ? 'A $5 Studio Pass unlocks deeper drafting and applies to an eligible purchase.'
-          : 'You have used the three drafts included with this beta session.'
+          : 'You have used the three free drafts included with this studio session.'
         : studioPassStatus === 'exhausted'
           ? env.studioPassEnabled
             ? 'This Studio Pass allowance is used. Checkout or contact support for more design help.'
             : 'Continue with your current artwork or contact support for more design help.'
-          : `${freeDraftsRemaining} beta draft${freeDraftsRemaining === 1 ? '' : 's'} remaining.`,
+          : `${freeDraftsRemaining} free draft${freeDraftsRemaining === 1 ? '' : 's'} remaining.`,
   };
 }
 
