@@ -118,6 +118,7 @@ export const localProducts: CatalogProduct[] = [
         isDefault: true,
         width: 12,
         height: 16,
+        additionalPriceCents: 595,
       },
       {
         code: 'back',
@@ -126,6 +127,7 @@ export const localProducts: CatalogProduct[] = [
         isDefault: false,
         width: 12,
         height: 16,
+        additionalPriceCents: 595,
       },
     ],
   },
@@ -236,7 +238,22 @@ export const localProducts: CatalogProduct[] = [
         costCents: 1125,
       },
     ],
-    placements: [{ code: 'front', displayName: 'Front print', technique: 'dtg', isDefault: true }],
+    placements: [
+      {
+        code: 'front',
+        displayName: 'Front print',
+        technique: 'dtg',
+        isDefault: true,
+        additionalPriceCents: 595,
+      },
+      {
+        code: 'back',
+        displayName: 'Back print',
+        technique: 'dtg',
+        isDefault: false,
+        additionalPriceCents: 595,
+      },
+    ],
   },
   {
     id: 'fixture-product-vinyl-sticker',
@@ -349,6 +366,11 @@ export function createLocalQuote(
     variantId: string;
     quantity: number;
     placementCodes: string[];
+    placements?: Array<{
+      code: string;
+      designAssetId?: string;
+      layout?: 'center' | 'left' | 'right';
+    }>;
     orientation?: 'portrait' | 'landscape' | 'square';
     designAssetId?: string;
   }>,
@@ -360,11 +382,33 @@ export function createLocalQuote(
     const variant = product.variants.find((candidate) => candidate.id === item.variantId);
     if (!variant) throw new Error(`Unknown variant ${item.variantId}`);
     const quantity = Math.max(1, Math.floor(item.quantity || 1));
-    const placementCodes = item.placementCodes.length
-      ? item.placementCodes
-      : product.placements
-          .filter((placement) => placement.isDefault)
-          .map((placement) => placement.code);
+    const placementCodes = item.placements?.length
+      ? item.placements.map((placement) => placement.code)
+      : item.placementCodes.length
+        ? item.placementCodes
+        : product.placements
+            .filter((placement) => placement.isDefault)
+            .map((placement) => placement.code);
+    const placements = placementCodes.map((code, index) => {
+      const selection = item.placements?.find((placement) => placement.code === code);
+      const option = product.placements.find((placement) => placement.code === code);
+      return {
+        code,
+        designAssetId: selection?.designAssetId ?? item.designAssetId,
+        layout: selection?.layout,
+        technique: option?.technique ?? 'default',
+        additionalCostCents: index === 0 ? 0 : (option?.additionalPriceCents ?? 0),
+      };
+    });
+    const placementCostCents = placements.reduce(
+      (total, placement) => total + placement.additionalCostCents,
+      0
+    );
+    const unitCostCents = variant.costCents + placementCostCents;
+    const uniqueDesignCount = new Set(
+      placements.map((placement) => placement.designAssetId).filter(Boolean)
+    ).size;
+    const designFeeCents = Math.max(1, uniqueDesignCount) * 300;
     return {
       productId: product.id,
       variantId: variant.id,
@@ -379,14 +423,22 @@ export function createLocalQuote(
           product.placements.find((placement) => placement.code === code)?.technique ?? 'default',
         ])
       ),
+      placements,
       orientation: item.orientation,
       designAssetId: item.designAssetId,
-      unitCostCents: variant.costCents,
-      unitRetailCents: variant.costCents + marginFor(variant.costCents, product.type) + 300,
+      designFeeCents,
+      placementCostCents,
+      pricingSource: 'catalog-snapshot' as const,
+      unitCostCents,
+      unitRetailCents: unitCostCents + marginFor(unitCostCents, product.type) + designFeeCents,
     };
   });
   const productCostCents = quoteItems.reduce(
     (total, item) => total + item.unitCostCents * item.quantity,
+    0
+  );
+  const placementCostCents = quoteItems.reduce(
+    (total, item) => total + item.placementCostCents * item.quantity,
     0
   );
   const retailBeforeFees = quoteItems.reduce(
@@ -394,6 +446,10 @@ export function createLocalQuote(
     0
   );
   const quantity = quoteItems.reduce((total, item) => total + item.quantity, 0);
+  const aiDesignFeeCents = quoteItems.reduce(
+    (total, item) => total + item.designFeeCents * item.quantity,
+    0
+  );
   const shippingEstimateCents = shippingFor(quantity);
   const paymentFeeCents = paymentFeeFor(retailBeforeFees + shippingEstimateCents);
   const targetMarginCents = quoteItems.reduce((total, item) => {
@@ -408,9 +464,10 @@ export function createLocalQuote(
     id: localId('quote'),
     currency: 'USD',
     productCostCents,
+    placementCostCents,
     shippingEstimateCents,
     taxEstimateCents: 0,
-    aiDesignFeeCents: quantity * 300,
+    aiDesignFeeCents,
     paymentFeeCents,
     targetMarginCents,
     studioPassCreditCents,
@@ -420,11 +477,21 @@ export function createLocalQuote(
     costLines: [
       {
         code: 'product-cost',
-        label: 'Product & printing',
-        amountCents: productCostCents,
+        label: 'Product & first print',
+        amountCents: productCostCents - placementCostCents,
         kind: 'cost',
       },
-      { code: 'design-allocation', label: 'Design work', amountCents: quantity * 300, kind: 'fee' },
+      ...(placementCostCents
+        ? [
+            {
+              code: 'additional-print-areas',
+              label: 'Additional print areas',
+              amountCents: placementCostCents,
+              kind: 'cost' as const,
+            },
+          ]
+        : []),
+      { code: 'design-allocation', label: 'Design work', amountCents: aiDesignFeeCents, kind: 'fee' },
       {
         code: 'margin',
         label: 'Open Merch Studio margin',

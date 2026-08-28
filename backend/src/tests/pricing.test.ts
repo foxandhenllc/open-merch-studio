@@ -40,7 +40,7 @@ test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
   assert.deepEqual(
     quote.costLines.map((line) => line.label),
     [
-      'Product & printing',
+      'Product & first print',
       'Design work',
       'Open Merch Studio margin',
       'Estimated shipping',
@@ -78,6 +78,84 @@ test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
       }
     ).totalCents
   );
+});
+
+test('buildQuoteBreakdown prices a second print area and keeps its artwork assignment', () => {
+  const product = sampleCatalog.products[0];
+  const variant = product.variants[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: ['front', 'back'],
+        placements: [
+          { code: 'front', designAssetId: 'art-front' },
+          { code: 'back', designAssetId: 'art-back' },
+        ],
+      },
+    ],
+    {
+      currency: 'USD',
+      targetMarginPercent: 30,
+      minMarginCents: 500,
+      aiDesignFeeCents: 300,
+      paymentFeePercent: 2.9,
+      paymentFeeFixedCents: 30,
+      studioPassCreditCents: 500,
+    }
+  );
+
+  assert.equal(quote.placementCostCents, 595);
+  assert.equal(quote.productCostCents, variant.costCents + 595);
+  assert.equal(quote.aiDesignFeeCents, 600);
+  assert.deepEqual(
+    quote.items[0].placements.map((placement) => ({
+      code: placement.code,
+      designAssetId: placement.designAssetId,
+      additionalCostCents: placement.additionalCostCents,
+    })),
+    [
+      { code: 'front', designAssetId: 'art-front', additionalCostCents: 0 },
+      { code: 'back', designAssetId: 'art-back', additionalCostCents: 595 },
+    ]
+  );
+  assert.equal(
+    quote.costLines.find((line) => line.code === 'additional-print-areas')?.amountCents,
+    595
+  );
+});
+
+test('buildQuoteBreakdown prefers live provider placement pricing', () => {
+  const product = sampleCatalog.products[0];
+  const variant = product.variants[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: ['front', 'back'],
+      },
+    ],
+    undefined,
+    {
+      providerPricingByVariantId: {
+        [variant.id]: {
+          baseCostCents: 1675,
+          placementCostsCents: { front: 725, back: 725 },
+          source: 'printful-live',
+        },
+      },
+    }
+  );
+
+  assert.equal(quote.items[0].pricingSource, 'printful-live');
+  assert.equal(quote.items[0].placementCostCents, 725);
+  assert.equal(quote.items[0].unitCostCents, 2400);
 });
 
 test('buildQuoteBreakdown applies Studio Pass credit once', () => {

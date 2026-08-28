@@ -14,6 +14,15 @@ export type PlacementOption = {
   isDefault: boolean;
   width?: number;
   height?: number;
+  additionalPriceCents?: number;
+};
+
+export type PlacementLayout = 'center' | 'left' | 'right';
+
+export type PlacementSelection = {
+  code: string;
+  designAssetId?: string;
+  layout?: PlacementLayout;
 };
 
 export type CatalogVariant = {
@@ -55,6 +64,7 @@ export type QuoteBreakdown = {
   id: string | null;
   currency: string;
   productCostCents: number;
+  placementCostCents: number;
   shippingEstimateCents: number;
   taxEstimateCents: number;
   aiDesignFeeCents: number;
@@ -84,9 +94,12 @@ export type QuoteBreakdown = {
     quantity: number;
     placementCodes: string[];
     placementTechniques: Record<string, string>;
+    placements: Array<PlacementSelection & { technique: string; additionalCostCents: number }>;
     orientation?: 'portrait' | 'landscape' | 'square';
     designAssetId?: string;
     designFeeCents?: number;
+    placementCostCents: number;
+    pricingSource: 'printful-live' | 'catalog-snapshot';
     unitCostCents: number;
     unitRetailCents: number;
   }>;

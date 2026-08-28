@@ -203,12 +203,15 @@ async function exerciseResponsiveConfigure(browser, viewport) {
 
 async function exerciseFixtureJourney(browser) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mockupBodies = [];
+  const quoteBodies = [];
   await context.route('**/api/design/drafts', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1800));
     await route.abort('failed');
   });
   await context.route('**/api/design/mockups', async (route) => {
     const body = route.request().postDataJSON();
+    mockupBodies.push(body);
     const imageUrl = body.imageUrl;
     const views = ['Product view', 'Front view', 'Back view', 'Side view', 'Detail view'].map(
       (label, index) => ({ label, imageUrl: `${imageUrl}#view-${index}` })
@@ -236,6 +239,7 @@ async function exerciseFixtureJourney(browser) {
     });
   });
   await context.route('**/api/catalog/quotes', async (route) => {
+    quoteBodies.push(route.request().postDataJSON());
     await new Promise((resolve) => setTimeout(resolve, 800));
     await route.abort('failed');
   });
@@ -248,6 +252,7 @@ async function exerciseFixtureJourney(browser) {
       .first()
       .click();
     await page.getByRole('button', { name: 'White', exact: true }).click();
+    await page.getByRole('button', { name: /Back print/ }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
     const prompt = page.getByRole('textbox', { name: /What should we make/ });
@@ -313,6 +318,37 @@ async function exerciseFixtureJourney(browser) {
     );
     await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
     await assertNoHorizontalOverflow(page, '390x844 review');
+    assert.equal(
+      await page.locator('.print-area-row').count(),
+      2,
+      'a two-sided tee should show both print areas in review'
+    );
+    await page.getByText('$5.95 for additional printing', { exact: true }).waitFor();
+
+    await page.getByRole('button', { name: 'Create different artwork', exact: true }).click();
+    await page.getByRole('heading', { name: 'Create the Back print' }).waitFor();
+    await page
+      .getByRole('textbox', { name: /What should we make/ })
+      .fill('A small original garden tools badge for the back print, no words');
+    await page.getByRole('button', { name: 'Generate my design', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
+    if (artifactDirectory) {
+      await mkdir(artifactDirectory, { recursive: true });
+      await page.screenshot({ path: join(artifactDirectory, 'multi-print-review-mobile.png') });
+    }
+    const latestMockupBody = mockupBodies.at(-1);
+    const latestQuoteBody = quoteBodies.at(-1);
+    assert.equal(latestMockupBody.placements.length, 2);
+    assert.notEqual(
+      latestMockupBody.placements[0].designAssetId,
+      latestMockupBody.placements[1].designAssetId,
+      'front and back mockups should carry distinct artwork IDs after customization'
+    );
+    assert.notEqual(
+      latestQuoteBody.items[0].placements[0].designAssetId,
+      latestQuoteBody.items[0].placements[1].designAssetId,
+      'front and back quote data should preserve distinct artwork IDs'
+    );
 
     const mobileRail = page.locator('.mockup-viewer__rail--mobile');
     const desktopRail = page.locator('.mockup-viewer__rail--desktop');
@@ -900,7 +936,7 @@ async function exerciseLegacyRecoveryExpiry(browser) {
       JSON.parse(window.localStorage.getItem('open-merch-studio:guest-workbench:v1') || 'null')
     );
     assert.notEqual(saved?.sessionId, 'sess_legacy_unknown_age');
-    assert.equal(saved?.version, 3);
+    assert.equal(saved?.version, 4);
   } finally {
     await context.close();
   }

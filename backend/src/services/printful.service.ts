@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { isLaunchCategoryTitle, slugify } from './catalog.service.js';
 import { sampleCatalog } from './catalog-fixtures.js';
-import type { QuoteBreakdown } from '../types/catalog.js';
+import type { PlacementLayout, QuoteBreakdown } from '../types/catalog.js';
 
 type PrintfulCategory = {
   id: number;
@@ -91,6 +91,32 @@ type PrintfulMockupTaskResult = {
   mockups?: unknown[];
 };
 
+type PrintfulVariantPriceResult = {
+  currency?: string;
+  product?: {
+    placements?: Array<{
+      id?: string;
+      technique_key?: string;
+      price?: string | number | null;
+      discounted_price?: string | number | null;
+    }>;
+  };
+  variant?: {
+    id?: number;
+    techniques?: Array<{
+      technique_key?: string;
+      price?: string | number | null;
+      discounted_price?: string | number | null;
+    }>;
+  };
+};
+
+export type PrintfulVariantPricing = {
+  baseCostCents: number;
+  placementCostsCents: Record<string, number>;
+  source: 'printful-live';
+};
+
 const createPrintfulClient = (): AxiosInstance => {
   if (!env.printfulApiKey) {
     throw new Error('PRINTFUL_API_KEY is not configured.');
@@ -108,6 +134,61 @@ const createPrintfulClient = (): AxiosInstance => {
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const variantPricingCache = new Map<number, { expiresAt: number; value: PrintfulVariantPricing }>();
+
+const moneyToCents = (value: string | number | null | undefined): number => {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : 0;
+};
+
+export async function fetchPrintfulVariantPricing(params: {
+  printfulVariantId: number;
+  technique: string;
+}): Promise<PrintfulVariantPricing> {
+  const cached = variantPricingCache.get(params.printfulVariantId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (!env.printfulApiKey || !env.enableLivePrintful) {
+    throw new Error('Live Printful pricing is unavailable.');
+  }
+  const response = await createPrintfulClient().get(
+    `/v2/catalog-variants/${params.printfulVariantId}/prices`,
+    {
+      params: {
+        selling_region_name: env.printfulSellingRegion,
+        currency: env.defaultCurrency,
+        production_currency: env.defaultCurrency,
+      },
+    }
+  );
+  const result = unwrapPrintfulResponse<PrintfulVariantPriceResult>(response.data);
+  const techniqueKey = params.technique.toLowerCase();
+  const technique =
+    result.variant?.techniques?.find(
+      (candidate) => candidate.technique_key?.toLowerCase() === techniqueKey
+    ) ?? result.variant?.techniques?.[0];
+  const baseCostCents = moneyToCents(technique?.discounted_price ?? technique?.price);
+  if (!baseCostCents) throw new Error('Printful did not return a usable variant price.');
+  const placementCostsCents = Object.fromEntries(
+    (result.product?.placements ?? [])
+      .filter(
+        (placement) =>
+          placement.id &&
+          (!placement.technique_key || placement.technique_key.toLowerCase() === techniqueKey)
+      )
+      .map((placement) => [String(placement.id), moneyToCents(placement.price)])
+  );
+  const value: PrintfulVariantPricing = {
+    baseCostCents,
+    placementCostsCents,
+    source: 'printful-live',
+  };
+  variantPricingCache.set(params.printfulVariantId, {
+    expiresAt: Date.now() + 15 * 60 * 1000,
+    value,
+  });
+  return value;
+}
 
 function unwrapPrintfulResponse<T>(data: unknown): T {
   const response = data as { result?: T; data?: T };
@@ -662,11 +743,12 @@ export function buildPrintfulOrderPayload(params: {
     zip: string;
     email?: string;
   };
-  artworkUrl: string;
+  artworkUrl?: string;
+  artworkUrlsByAssetId?: Record<string, string>;
 }): Record<string, unknown> {
-  if (!isPublicHttpUrl(params.artworkUrl)) {
-    throw new Error('Printful orders require a public HTTP(S) artwork URL.');
-  }
+  const fallbackArtworkUrl = params.artworkUrl;
+  if (fallbackArtworkUrl && !isPublicHttpUrl(fallbackArtworkUrl))
+    throw new Error('Printful orders require public HTTP(S) artwork URLs.');
   if (!params.recipient.name || !params.recipient.address1 || !params.recipient.city) {
     throw new Error('Printful orders require recipient name, address, and city.');
   }
@@ -683,6 +765,15 @@ export function buildPrintfulOrderPayload(params: {
     for (const placementCode of item.placementCodes) {
       if (!item.placementTechniques[placementCode]) {
         throw new Error(`Printful technique is missing for ${item.title} ${placementCode}.`);
+      }
+    }
+    for (const placement of item.placements) {
+      const artworkUrl =
+        (placement.designAssetId
+          ? params.artworkUrlsByAssetId?.[placement.designAssetId]
+          : undefined) ?? fallbackArtworkUrl;
+      if (!artworkUrl || !isPublicHttpUrl(artworkUrl)) {
+        throw new Error(`Printful artwork is missing for ${item.title} ${placement.code}.`);
       }
     }
     if (item.quantity <= 0 || item.unitRetailCents <= 0) {
@@ -707,13 +798,16 @@ export function buildPrintfulOrderPayload(params: {
       quantity: item.quantity,
       name: `${item.title} - ${item.variantName}`,
       retail_price: (item.unitRetailCents / 100).toFixed(2),
-      placements: item.placementCodes.map((placementCode) => ({
-        placement: placementCode,
-        technique: item.placementTechniques[placementCode],
+      placements: item.placements.map((placement) => ({
+        placement: placement.code,
+        technique: placement.technique,
         layers: [
           {
             type: 'file',
-            url: params.artworkUrl,
+            url:
+              (placement.designAssetId
+                ? params.artworkUrlsByAssetId?.[placement.designAssetId]
+                : undefined) ?? fallbackArtworkUrl,
           },
         ],
       })),
@@ -754,7 +848,8 @@ export type SubmitPrintfulDraftOrderParams = {
     zip: string;
     email?: string;
   };
-  artworkUrl: string;
+  artworkUrl?: string;
+  artworkUrlsByAssetId?: Record<string, string>;
 };
 
 export async function submitPrintfulDraftOrderWithClient(
@@ -765,6 +860,7 @@ export async function submitPrintfulDraftOrderWithClient(
     quote: params.quote,
     recipient: params.recipient,
     artworkUrl: params.artworkUrl,
+    artworkUrlsByAssetId: params.artworkUrlsByAssetId,
   });
 
   let order = await fetchPrintfulOrderByExternalId(client, params.orderNumber);
@@ -894,7 +990,8 @@ export function mapPrintfulOrderStatus(status?: string): {
 
 function computeCenteredSquarePosition(
   printfile: PrintfulPrintfile,
-  orientation?: 'portrait' | 'landscape' | 'square'
+  orientation?: 'portrait' | 'landscape' | 'square',
+  layout: PlacementLayout = 'center'
 ) {
   const shouldSwap =
     (orientation === 'portrait' && printfile.width > printfile.height) ||
@@ -903,13 +1000,20 @@ function computeCenteredSquarePosition(
   const areaHeight = shouldSwap ? printfile.width : printfile.height;
   const size = Math.min(areaWidth, areaHeight);
 
+  const centeredLeft = Math.max(0, Math.round((areaWidth - size) / 2));
+  const layoutLeft =
+    layout === 'left'
+      ? Math.max(0, Math.round(areaWidth * 0.08))
+      : layout === 'right'
+        ? Math.max(0, Math.round(areaWidth - size - areaWidth * 0.08))
+        : centeredLeft;
   return {
     area_width: areaWidth,
     area_height: areaHeight,
     width: size,
     height: size,
     top: Math.max(0, Math.round((areaHeight - size) / 2)),
-    left: Math.max(0, Math.round((areaWidth - size) / 2)),
+    left: layoutLeft,
   };
 }
 
@@ -935,6 +1039,7 @@ export function buildPrintfulMockupPayload(params: {
   designImageUrl: string;
   printfile: PrintfulPrintfile;
   orientation?: 'portrait' | 'landscape' | 'square';
+  layout?: PlacementLayout;
 }) {
   return {
     variant_ids: [params.printfulVariantId],
@@ -943,10 +1048,33 @@ export function buildPrintfulMockupPayload(params: {
       {
         placement: params.placement,
         image_url: params.designImageUrl,
-        position: computeCenteredSquarePosition(params.printfile, params.orientation),
+        position: computeCenteredSquarePosition(
+          params.printfile,
+          params.orientation,
+          params.layout
+        ),
       },
     ],
   };
+}
+
+export function buildPrintfulMockupTaskPayload(params: {
+  printfulVariantId: number;
+  files: Array<{
+    placement: string;
+    image_url: string;
+    position: {
+      area_width: number;
+      area_height: number;
+      width: number;
+      height: number;
+      top: number;
+      left: number;
+    };
+  }>;
+}) {
+  if (!params.files.length) throw new Error('A Printful mockup task requires at least one file.');
+  return { variant_ids: [params.printfulVariantId], format: 'png', files: params.files };
 }
 
 export function describePrintfulError(error: unknown): string {
@@ -1000,21 +1128,36 @@ async function createPrintfulMockupTask(params: {
   client: AxiosInstance;
   printfulProductId: string;
   printfulVariantId: number;
-  placement: string;
-  designImageUrl: string;
-  technique?: string;
+  placements: Array<{
+    placement: string;
+    designImageUrl: string;
+    technique?: string;
+    layout?: PlacementLayout;
+  }>;
   orientation?: 'portrait' | 'landscape' | 'square';
 }): Promise<string> {
-  const printfile = await fetchPrintfileForVariant(params);
+  const files = await Promise.all(
+    params.placements.map(async (placement) => {
+      const printfile = await fetchPrintfileForVariant({
+        client: params.client,
+        printfulProductId: params.printfulProductId,
+        printfulVariantId: params.printfulVariantId,
+        placement: placement.placement,
+        technique: placement.technique,
+      });
+      return buildPrintfulMockupPayload({
+        printfulVariantId: params.printfulVariantId,
+        placement: placement.placement,
+        designImageUrl: placement.designImageUrl,
+        printfile,
+        orientation: params.orientation,
+        layout: placement.layout,
+      }).files[0];
+    })
+  );
   const response = await params.client.post(
     `/mockup-generator/create-task/${params.printfulProductId}`,
-    buildPrintfulMockupPayload({
-      printfulVariantId: params.printfulVariantId,
-      placement: params.placement,
-      designImageUrl: params.designImageUrl,
-      printfile,
-      orientation: params.orientation,
-    })
+    buildPrintfulMockupTaskPayload({ printfulVariantId: params.printfulVariantId, files })
   );
   const result = unwrapPrintfulResponse<PrintfulMockupTaskCreateResult>(response.data);
   if (!result.task_key) {
@@ -1046,25 +1189,31 @@ async function pollPrintfulMockupTask(
 
 export function extractMockupViews(
   taskResult: PrintfulMockupTaskResult,
-  placement: string,
+  placement: string | string[],
   preferFrontView = false
 ): Array<{ label: string; imageUrl: string }> {
   const mockups = Array.isArray(taskResult.mockups) ? taskResult.mockups : [];
   const candidates = mockups as Array<Record<string, unknown>>;
-  const match =
-    candidates.find((candidate) => String(candidate.placement ?? '') === placement) ??
-    candidates[0];
+  const placements = new Set(Array.isArray(placement) ? placement : [placement]);
+  const matches = candidates.filter((candidate) =>
+    placements.has(String(candidate.placement ?? ''))
+  );
+  if (!matches.length && candidates[0]) matches.push(candidates[0]);
   const views: Array<{ label: string; imageUrl: string }> = [];
-  const directUrl = match?.mockup_url ?? match?.mockupUrl ?? match?.url;
-  if (typeof directUrl === 'string' && directUrl) {
-    views.push({ label: String(match?.display_name ?? 'Product view'), imageUrl: directUrl });
-  }
-  const extra = Array.isArray(match?.extra) ? (match.extra as Array<Record<string, unknown>>) : [];
-  for (const entry of extra) {
-    if (typeof entry.url !== 'string' || !entry.url) continue;
-    const title = String(entry.title ?? entry.option ?? 'Product view');
-    const group = typeof entry.option_group === 'string' ? entry.option_group : '';
-    views.push({ label: group ? `${title} · ${group}` : title, imageUrl: entry.url });
+  for (const match of matches) {
+    const directUrl = match?.mockup_url ?? match?.mockupUrl ?? match?.url;
+    if (typeof directUrl === 'string' && directUrl) {
+      views.push({ label: String(match?.display_name ?? 'Product view'), imageUrl: directUrl });
+    }
+    const extra = Array.isArray(match?.extra)
+      ? (match.extra as Array<Record<string, unknown>>)
+      : [];
+    for (const entry of extra) {
+      if (typeof entry.url !== 'string' || !entry.url) continue;
+      const title = String(entry.title ?? entry.option ?? 'Product view');
+      const group = typeof entry.option_group === 'string' ? entry.option_group : '';
+      views.push({ label: group ? `${title} · ${group}` : title, imageUrl: entry.url });
+    }
   }
   const unique = Array.from(new Map(views.map((view) => [view.imageUrl, view])).values());
   if (!unique.length) throw new Error('Unable to extract Printful mockup URL.');
@@ -1085,9 +1234,12 @@ export function extractMockupViews(
 export async function generatePrintfulMockupPreview(params: {
   printfulProductId: string;
   printfulVariantId: number;
-  placement: string;
-  designImageUrl: string;
-  technique?: string;
+  placements: Array<{
+    placement: string;
+    designImageUrl: string;
+    technique?: string;
+    layout?: PlacementLayout;
+  }>;
   orientation?: 'portrait' | 'landscape' | 'square';
   preferFrontView?: boolean;
 }): Promise<{
@@ -1098,14 +1250,21 @@ export async function generatePrintfulMockupPreview(params: {
   if (!env.printfulApiKey || !env.enableLivePrintful) {
     throw new Error('Printful live mockups require PRINTFUL_API_KEY and ENABLE_LIVE_PRINTFUL.');
   }
-  if (!isPublicHttpUrl(params.designImageUrl)) {
+  if (
+    !params.placements.length ||
+    params.placements.some((item) => !isPublicHttpUrl(item.designImageUrl))
+  ) {
     throw new Error('Printful live mockups require a public HTTP(S) artwork URL.');
   }
 
   const client = createPrintfulClient();
   const taskKey = await createPrintfulMockupTask({ client, ...params });
   const taskResult = await pollPrintfulMockupTask(client, taskKey);
-  const views = extractMockupViews(taskResult, params.placement, params.preferFrontView);
+  const views = extractMockupViews(
+    taskResult,
+    params.placements.map((placement) => placement.placement),
+    params.preferFrontView
+  );
   return {
     taskKey,
     imageUrl: views[0].imageUrl,

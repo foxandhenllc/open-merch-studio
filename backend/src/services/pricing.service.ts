@@ -1,5 +1,11 @@
 import { env } from '../config/env.js';
-import type { CatalogProductDto, QuoteBreakdown, QuoteLineInput } from '../types/catalog.js';
+import type {
+  CatalogProductDto,
+  PlacementSelection,
+  QuoteBreakdown,
+  QuoteLineInput,
+} from '../types/catalog.js';
+import type { PrintfulVariantPricing } from './printful.service.js';
 
 export type PricingSettings = {
   currency: string;
@@ -80,6 +86,7 @@ export function buildQuoteBreakdown(
   options: {
     studioPassCreditCents?: number;
     designFeeCentsByAssetId?: Record<string, number>;
+    providerPricingByVariantId?: Record<string, PrintfulVariantPricing>;
   } = {}
 ): QuoteBreakdown {
   const productMap = new Map(products.map((product) => [product.id, product]));
@@ -94,8 +101,18 @@ export function buildQuoteBreakdown(
       throw new Error(`Unknown variant ${input.variantId}`);
     }
 
-    const placementCodes = input.placementCodes.length
-      ? input.placementCodes
+    const requestedPlacements: PlacementSelection[] = input.placements?.length
+      ? input.placements
+      : input.placementCodes.length
+        ? input.placementCodes.map((code) => ({ code, designAssetId: input.designAssetId }))
+        : product.placements
+            .filter((placement) => placement.isDefault)
+            .map((placement) => ({ code: placement.code, designAssetId: input.designAssetId }));
+    const placements = Array.from(
+      new Map(requestedPlacements.map((placement) => [placement.code, placement])).values()
+    );
+    const placementCodes = placements.length
+      ? placements.map((placement) => placement.code)
       : product.placements
           .filter((placement) => placement.isDefault)
           .map((placement) => placement.code);
@@ -105,7 +122,6 @@ export function buildQuoteBreakdown(
     }
 
     const quantity = Math.max(1, Math.floor(input.quantity || 1));
-    const unitCostCents = variant.costCents;
     const unavailablePlacement = placementCodes.find(
       (placementCode) => !product.placements.some((placement) => placement.code === placementCode)
     );
@@ -122,10 +138,43 @@ export function buildQuoteBreakdown(
       })
     );
 
+    const providerPricing = options.providerPricingByVariantId?.[variant.id];
+    const baseCostCents = providerPricing?.baseCostCents || variant.costCents;
+    const resolvedPlacements = placements.map((selection, index) => {
+      const placement = product.placements.find((candidate) => candidate.code === selection.code)!;
+      const providerCost = providerPricing?.placementCostsCents[selection.code];
+      const additionalCostCents =
+        index === 0 ? 0 : (providerCost ?? placement.additionalPriceCents ?? 0);
+      return {
+        ...selection,
+        technique: placement.technique,
+        additionalCostCents,
+      };
+    });
+    const placementCostCents = resolvedPlacements.reduce(
+      (total, placement) => total + placement.additionalCostCents,
+      0
+    );
+    const unitCostCents = baseCostCents + placementCostCents;
+
     const unitMarginCents = calculateTargetMarginCents(unitCostCents, product.type, settings);
-    const designFeeCents = input.designAssetId
-      ? (options.designFeeCentsByAssetId?.[input.designAssetId] ?? settings.aiDesignFeeCents)
-      : settings.aiDesignFeeCents;
+    const designAssetIds = Array.from(
+      new Set(
+        resolvedPlacements
+          .map((placement) => placement.designAssetId)
+          .filter((assetId): assetId is string => Boolean(assetId))
+      )
+    );
+    const legacyDesignAssetId = input.designAssetId ?? designAssetIds[0];
+    const designFeeCents = designAssetIds.length
+      ? designAssetIds.reduce(
+          (total, assetId) =>
+            total + (options.designFeeCentsByAssetId?.[assetId] ?? settings.aiDesignFeeCents),
+          0
+        )
+      : legacyDesignAssetId
+        ? (options.designFeeCentsByAssetId?.[legacyDesignAssetId] ?? settings.aiDesignFeeCents)
+        : settings.aiDesignFeeCents;
     const unitRetailCents = unitCostCents + unitMarginCents + designFeeCents;
 
     return {
@@ -137,9 +186,12 @@ export function buildQuoteBreakdown(
       quantity,
       placementCodes,
       placementTechniques,
+      placements: resolvedPlacements,
       orientation: input.orientation,
-      designAssetId: input.designAssetId,
+      designAssetId: legacyDesignAssetId,
       designFeeCents,
+      placementCostCents,
+      pricingSource: providerPricing ? ('printful-live' as const) : ('catalog-snapshot' as const),
       unitCostCents,
       unitRetailCents,
     };
@@ -147,6 +199,10 @@ export function buildQuoteBreakdown(
 
   const productCostCents = items.reduce(
     (total, item) => total + item.unitCostCents * item.quantity,
+    0
+  );
+  const placementCostCents = items.reduce(
+    (total, item) => total + item.placementCostCents * item.quantity,
     0
   );
   const itemRetailBeforeFees = items.reduce(
@@ -186,10 +242,20 @@ export function buildQuoteBreakdown(
   const costLines: QuoteBreakdown['costLines'] = [
     {
       code: 'product-cost',
-      label: 'Product & printing',
-      amountCents: productCostCents,
+      label: 'Product & first print',
+      amountCents: productCostCents - placementCostCents,
       kind: 'cost',
     },
+    ...(placementCostCents > 0
+      ? [
+          {
+            code: 'additional-print-areas',
+            label: 'Additional print areas',
+            amountCents: placementCostCents,
+            kind: 'cost' as const,
+          },
+        ]
+      : []),
     {
       code: 'design-allocation',
       label: aiDesignFeeCents > 0 ? 'Design work' : 'Customer-supplied artwork',
@@ -227,6 +293,7 @@ export function buildQuoteBreakdown(
   return {
     currency: settings.currency,
     productCostCents,
+    placementCostCents,
     shippingEstimateCents,
     taxEstimateCents: 0,
     aiDesignFeeCents,

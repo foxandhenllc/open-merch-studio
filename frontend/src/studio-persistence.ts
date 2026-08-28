@@ -1,13 +1,15 @@
 import type { DesignMockup } from './types/catalog';
 
 export type StudioResumeState = {
-  version: 3;
+  version: 4;
   savedAt: string;
   sessionId: string;
   selectedCategory: string;
   productId: string;
   variantId: string;
   placementCodes: string[];
+  placementDesignAssetIds: Record<string, string>;
+  mugLayout?: 'center' | 'left' | 'right';
   orientation?: 'portrait' | 'landscape' | 'square';
   prompt: string;
   designId?: string;
@@ -22,7 +24,7 @@ const RESUME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 type PersistableStudioResumeState = Omit<StudioResumeState, 'savedAt'>;
 type StoredStudioResumeState = Omit<Partial<StudioResumeState>, 'version' | 'savedAt'> & {
-  version?: 2 | 3;
+  version?: 2 | 3 | 4;
   savedAt?: unknown;
 };
 
@@ -48,7 +50,7 @@ export function readStudioResumeState(): StudioResumeState | null {
     if (!value) return null;
     const parsed = JSON.parse(value) as StoredStudioResumeState;
     if (
-      ![2, 3].includes(Number(parsed.version)) ||
+      ![2, 3, 4].includes(Number(parsed.version)) ||
       typeof parsed.sessionId !== 'string' ||
       !parsed.sessionId
     ) {
@@ -60,7 +62,7 @@ export function readStudioResumeState(): StudioResumeState | null {
       return null;
     }
     const restored: StudioResumeState = {
-      version: 3,
+      version: 4,
       savedAt: parsed.savedAt,
       sessionId: parsed.sessionId,
       selectedCategory: typeof parsed.selectedCategory === 'string' ? parsed.selectedCategory : '',
@@ -69,6 +71,20 @@ export function readStudioResumeState(): StudioResumeState | null {
       placementCodes: Array.isArray(parsed.placementCodes)
         ? parsed.placementCodes.filter((value): value is string => typeof value === 'string')
         : [],
+      placementDesignAssetIds:
+        parsed.placementDesignAssetIds &&
+        typeof parsed.placementDesignAssetIds === 'object' &&
+        !Array.isArray(parsed.placementDesignAssetIds)
+          ? Object.fromEntries(
+              Object.entries(parsed.placementDesignAssetIds).filter(
+                (entry): entry is [string, string] =>
+                  typeof entry[0] === 'string' && typeof entry[1] === 'string'
+              )
+            )
+          : {},
+      mugLayout: ['center', 'left', 'right'].includes(String(parsed.mugLayout))
+        ? (parsed.mugLayout as 'center' | 'left' | 'right')
+        : undefined,
       orientation: ['portrait', 'landscape', 'square'].includes(String(parsed.orientation))
         ? parsed.orientation
         : undefined,

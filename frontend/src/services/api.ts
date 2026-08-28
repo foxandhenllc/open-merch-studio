@@ -8,6 +8,7 @@ import type {
   DesignDraft,
   DesignIdea,
   DesignMockup,
+  PlacementSelection,
   QuoteBreakdown,
   StudioCapabilities,
   StudioSession,
@@ -117,6 +118,7 @@ export const api = {
         variantId: string;
         quantity: number;
         placementCodes: string[];
+        placements?: PlacementSelection[];
         orientation?: 'portrait' | 'landscape' | 'square';
         designAssetId?: string;
       }>;
@@ -320,6 +322,7 @@ export const api = {
     productId: string;
     variantId: string;
     placementCodes: string[];
+    placements?: PlacementSelection[];
     designAssetId?: string;
     imageUrl?: string;
     orientation?: 'portrait' | 'landscape' | 'square';

@@ -277,10 +277,19 @@ export function WorkbenchStudioApp() {
       : emailBlocker
         ? ''
         : vm.checkoutReadiness.blocker;
+  const activePlacement = vm.selectedProduct?.placements.find(
+    (placement) => placement.code === vm.activePlacementCode
+  );
+  const selectedPlacementOptions =
+    vm.selectedProduct?.placements.filter((placement) =>
+      vm.selectedPlacements.includes(placement.code)
+    ) ?? [];
+  const primaryPlacement = selectedPlacementOptions[0];
+  const quoteItem = vm.quote?.items[0];
   const panelTitle = {
     product: 'Choose a product',
     configure: 'Choose color and size',
-    describe: 'Describe your design',
+    describe: activePlacement ? `Create the ${activePlacement.displayName}` : 'Describe your design',
     generating: 'Making your artwork',
     review: reviewSettling ? 'Finishing your preview' : 'Your design is ready',
     checkout: 'Review and checkout',
@@ -439,9 +448,13 @@ export function WorkbenchStudioApp() {
                   onChange={vm.setSelectedVariantId}
                 />
                 {vm.selectedProduct!.placements.length > 1 && (
-                  <fieldset>
-                    <legend>Print placement</legend>
-                    <div className="placement-options compact-options">
+                  <fieldset className="print-area-picker">
+                    <legend>Print areas</legend>
+                    <p className="selection-help">
+                      Your first print is included in the product price. Add the other side for a
+                      second production charge.
+                    </p>
+                    <div className="placement-options compact-options print-area-options">
                       {vm.selectedProduct!.placements.map((placement) => (
                         <button
                           key={placement.code}
@@ -449,7 +462,52 @@ export function WorkbenchStudioApp() {
                           aria-pressed={vm.selectedPlacements.includes(placement.code)}
                           onClick={() => vm.togglePlacement(placement.code)}
                         >
-                          {placement.displayName}
+                          <b>{placement.displayName}</b>
+                          <small>
+                            {vm.selectedPlacements[0] === placement.code
+                              ? 'First print included'
+                              : vm.selectedPlacements.includes(placement.code) &&
+                                  !vm.quoteStale &&
+                                  quoteItem?.placements.find(
+                                    (item) => item.code === placement.code
+                                  )?.additionalCostCents
+                                ? `+${money(
+                                    quoteItem.placements.find(
+                                      (item) => item.code === placement.code
+                                    )!.additionalCostCents,
+                                    vm.quote?.currency
+                                  )} production`
+                                : placement.additionalPriceCents
+                                  ? `About +${money(placement.additionalPriceCents)} when added`
+                                  : 'Additional print charge when added'}
+                          </small>
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+                {vm.selectedProduct!.categorySlug === 'drinkware' && (
+                  <fieldset className="mug-layout-picker">
+                    <legend>Artwork position around the mug</legend>
+                    <p className="selection-help">
+                      This moves one design inside the mug’s wraparound print area and does not add
+                      another print charge.
+                    </p>
+                    <div className="placement-options compact-options">
+                      {(
+                        [
+                          ['center', 'Centered'],
+                          ['left', 'Shift left'],
+                          ['right', 'Shift right'],
+                        ] as const
+                      ).map(([layout, label]) => (
+                        <button
+                          key={layout}
+                          type="button"
+                          aria-pressed={vm.mugLayout === layout}
+                          onClick={() => vm.setMugLayout(layout)}
+                        >
+                          {label}
                         </button>
                       ))}
                     </div>
@@ -501,6 +559,15 @@ export function WorkbenchStudioApp() {
                   <b>{vm.selectedVariant!.name}</b>
                   <small>Edit</small>
                 </button>
+                {activePlacement && (
+                  <div className="placement-target" role="status">
+                    <b>Creating artwork for {activePlacement.displayName}</b>
+                    <p>
+                      Your other print area stays unchanged. Generate, upload, or use references
+                      for this side only.
+                    </p>
+                  </div>
+                )}
                 <div className="artwork-source" role="group" aria-label="Choose how to make artwork">
                   <button
                     type="button"
@@ -723,6 +790,103 @@ export function WorkbenchStudioApp() {
                 ) : !reviewSettling ? (
                   <p className="muted-copy">Price unavailable right now.</p>
                 ) : null}
+                {!reviewSettling && selectedPlacementOptions.length > 0 && (
+                  <section className="print-area-review" aria-labelledby="print-area-review-title">
+                    <header>
+                      <div>
+                        <b id="print-area-review-title">
+                          {vm.selectedProduct?.categorySlug === 'drinkware'
+                            ? 'Mug artwork'
+                            : 'Print areas'}
+                        </b>
+                        <small>
+                          {vm.quote?.placementCostCents
+                            ? `${money(vm.quote.placementCostCents, vm.quote.currency)} for additional printing`
+                            : vm.selectedProduct?.categorySlug === 'drinkware'
+                              ? 'One wraparound print area'
+                              : 'First print included'}
+                        </small>
+                      </div>
+                      <button className="text-action" type="button" onClick={vm.showConfigure}>
+                        Edit areas
+                      </button>
+                    </header>
+                    <div className="print-area-list">
+                      {selectedPlacementOptions.map((placement, index) => {
+                        const assignedArtwork = vm.placementArtwork[placement.code] ?? vm.design;
+                        const primaryArtwork = primaryPlacement
+                          ? (vm.placementArtwork[primaryPlacement.code] ?? vm.design)
+                          : vm.design;
+                        const usesPrimaryArtwork = Boolean(
+                          assignedArtwork?.id && assignedArtwork.id === primaryArtwork?.id
+                        );
+                        const quotePlacement = quoteItem?.placements.find(
+                          (item) => item.code === placement.code
+                        );
+                        return (
+                          <article key={placement.code} className="print-area-row">
+                            <img src={assignedArtwork.imageUrl} alt="" />
+                            <div>
+                              <b>{placement.displayName}</b>
+                              <small>
+                                {index === 0
+                                  ? 'First print included'
+                                  : quotePlacement?.additionalCostCents
+                                    ? `+${money(
+                                        quotePlacement.additionalCostCents,
+                                        vm.quote?.currency
+                                      )} production`
+                                    : 'Additional print charge'}
+                                {index > 0 && usesPrimaryArtwork
+                                  ? ` · Same artwork as ${primaryPlacement?.displayName}`
+                                  : index > 0
+                                    ? ' · Different artwork'
+                                    : ''}
+                              </small>
+                            </div>
+                            <div className="print-area-row__actions">
+                              <button
+                                className="text-action"
+                                type="button"
+                                onClick={() => vm.customizePlacement(placement.code)}
+                              >
+                                {index > 0 && usesPrimaryArtwork
+                                  ? 'Create different artwork'
+                                  : 'Replace artwork'}
+                              </button>
+                              {index > 0 && !usesPrimaryArtwork && primaryPlacement && (
+                                <button
+                                  className="text-action"
+                                  type="button"
+                                  onClick={() =>
+                                    vm.reusePlacementArtwork(
+                                      primaryPlacement.code,
+                                      placement.code
+                                    )
+                                  }
+                                >
+                                  Use same as {primaryPlacement.displayName}
+                                </button>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                    {vm.selectedProduct?.categorySlug === 'drinkware' && (
+                      <p className="mug-layout-summary">
+                        Position:{' '}
+                        <b>
+                          {vm.mugLayout === 'left'
+                            ? 'Shifted left'
+                            : vm.mugLayout === 'right'
+                              ? 'Shifted right'
+                              : 'Centered'}
+                        </b>
+                      </p>
+                    )}
+                  </section>
+                )}
                 <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
                 {!reviewSettling && (
                   <div className="review-actions">

@@ -11,6 +11,8 @@ import type {
   DesignIdea,
   DesignMockup,
   PlacementOption,
+  PlacementLayout,
+  PlacementSelection,
   QuoteBreakdown,
   StudioCapabilities,
   StudioPass,
@@ -84,6 +86,8 @@ const mockupKey = (params: {
   variantId: string;
   placements: string[];
   draftId: string;
+  placementDesigns?: Record<string, string>;
+  mugLayout?: PlacementLayout;
   orientation?: PreviewOrientation;
 }) =>
   [
@@ -91,6 +95,11 @@ const mockupKey = (params: {
     params.productId,
     params.variantId,
     [...params.placements].sort().join(','),
+    Object.entries(params.placementDesigns ?? {})
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([code, assetId]) => `${code}:${assetId}`)
+      .join(','),
+    params.mugLayout ?? 'center',
     params.orientation ?? 'default',
   ].join('|');
 const emptyBusy: Record<ActionKey, boolean> = {
@@ -205,6 +214,9 @@ export function useStudioViewModel() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedVariantId, setSelectedVariantIdState] = useState('');
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
+  const [placementArtwork, setPlacementArtwork] = useState<Record<string, DesignDraft>>({});
+  const [activePlacementCode, setActivePlacementCode] = useState('');
+  const [mugLayout, setMugLayoutState] = useState<PlacementLayout>('center');
   const [selectedOrientation, setSelectedOrientationState] = useState<
     PreviewOrientation | undefined
   >();
@@ -251,18 +263,35 @@ export function useStudioViewModel() {
     [selectedProduct, selectedVariantId]
   );
   const quoteExpired = Boolean(quote && new Date(quote.expiresAt).getTime() <= Date.now());
-  const printReadiness = design ? customerPrintReadiness(design.readiness) : null;
+  const selectedArtwork = selectedPlacements.map((code) => placementArtwork[code] ?? design);
+  const uniqueSelectedArtwork = Array.from(
+    new Map(
+      selectedArtwork
+        .filter((draft): draft is DesignDraft => Boolean(draft?.id))
+        .map((draft) => [draft.id!, draft])
+    ).values()
+  );
+  const allPlacementsAssigned =
+    selectedPlacements.length > 0 && selectedArtwork.every((draft) => Boolean(draft?.id));
   const artworkReady = Boolean(
-    design?.id &&
-    design.generationStatus === 'complete' &&
-    design.policy.status === 'pass' &&
-    printReadiness?.status === 'pass'
+    allPlacementsAssigned &&
+      uniqueSelectedArtwork.every(
+        (draft) =>
+          draft.generationStatus === 'complete' &&
+          draft.policy.status === 'pass' &&
+          customerPrintReadiness(draft.readiness).status === 'pass'
+      )
   );
   const artworkQuoteEligible = Boolean(
-    design?.id &&
-    design.generationStatus === 'complete' &&
-    design.policy.status === 'pass' &&
-    (printReadiness?.status === 'pass' || printReadiness?.status === 'warning')
+    allPlacementsAssigned &&
+      uniqueSelectedArtwork.every((draft) => {
+        const readiness = customerPrintReadiness(draft.readiness);
+        return (
+          draft.generationStatus === 'complete' &&
+          draft.policy.status === 'pass' &&
+          (readiness.status === 'pass' || readiness.status === 'warning')
+        );
+      })
   );
   const emailValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const checkoutReadiness = useMemo(() => {
@@ -314,6 +343,18 @@ export function useStudioViewModel() {
     setErrors((current) => ({ ...current, [surface]: undefined }));
   const fail = (surface: Surface, error: unknown) =>
     setErrors((current) => ({ ...current, [surface]: mapError(error, surface) }));
+
+  const buildPlacementSelections = (
+    codes: string[],
+    fallbackDraft: DesignDraft,
+    artworkByCode: Record<string, DesignDraft> = placementArtwork,
+    layout: PlacementLayout = mugLayout
+  ): PlacementSelection[] =>
+    codes.map((code) => ({
+      code,
+      designAssetId: artworkByCode[code]?.id ?? fallbackDraft.id ?? undefined,
+      layout: code === 'default' ? layout : undefined,
+    }));
 
   const boot = useCallback(async () => {
     setFlow('booting');
@@ -383,6 +424,7 @@ export function useStudioViewModel() {
       setSelectedProductId(product.id);
       setSelectedVariantIdState(variant.id);
       setSelectedPlacements(placements);
+      setMugLayoutState(saved.mugLayout ?? 'center');
       setSelectedOrientationState(orientation);
       productSelections.current.set(product.id, {
         variantId: variant.id,
@@ -402,6 +444,25 @@ export function useStudioViewModel() {
         }
       }
       setDesign(restoredDraft);
+      const restoredPlacementArtworkEntries = await Promise.all(
+        placements.map(async (code) => {
+          const assetId = saved.placementDesignAssetIds[code];
+          if (!assetId) return restoredDraft ? ([code, restoredDraft] as const) : null;
+          if (restoredDraft?.id === assetId) return [code, restoredDraft] as const;
+          try {
+            const asset = consumeSource(await api.designDraftById(assetId, nextSession.id));
+            return asset.id ? ([code, asset] as const) : null;
+          } catch {
+            return restoredDraft ? ([code, restoredDraft] as const) : null;
+          }
+        })
+      );
+      const restoredPlacementArtwork = Object.fromEntries(
+        restoredPlacementArtworkEntries.filter(
+          (entry): entry is readonly [string, DesignDraft] => Boolean(entry)
+        )
+      );
+      setPlacementArtwork(restoredPlacementArtwork);
       setDesignHistory([]);
       setActiveMockupViewIndex(saved.mockupViewIndex);
 
@@ -444,6 +505,8 @@ export function useStudioViewModel() {
               variantId: variant.id,
               placements,
               draftId: restoredDraft.id,
+              placementDesigns: saved.placementDesignAssetIds,
+              mugLayout: saved.mugLayout,
               orientation,
             }),
             savedMockup
@@ -456,6 +519,11 @@ export function useStudioViewModel() {
                 productId: product.id,
                 variantId: variant.id,
                 placementCodes: placements,
+                placements: placements.map((code) => ({
+                  code,
+                  designAssetId: restoredPlacementArtwork[code]?.id ?? restoredDraft.id ?? undefined,
+                  layout: code === 'default' ? saved.mugLayout : undefined,
+                })),
                 designAssetId: restoredDraft.id,
                 imageUrl: restoredDraft.imageUrl,
                 orientation,
@@ -469,6 +537,8 @@ export function useStudioViewModel() {
                   variantId: variant.id,
                   placements,
                   draftId: restoredDraft.id,
+                  placementDesigns: saved.placementDesignAssetIds,
+                  mugLayout: saved.mugLayout,
                   orientation,
                 }),
                 restoredMockup
@@ -496,12 +566,18 @@ export function useStudioViewModel() {
   useEffect(() => {
     if (startingFresh.current || !session || flow === 'booting' || flow === 'boot_failed') return;
     writeStudioResumeState({
-      version: 3,
+      version: 4,
       sessionId: session.id,
       selectedCategory,
       productId: selectedProductId,
       variantId: selectedVariantId,
       placementCodes: selectedPlacements,
+      placementDesignAssetIds: Object.fromEntries(
+        Object.entries(placementArtwork).flatMap(([code, draft]) =>
+          draft.id ? [[code, draft.id]] : []
+        )
+      ),
+      mugLayout,
       orientation: selectedOrientation,
       prompt,
       designId: design?.id ?? undefined,
@@ -518,6 +594,8 @@ export function useStudioViewModel() {
     flow,
     prompt,
     mockup,
+    mugLayout,
+    placementArtwork,
     quote?.id,
     referenceAssets,
     selectedCategory,
@@ -567,16 +645,30 @@ export function useStudioViewModel() {
     variant: CatalogVariant;
     placements: string[];
     draft: DesignDraft;
+    artworkByCode?: Record<string, DesignDraft>;
+    mugLayout?: PlacementLayout;
     orientation?: PreviewOrientation;
     revealReview?: boolean;
   }) => {
     if (!params.draft.id || params.draft.readiness.status === 'blocked') return;
+    const placementSelections = buildPlacementSelections(
+      params.placements,
+      params.draft,
+      params.artworkByCode,
+      params.mugLayout
+    );
+    if (placementSelections.some((placement) => !placement.designAssetId)) return;
+    const placementDesigns = Object.fromEntries(
+      placementSelections.map((placement) => [placement.code, placement.designAssetId!])
+    );
     const requestId = ++mockupRequestId.current;
     const key = mockupKey({
       productId: params.product.id,
       variantId: params.variant.id,
       placements: params.placements,
       draftId: params.draft.id,
+      placementDesigns,
+      mugLayout: params.mugLayout ?? mugLayout,
       orientation: params.orientation,
     });
     const cached = mockupCache.current.get(key);
@@ -604,6 +696,7 @@ export function useStudioViewModel() {
         productId: params.product.id,
         variantId: params.variant.id,
         placementCodes: params.placements,
+        placements: placementSelections,
         designAssetId: params.draft.id,
         imageUrl: params.draft.imageUrl,
         orientation: params.orientation,
@@ -668,6 +761,12 @@ export function useStudioViewModel() {
     setCheckout(null);
     setOrder(null);
   };
+  const artworkAssignmentsForDraft = (draft: DesignDraft): Record<string, DesignDraft> => {
+    if (activePlacementCode && selectedPlacements.includes(activePlacementCode)) {
+      return { ...placementArtwork, [activePlacementCode]: draft };
+    }
+    return Object.fromEntries(selectedPlacements.map((code) => [code, draft]));
+  };
   const selectProduct = (product: CatalogProduct) => {
     setRecoveryMessage('');
     if (selectedProductId && selectedVariantId) {
@@ -693,7 +792,17 @@ export function useStudioViewModel() {
     const orientation = remembered?.orientation ?? previewOrientation(product, variant);
     setSelectedProductId(product.id);
     setSelectedVariantIdState(variant?.id ?? '');
+    const nextPlacementArtwork = design
+      ? Object.fromEntries(placements.map((code) => [code, design]))
+      : {};
     setSelectedPlacements(placements);
+    if (design) {
+      setPlacementArtwork(nextPlacementArtwork);
+    } else {
+      setPlacementArtwork({});
+    }
+    setActivePlacementCode('');
+    setMugLayoutState('center');
     setSelectedOrientationState(orientation);
     trackEvent('product_selected', {
       category: product.categorySlug || 'other',
@@ -716,6 +825,7 @@ export function useStudioViewModel() {
         variant,
         placements,
         draft: design,
+        artworkByCode: nextPlacementArtwork,
         orientation,
         revealReview: false,
       });
@@ -766,7 +876,15 @@ export function useStudioViewModel() {
         : selectedPlacements.filter((item) => item !== code)
       : [...selectedPlacements, code];
     if (next === selectedPlacements) return;
+    const nextPlacementArtwork = next.includes(code)
+      ? design
+        ? { ...placementArtwork, [code]: placementArtwork[code] ?? design }
+        : placementArtwork
+      : Object.fromEntries(
+          Object.entries(placementArtwork).filter(([placementCode]) => placementCode !== code)
+        );
     setSelectedPlacements(next);
+    setPlacementArtwork(nextPlacementArtwork);
     trackEvent('configuration_changed', {
       field: 'placement',
       value: next.length > 1 ? 'multiple' : 'single',
@@ -786,6 +904,7 @@ export function useStudioViewModel() {
         variant: selectedVariant,
         placements: next,
         draft: design,
+        artworkByCode: nextPlacementArtwork,
         orientation: selectedOrientation,
         revealReview: false,
       });
@@ -809,6 +928,53 @@ export function useStudioViewModel() {
         placements: selectedPlacements,
         draft: design,
         orientation,
+        revealReview: false,
+      });
+    }
+  };
+  const setMugLayout = (layout: PlacementLayout) => {
+    if (!selectedProduct || !selectedVariant || layout === mugLayout) return;
+    setMugLayoutState(layout);
+    markStale();
+    if (design) {
+      setMockup(null);
+      void requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: selectedPlacements,
+        draft: design,
+        artworkByCode: placementArtwork,
+        mugLayout: layout,
+        orientation: selectedOrientation,
+        revealReview: false,
+      });
+    }
+  };
+  const customizePlacement = (code: string) => {
+    setActivePlacementCode(code);
+    setPrompt('');
+    setIdea(null);
+    setCreationPath('generate');
+    setWorkbenchMode('describe');
+    const label = selectedProduct?.placements.find((placement) => placement.code === code)?.displayName;
+    setAnnouncement(`Create different artwork for ${label ?? code}.`);
+  };
+  const reusePlacementArtwork = (sourceCode: string, targetCode: string) => {
+    const source = placementArtwork[sourceCode] ?? design;
+    if (!source) return;
+    const next = { ...placementArtwork, [targetCode]: source };
+    setPlacementArtwork(next);
+    setActivePlacementCode('');
+    markStale();
+    if (selectedProduct && selectedVariant && design) {
+      setMockup(null);
+      void requestMockup({
+        product: selectedProduct,
+        variant: selectedVariant,
+        placements: selectedPlacements,
+        draft: design,
+        artworkByCode: next,
+        orientation: selectedOrientation,
         revealReview: false,
       });
     }
@@ -838,6 +1004,7 @@ export function useStudioViewModel() {
         removeBackground,
       });
       const draft = consumeSource(result);
+      const nextPlacementArtwork = artworkAssignmentsForDraft(draft);
       if (design?.id) {
         setDesignHistory((current) =>
           current.some((item) => item.id === design.id) ? current : [...current, design]
@@ -845,6 +1012,8 @@ export function useStudioViewModel() {
       }
       setPrompt(draft.prompt);
       setDesign(draft);
+      setPlacementArtwork(nextPlacementArtwork);
+      setActivePlacementCode('');
       setMockup(null);
       setQuote(null);
       setMockupStale(false);
@@ -862,6 +1031,7 @@ export function useStudioViewModel() {
         variant: selectedVariant,
         placements: selectedPlacements,
         draft,
+        artworkByCode: nextPlacementArtwork,
         orientation: selectedOrientation,
       });
     } catch (error) {
@@ -1003,7 +1173,10 @@ export function useStudioViewModel() {
           current.some((item) => item.id === design.id) ? current : [...current, design]
         );
       }
+      const nextPlacementArtwork = artworkAssignmentsForDraft(draft);
       setDesign(draft);
+      setPlacementArtwork(nextPlacementArtwork);
+      setActivePlacementCode('');
       setMockup(null);
       setQuote(null);
       setMockupStale(false);
@@ -1021,6 +1194,7 @@ export function useStudioViewModel() {
         variant: selectedVariant,
         placements: selectedPlacements,
         draft,
+        artworkByCode: nextPlacementArtwork,
         orientation: selectedOrientation,
       });
     } catch (error) {
@@ -1079,10 +1253,17 @@ export function useStudioViewModel() {
         sessionId: session?.id,
       });
       const revised = consumeSource(result);
+      const nextPlacementArtwork = Object.fromEntries(
+        Object.entries(placementArtwork).map(([code, assigned]) => [
+          code,
+          assigned.id === design.id ? revised : assigned,
+        ])
+      );
       setDesignHistory((current) =>
         current.some((item) => item.id === design.id) ? current : [...current, design]
       );
       setDesign(revised);
+      setPlacementArtwork(nextPlacementArtwork);
       setMockup(null);
       setQuoteStale(Boolean(quote));
       setFlow('drafted');
@@ -1099,6 +1280,7 @@ export function useStudioViewModel() {
           variant: selectedVariant,
           placements: selectedPlacements,
           draft: revised,
+          artworkByCode: nextPlacementArtwork,
           orientation: selectedOrientation,
         });
       }
@@ -1117,8 +1299,15 @@ export function useStudioViewModel() {
   const undoDraft = async () => {
     const previous = designHistory[designHistory.length - 1];
     if (!previous) return;
+    const nextPlacementArtwork = Object.fromEntries(
+      Object.entries(placementArtwork).map(([code, assigned]) => [
+        code,
+        assigned.id === design?.id ? previous : assigned,
+      ])
+    );
     setDesignHistory((current) => current.slice(0, -1));
     setDesign(previous);
+    setPlacementArtwork(nextPlacementArtwork);
     setRevision('');
     setQuoteStale(Boolean(quote));
     setCheckout(null);
@@ -1134,6 +1323,7 @@ export function useStudioViewModel() {
         variant: selectedVariant,
         placements: selectedPlacements,
         draft: previous,
+        artworkByCode: nextPlacementArtwork,
         orientation: selectedOrientation,
       });
     }
@@ -1145,9 +1335,14 @@ export function useStudioViewModel() {
       variant: selectedVariant,
       placements: selectedPlacements,
       draft: design,
+      artworkByCode: placementArtwork,
+      mugLayout,
       orientation: selectedOrientation,
     });
   };
+  const placementArtworkKey = selectedPlacements
+    .map((code) => `${code}:${placementArtwork[code]?.id ?? design?.id ?? ''}`)
+    .join('|');
   const createQuote = async (options: { automatic?: boolean } = {}) => {
     if (!selectedProduct || !selectedVariant || !artworkQuoteEligible || !design?.id) return;
     const requestId = ++quoteRequestId.current;
@@ -1167,6 +1362,7 @@ export function useStudioViewModel() {
               variantId: selectedVariant.id,
               quantity: 1,
               placementCodes: selectedPlacements,
+              placements: buildPlacementSelections(selectedPlacements, design),
               orientation: selectedOrientation,
               designAssetId: design.id,
             },
@@ -1216,6 +1412,8 @@ export function useStudioViewModel() {
     quote,
     quoteExpired,
     quoteStale,
+    placementArtworkKey,
+    mugLayout,
     selectedOrientation,
     selectedPlacements,
     selectedProduct?.id,
@@ -1421,6 +1619,9 @@ export function useStudioViewModel() {
     selectedProductId,
     selectedVariantId,
     selectedPlacements,
+    placementArtwork,
+    activePlacementCode,
+    mugLayout,
     selectedOrientation,
     prompt,
     creationPath,
@@ -1462,6 +1663,9 @@ export function useStudioViewModel() {
     setSelectedVariantId,
     setSelectedOrientation,
     togglePlacement,
+    setMugLayout,
+    customizePlacement,
+    reusePlacementArtwork,
     refineIdea,
     generate,
     uploadArtwork,

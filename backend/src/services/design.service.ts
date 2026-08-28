@@ -1,7 +1,12 @@
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
-import type { DesignDraft, DesignIdea, DesignMockup } from '../types/catalog.js';
+import type {
+  DesignDraft,
+  DesignIdea,
+  DesignMockup,
+  PlacementSelection,
+} from '../types/catalog.js';
 import {
   createMockDesignImage,
   dataUrlToBuffer,
@@ -797,11 +802,19 @@ export async function createDesignMockup(params: {
   productId: string;
   variantId: string;
   placementCodes: string[];
+  placements?: PlacementSelection[];
   designAssetId?: string;
   orientation?: DesignMockup['orientation'];
 }): Promise<DesignMockup> {
   const session = await getOrCreateDurableSession(params.sessionId);
-  const reusable = await getReusableMockup(params);
+  const placementSelections: PlacementSelection[] = params.placements?.length
+    ? params.placements
+    : params.placementCodes.map((code) => ({ code, designAssetId: params.designAssetId }));
+  const hasDistinctPlacementArtwork =
+    new Set(placementSelections.map((placement) => placement.designAssetId).filter(Boolean)).size >
+      1 ||
+    placementSelections.some((placement) => placement.layout && placement.layout !== 'center');
+  const reusable = hasDistinctPlacementArtwork ? null : await getReusableMockup(params);
   if (reusable) return reusable;
   await recordDesignSpend({
     sessionId: session.id,
@@ -810,19 +823,32 @@ export async function createDesignMockup(params: {
     provider: env.printfulApiKey && env.enableLivePrintful ? 'printful-ready' : 'fixture',
     estimatedCostCents: 1,
   });
-  const artwork = await getArtworkForProvider(params.designAssetId);
+  const resolvedArtwork = await Promise.all(
+    placementSelections.map(async (placement) => ({
+      placement,
+      artwork: await getArtworkForProvider(placement.designAssetId ?? params.designAssetId),
+    }))
+  );
+  const artwork = resolvedArtwork[0]?.artwork ?? null;
   if (env.printfulApiKey && env.enableLivePrintful) {
     try {
       const [product] = await getProductsByIds([params.productId]);
       const variant = product?.variants.find((candidate) => candidate.id === params.variantId);
-      const placement = params.placementCodes[0];
-      const placementOption = product?.placements.find((candidate) => candidate.code === placement);
-      if (!product?.printfulId || !variant?.printfulVariantId || !placement || !artwork?.imageUrl) {
+      if (
+        !product?.printfulId ||
+        !variant?.printfulVariantId ||
+        !resolvedArtwork.length ||
+        resolvedArtwork.some(({ artwork: item }) => !item?.imageUrl)
+      ) {
         throw new Error(
           'Live Printful mockup requires synced product, variant, placement, and artwork.'
         );
       }
-      if (artwork.policyStatus !== 'pass' || artwork.readinessStatus === 'blocked') {
+      if (
+        resolvedArtwork.some(
+          ({ artwork: item }) => item?.policyStatus !== 'pass' || item.readinessStatus === 'blocked'
+        )
+      ) {
         throw new Error(
           'Live Printful mockup requires policy-passing artwork without blocked checks.'
         );
@@ -830,9 +856,13 @@ export async function createDesignMockup(params: {
       const mockup = await generatePrintfulMockupPreview({
         printfulProductId: String(product.printfulId),
         printfulVariantId: variant.printfulVariantId,
-        placement,
-        designImageUrl: artwork.imageUrl,
-        technique: placementOption?.technique,
+        placements: resolvedArtwork.map(({ placement, artwork: item }) => ({
+          placement: placement.code,
+          designImageUrl: item!.imageUrl,
+          technique: product.placements.find((candidate) => candidate.code === placement.code)
+            ?.technique,
+          layout: placement.layout,
+        })),
         orientation: params.orientation,
         preferFrontView: product.categorySlug === 'drinkware',
       });

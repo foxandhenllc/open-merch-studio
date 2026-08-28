@@ -5,6 +5,7 @@ import { sampleCatalog } from '../services/catalog-fixtures.js';
 import { env } from '../config/env.js';
 import {
   buildPrintfulMockupPayload,
+  buildPrintfulMockupTaskPayload,
   buildPrintfulOrderPayload,
   extractMockupViews,
   mapPrintfulOrderStatus,
@@ -49,6 +50,33 @@ test('mockup payloads preserve placement while omitting invalid zero width', () 
     top: 300,
     left: 0,
   });
+});
+
+test('mockup task payload keeps distinct artwork files for front and back', () => {
+  const front = buildPrintfulMockupPayload({
+    printfulVariantId: 4011,
+    placement: 'front',
+    designImageUrl: 'https://example.com/front.png',
+    printfile: { printfile_id: 101, width: 1800, height: 2400 },
+  });
+  const back = buildPrintfulMockupPayload({
+    printfulVariantId: 4011,
+    placement: 'back',
+    designImageUrl: 'https://example.com/back.png',
+    printfile: { printfile_id: 102, width: 1800, height: 2400 },
+  });
+  const task = buildPrintfulMockupTaskPayload({
+    printfulVariantId: 4011,
+    files: [front.files[0], back.files[0]],
+  });
+
+  assert.deepEqual(
+    task.files.map((file) => ({ placement: file.placement, imageUrl: file.image_url })),
+    [
+      { placement: 'front', imageUrl: 'https://example.com/front.png' },
+      { placement: 'back', imageUrl: 'https://example.com/back.png' },
+    ]
+  );
 });
 
 test('mockup views keep provider alternatives and prefer a front-facing mug', () => {
@@ -121,6 +149,66 @@ test('buildPrintfulOrderPayload keeps placement and retail quote details', () =>
   assert.equal(payload.order_items[0].placements[0].technique, 'embroidery');
   assert.equal(payload.recipient.address2, 'Suite 200');
   assert.equal(payload.retail_costs.total, (quote.totalCents / 100).toFixed(2));
+});
+
+test('buildPrintfulOrderPayload maps distinct artwork to two print areas', () => {
+  const baseProduct = sampleCatalog.products[0];
+  const product = {
+    ...baseProduct,
+    variants: baseProduct.variants.map((variant) => ({
+      ...variant,
+      printfulVariantId: 4011,
+    })),
+  };
+  const variant = product.variants[0];
+  const quote = buildQuoteBreakdown(
+    [product],
+    [
+      {
+        productId: product.id,
+        variantId: variant.id,
+        quantity: 1,
+        placementCodes: ['front', 'back'],
+        placements: [
+          { code: 'front', designAssetId: 'art-front' },
+          { code: 'back', designAssetId: 'art-back' },
+        ],
+      },
+    ]
+  );
+  const payload = buildPrintfulOrderPayload({
+    quote,
+    artworkUrlsByAssetId: {
+      'art-front': 'https://example.com/front.png',
+      'art-back': 'https://example.com/back.png',
+    },
+    recipient: {
+      name: 'Example Customer',
+      address1: '1 Main St',
+      city: 'Boston',
+      stateCode: 'MA',
+      countryCode: 'US',
+      zip: '02108',
+    },
+  }) as {
+    order_items: Array<{
+      placements: Array<{
+        placement: string;
+        layers: Array<{ url: string }>;
+      }>;
+    }>;
+  };
+
+  assert.deepEqual(
+    payload.order_items[0].placements.map((placement) => ({
+      placement: placement.placement,
+      artworkUrl: placement.layers[0].url,
+    })),
+    [
+      { placement: 'front', artworkUrl: 'https://example.com/front.png' },
+      { placement: 'back', artworkUrl: 'https://example.com/back.png' },
+    ]
+  );
 });
 
 test('buildPrintfulOrderPayload rejects missing fulfillment data', () => {

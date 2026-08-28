@@ -117,6 +117,7 @@ export const sampleCatalog: {
           isDefault: true,
           width: 12,
           height: 16,
+          additionalPriceCents: 595,
         },
         {
           code: 'back',
@@ -125,6 +126,7 @@ export const sampleCatalog: {
           isDefault: false,
           width: 12,
           height: 16,
+          additionalPriceCents: 595,
         },
       ],
     },
@@ -231,7 +233,26 @@ export const sampleCatalog: {
           costCents: 1125,
         },
       ],
-      placements: defaultPlacements('front', 'dtg'),
+      placements: [
+        {
+          code: 'front',
+          displayName: 'Front print',
+          technique: 'dtg',
+          isDefault: true,
+          width: 10,
+          height: 10,
+          additionalPriceCents: 595,
+        },
+        {
+          code: 'back',
+          displayName: 'Back print',
+          technique: 'dtg',
+          isDefault: false,
+          width: 10,
+          height: 10,
+          additionalPriceCents: 595,
+        },
+      ],
     },
     {
       id: 'fixture-product-vinyl-sticker',

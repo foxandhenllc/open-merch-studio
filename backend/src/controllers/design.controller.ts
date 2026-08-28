@@ -160,10 +160,28 @@ export const postDesignMockup = asyncHandler(async (req: Request, res: Response)
   const productId = String(req.body?.productId ?? '').trim();
   const variantId = String(req.body?.variantId ?? '').trim();
   const placementCodes = Array.isArray(req.body?.placementCodes) ? req.body.placementCodes : [];
+  const placements = Array.isArray(req.body?.placements)
+    ? req.body.placements
+        .map((placement: unknown) => {
+          if (!placement || typeof placement !== 'object') return null;
+          const candidate = placement as Record<string, unknown>;
+          const code = String(candidate.code ?? '').trim();
+          if (!code) return null;
+          const layout = ['center', 'left', 'right'].includes(String(candidate.layout))
+            ? (candidate.layout as 'center' | 'left' | 'right')
+            : undefined;
+          return {
+            code,
+            designAssetId: String(candidate.designAssetId ?? '') || undefined,
+            layout,
+          };
+        })
+        .filter(Boolean)
+    : undefined;
   const orientation = ['portrait', 'landscape', 'square'].includes(req.body?.orientation)
     ? req.body.orientation
     : undefined;
-  if (!productId || !variantId || !placementCodes.length) {
+  if (!productId || !variantId || (!placementCodes.length && !placements?.length)) {
     throw new HttpError('Product, variant, and placement are required for mockup.', 400);
   }
   const mockup = await createDesignMockup({
@@ -171,6 +189,7 @@ export const postDesignMockup = asyncHandler(async (req: Request, res: Response)
     productId,
     variantId,
     placementCodes,
+    placements,
     designAssetId: String(req.body?.designAssetId ?? '') || undefined,
     orientation,
   });

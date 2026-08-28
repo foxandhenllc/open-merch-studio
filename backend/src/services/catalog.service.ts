@@ -11,6 +11,7 @@ import type {
   QuoteLineInput,
 } from '../types/catalog.js';
 import { buildQuoteBreakdown, estimateRetailTotalCents } from './pricing.service.js';
+import { fetchPrintfulVariantPricing, type PrintfulVariantPricing } from './printful.service.js';
 import {
   getDraft,
   getStudioPassById,
@@ -78,6 +79,14 @@ const withRetailEstimates = (product: CatalogProductDto): CatalogProductDto => (
 
 const fixtureProducts = (): CatalogProductDto[] => sampleCatalog.products.map(withRetailEstimates);
 
+const placementPriceFallbackCents = (
+  printfulId: number | null,
+  code: string
+): number | undefined => {
+  if ([71, 367].includes(printfulId ?? -1) && ['front', 'back'].includes(code)) return 595;
+  return undefined;
+};
+
 const mapCategory = (category: {
   id: string;
   printfulId: number | null;
@@ -133,14 +142,21 @@ const mapProduct = (product: ProductWithCatalog): CatalogProductDto => {
     retailEstimateCents: estimateRetailTotalCents(variant.costCents, product.type),
   }));
 
-  const placements: PlacementOption[] = product.placements.map((placement) => ({
-    code: placement.code,
-    displayName: placement.displayName,
-    technique: placement.technique,
-    isDefault: placement.isDefault,
-    width: placement.width === null ? undefined : Number(placement.width),
-    height: placement.height === null ? undefined : Number(placement.height),
-  }));
+  const placements: PlacementOption[] = product.placements
+    .map((placement) => ({
+      code: placement.code,
+      displayName: placement.displayName,
+      technique: placement.technique,
+      isDefault: placement.isDefault,
+      width: placement.width === null ? undefined : Number(placement.width),
+      height: placement.height === null ? undefined : Number(placement.height),
+      additionalPriceCents: placementPriceFallbackCents(product.printfulId, placement.code),
+    }))
+    .sort(
+      (left, right) =>
+        Number(right.isDefault) - Number(left.isDefault) ||
+        left.displayName.localeCompare(right.displayName)
+    );
 
   return {
     id: product.id,
@@ -298,7 +314,14 @@ export async function createQuote(
         getStudioPassById(options.studioPassId))
       : undefined;
   const designAssetIds = Array.from(
-    new Set(inputItems.map((item) => item.designAssetId).filter(Boolean) as string[])
+    new Set(
+      inputItems
+        .flatMap((item) => [
+          item.designAssetId,
+          ...(item.placements ?? []).map((placement) => placement.designAssetId),
+        ])
+        .filter(Boolean) as string[]
+    )
   );
   const designFeeCentsByAssetId: Record<string, number> = {};
   if (designAssetIds.length) {
@@ -320,9 +343,30 @@ export async function createQuote(
       }
     }
   }
+  const providerPricingByVariantId: Record<string, PrintfulVariantPricing> = {};
+  await Promise.all(
+    inputItems.map(async (input) => {
+      const product = products.find((candidate) => candidate.id === input.productId);
+      const variant = product?.variants.find((candidate) => candidate.id === input.variantId);
+      const firstCode = input.placements?.[0]?.code ?? input.placementCodes[0];
+      const technique = product?.placements.find(
+        (placement) => placement.code === firstCode
+      )?.technique;
+      if (!variant?.printfulVariantId || !technique) return;
+      try {
+        providerPricingByVariantId[variant.id] = await fetchPrintfulVariantPricing({
+          printfulVariantId: variant.printfulVariantId,
+          technique,
+        });
+      } catch {
+        // A recent catalog snapshot and explicit placement fallbacks keep quotes available.
+      }
+    })
+  );
   const quote = buildQuoteBreakdown(products, inputItems, undefined, {
     studioPassCreditCents: pass && pass.status !== 'applied' ? pass.creditCents : 0,
     designFeeCentsByAssetId,
+    providerPricingByVariantId,
   });
   const runtimeQuote = saveQuote(quote);
 
@@ -356,7 +400,10 @@ export async function createQuote(
             options: {
               orientation: item.orientation,
               placementTechniques: item.placementTechniques,
+              placements: item.placements,
               designFeeCents: item.designFeeCents,
+              placementCostCents: item.placementCostCents,
+              pricingSource: item.pricingSource,
             },
             unitCostCents: item.unitCostCents,
             unitRetailCents: item.unitRetailCents,

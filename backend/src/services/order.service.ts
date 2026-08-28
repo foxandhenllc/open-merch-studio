@@ -253,6 +253,11 @@ function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
     id: quote.id,
     currency: quote.currency,
     productCostCents: quote.productCostCents,
+    placementCostCents: quote.costLines
+      ? jsonArray<MoneyLine>(quote.costLines, [])
+          .filter((line) => line.code === 'additional-print-areas')
+          .reduce((total, line) => total + line.amountCents, 0)
+      : 0,
     shippingEstimateCents: quote.shippingEstimateCents,
     taxEstimateCents: quote.taxEstimateCents,
     aiDesignFeeCents: quote.aiDesignFeeCents,
@@ -269,10 +274,23 @@ function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
         const options = jsonObject<{
           orientation?: QuoteBreakdown['items'][number]['orientation'];
           placementTechniques?: Record<string, string>;
+          placements?: QuoteBreakdown['items'][number]['placements'];
+          placementCostCents?: number;
+          pricingSource?: QuoteBreakdown['items'][number]['pricingSource'];
         }>(item.options, {});
         return {
           orientation: options.orientation,
           placementTechniques: options.placementTechniques ?? {},
+          placements:
+            options.placements ??
+            item.placementCodes.map((code) => ({
+              code,
+              designAssetId: item.designAssetId ?? undefined,
+              technique: options.placementTechniques?.[code] ?? 'default',
+              additionalCostCents: 0,
+            })),
+          placementCostCents: options.placementCostCents ?? 0,
+          pricingSource: options.pricingSource ?? 'catalog-snapshot',
         };
       })(),
       productId: item.productId,
@@ -783,7 +801,12 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     quoteIssues.push('Quote expired. Create a fresh quote before checkout.');
   }
   const requiredDesignIds = new Set(
-    quote.items.map((item) => item.designAssetId).filter(Boolean) as string[]
+    quote.items
+      .flatMap((item) => [
+        item.designAssetId,
+        ...item.placements.map((placement) => placement.designAssetId),
+      ])
+      .filter(Boolean) as string[]
   );
   if (input.designAssetId) requiredDesignIds.add(input.designAssetId);
   if (!requiredDesignIds.size) {
@@ -979,33 +1002,57 @@ export function stripeRecipient(session: Stripe.Checkout.Session): {
   };
 }
 
-async function getArtworkUrl(order: OrderSummary): Promise<string | null> {
+async function getArtworkUrls(order: OrderSummary): Promise<Record<string, string> | null> {
+  const assetIds = Array.from(
+    new Set(
+      (order.quote?.items ?? [])
+        .flatMap((item) => [
+          item.designAssetId,
+          ...item.placements.map((placement) => placement.designAssetId),
+        ])
+        .filter((assetId): assetId is string => Boolean(assetId))
+    )
+  );
+  if (!assetIds.length && order.designAssetId) assetIds.push(order.designAssetId);
+  if (!assetIds.length) return null;
   if (env.databaseUrl) {
-    if (!order.designAssetId) return null;
     try {
-      const asset = await prisma.designAsset.findUnique({
-        where: { id: order.designAssetId },
+      const assets = await prisma.designAsset.findMany({
+        where: { id: { in: assetIds } },
         select: { id: true, transparentUrl: true, imageUrl: true },
       });
-      const storedUrl = asset?.transparentUrl ?? asset?.imageUrl;
-      return asset?.id && storedUrl
-        ? resolveDesignAssetProviderUrl({
-            assetId: asset.id,
-            storedUrl,
-            backendUrl: env.backendUrl,
-          })
-        : null;
+      const resolved = Object.fromEntries(
+        assets.flatMap((asset) => {
+          const storedUrl = asset.transparentUrl ?? asset.imageUrl;
+          const url = storedUrl
+            ? resolveDesignAssetProviderUrl({
+                assetId: asset.id,
+                storedUrl,
+                backendUrl: env.backendUrl,
+              })
+            : null;
+          return url ? [[asset.id, url]] : [];
+        })
+      );
+      return Object.keys(resolved).length === assetIds.length ? resolved : null;
     } catch {
       return null;
     }
   }
-  const draft = getDraft(order.designAssetId);
-  if (!draft?.id || !draft.imageUrl) return null;
-  return resolveDesignAssetProviderUrl({
-    assetId: draft.id,
-    storedUrl: draft.imageUrl,
-    backendUrl: env.backendUrl,
-  });
+  const resolved = Object.fromEntries(
+    assetIds.flatMap((assetId) => {
+      const draft = getDraft(assetId);
+      const url = draft?.imageUrl
+        ? resolveDesignAssetProviderUrl({
+            assetId,
+            storedUrl: draft.imageUrl,
+            backendUrl: env.backendUrl,
+          })
+        : null;
+      return url ? [[assetId, url]] : [];
+    })
+  );
+  return Object.keys(resolved).length === assetIds.length ? resolved : null;
 }
 
 type StripeEventClaim = 'claimed' | 'duplicate' | 'busy';
@@ -1281,9 +1328,12 @@ export async function handleStripeCheckoutCompleted(
   }
 
   const recipient = stripeRecipient(session);
-  const artworkUrl = await getArtworkUrl(next);
+  const artworkUrlsByAssetId = await getArtworkUrls(next);
+  const artworkUrl = next.designAssetId
+    ? (artworkUrlsByAssetId?.[next.designAssetId] ?? null)
+    : (Object.values(artworkUrlsByAssetId ?? {})[0] ?? null);
   const quote = next.quote;
-  if (!recipient || !artworkUrl || !quote) {
+  if (!recipient || !artworkUrl || !artworkUrlsByAssetId || !quote) {
     next = {
       ...next,
       status: 'needs_review',
@@ -1340,6 +1390,7 @@ export async function handleStripeCheckoutCompleted(
       orderNumber: next.orderNumber,
       recipient,
       artworkUrl,
+      artworkUrlsByAssetId,
     });
   } catch (error) {
     const failure = classifyPrintfulFailure(error);
@@ -2008,8 +2059,11 @@ export async function retryPrintfulDraftOrder(
   }
   const order = mapPersistedOrder(persisted);
   const recipient = stripeRecipient(session);
-  const artworkUrl = await getArtworkUrl(order);
-  if (!order.quote || !recipient || !artworkUrl) {
+  const artworkUrlsByAssetId = await getArtworkUrls(order);
+  const artworkUrl = order.designAssetId
+    ? (artworkUrlsByAssetId?.[order.designAssetId] ?? null)
+    : (Object.values(artworkUrlsByAssetId ?? {})[0] ?? null);
+  if (!order.quote || !recipient || !artworkUrl || !artworkUrlsByAssetId) {
     throw new OrderRecoveryError(
       'The durable quote, shipping recipient, or artwork is unavailable.',
       409,
@@ -2051,6 +2105,7 @@ export async function retryPrintfulDraftOrder(
       orderNumber: order.orderNumber,
       recipient,
       artworkUrl,
+      artworkUrlsByAssetId,
     });
   } catch (error) {
     const failure = classifyPrintfulFailure(error);
