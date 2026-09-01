@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -24,7 +24,8 @@ const horizontal = brandAsset('fox-and-hen-logo-horizontal.svg');
 const horizontalLight = brandAsset('fox-and-hen-logo-horizontal-light.svg');
 const stacked = brandAsset('fox-and-hen-logo-primary-stacked.svg');
 const stackedLight = brandAsset('fox-and-hen-logo-primary-stacked-light.svg');
-const avatar = brandAsset('fox-and-hen-avatar-universal.svg');
+const ampersand = brandAsset('fox-and-hen-ampersand-mark.svg');
+const studioSeal = brandAsset('fox-and-hen-studio-seal.svg');
 
 function xml(value) {
   return String(value)
@@ -77,6 +78,23 @@ async function writeBackground(width, height, background, composites, destinatio
 }
 
 await mkdir(printDirectory, { recursive: true });
+
+const ampersandSource = await readFile(ampersand, 'utf8');
+const ampersandPath = ampersandSource.match(/<path\b[^>]*\/>/)?.[0];
+
+if (!ampersandPath) {
+  throw new Error('The Fox & Hen ampersand source did not contain an SVG path.');
+}
+
+const sealSource = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <circle cx="512" cy="512" r="480" fill="${palette.rust}" />
+  <circle cx="512" cy="512" r="444" fill="${palette.deep}" />
+  <g transform="translate(512 512) scale(1.35) translate(-512 -512)">
+    ${ampersandPath.replace(/fill="[^"]*"/, `fill="${palette.paper}"`)}
+  </g>
+</svg>\n`;
+
+await writeFile(studioSeal, sealSource);
 
 const teeFrontLogo = await resizedInput(stackedLight, 2700, 3000);
 await writeTransparent(
@@ -136,12 +154,12 @@ await writeTransparent(
   output('studio-notes-tote-front.png')
 );
 
-const toteBackAvatar = await resizedInput(avatar, 1750, 1750);
+const toteBackSeal = await resizedInput(studioSeal, 1750, 1750);
 await writeTransparent(
   4500,
   5100,
   [
-    { input: toteBackAvatar, top: 650, left: 1375 },
+    { input: toteBackSeal, top: 650, left: 1375 },
     {
       input: svg(
         4500,
@@ -159,14 +177,14 @@ await writeTransparent(
 );
 
 const mugLogo = await resizedInput(horizontalLight, 1680, 630);
-const mugAvatar = await resizedInput(avatar, 765, 765);
+const mugSeal = await resizedInput(studioSeal, 765, 765);
 await writeBackground(
   4050,
   1680,
   palette.deep,
   [
     { input: mugLogo, top: 315, left: 255 },
-    { input: mugAvatar, top: 255, left: 2970 },
+    { input: mugSeal, top: 255, left: 2970 },
     {
       input: svg(
         4050,
@@ -216,17 +234,17 @@ await writeBackground(
   output('system-map-poster.png')
 );
 
-const stickerAvatar = await resizedInput(avatar, 1700, 1700);
+const stickerSeal = await resizedInput(studioSeal, 1700, 1700);
 await writeTransparent(
   1800,
   1800,
-  [{ input: stickerAvatar, top: 50, left: 50 }],
+  [{ input: stickerSeal, top: 50, left: 50 }],
   output('studio-mark-sticker.png')
 );
 
 const shareLogo = await resizedInput(horizontal, 760, 300);
 const shareStacked = await resizedInput(stackedLight, 530, 530);
-const shareAvatar = await resizedInput(avatar, 164, 164);
+const shareSeal = await resizedInput(studioSeal, 164, 164);
 await writeBackground(
   1200,
   630,
@@ -248,7 +266,7 @@ await writeBackground(
       ),
     },
     { input: shareStacked, top: 55, left: 748 },
-    { input: shareAvatar, top: 430, left: 934 },
+    { input: shareSeal, top: 430, left: 934 },
   ],
   join(collectionDirectory, 'collection-share.png')
 );
