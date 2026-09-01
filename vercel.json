@@ -69,6 +69,10 @@
     {
       "source": "/support",
       "destination": "/support/index.html"
+    },
+    {
+      "source": "/examples/fox-and-hen",
+      "destination": "/examples/fox-and-hen/index.html"
     }
   ]
 }

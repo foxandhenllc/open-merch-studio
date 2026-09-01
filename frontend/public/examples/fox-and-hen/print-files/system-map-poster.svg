@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3600" height="5400" viewBox="0 0 3600 5400">
+  <rect width="3600" height="5400" fill="#fbf8f3"/>
+  <g fill="#222e27" font-family="Arial, Helvetica, sans-serif">
+    <text x="300" y="430" font-size="150" font-weight="700" letter-spacing="25">FOX &amp; HEN / SYSTEM MAP 001</text>
+    <text x="300" y="1060" font-size="430" font-weight="900" letter-spacing="-26">ONE CLEAR</text>
+    <text x="300" y="1500" fill="#b4532a" font-size="430" font-weight="900" letter-spacing="-26">SYSTEM.</text>
+  </g>
+  <g fill="none" stroke="#222e27" stroke-width="22">
+    <rect x="300" y="2100" width="760" height="760" rx="380"/>
+    <rect x="1420" y="2100" width="760" height="760" rx="380"/>
+    <rect x="2540" y="2100" width="760" height="760" rx="380"/>
+    <path d="M1060 2480h360M2180 2480h360"/>
+    <path d="m1300 2380 120 100-120 100M2420 2380l120 100-120 100"/>
+    <path d="M2920 2860v920H680v-920" stroke-dasharray="48 34"/>
+  </g>
+  <g fill="#222e27" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <text x="680" y="2430" font-size="135" font-weight="900">WEBSITE</text>
+    <text x="680" y="2605" font-size="74">WHAT PEOPLE SEE</text>
+    <text x="1800" y="2430" font-size="135" font-weight="900">WORKFLOW</text>
+    <text x="1800" y="2605" font-size="74">HOW WORK MOVES</text>
+    <text x="2920" y="2390" fill="#b4532a" font-size="118" font-weight="900">CONNECTED</text>
+    <text x="2920" y="2540" fill="#b4532a" font-size="118" font-weight="900">SYSTEM</text>
+    <text x="2920" y="2700" font-size="74">WHERE IT MEETS</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="300" y="4270" fill="#222e27" font-size="120" font-weight="700" letter-spacing="14">START WITH THE FRICTION.</text>
+    <text x="300" y="4500" fill="#222e27" font-size="120" font-weight="700" letter-spacing="14">MAP THE SYSTEM.</text>
+    <text x="300" y="4730" fill="#b4532a" font-size="120" font-weight="700" letter-spacing="14">BUILD THE SMALLEST USEFUL CHANGE.</text>
+  </g>
+  <path d="M300 5000h3000" stroke="#222e27" stroke-width="26"/>
+  <circle cx="3100" cy="5100" r="120" fill="#b4532a"/>
+</svg>

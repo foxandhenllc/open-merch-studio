@@ -1,5 +1,6 @@
 import type { PolicyRoute } from './App.types';
 import { OpenSourceAttribution } from './components/OpenSourceAttribution';
+import { FoxHenCollectionPage } from './components/FoxHenCollectionPage';
 import { publicConfig } from './config';
 import { WorkbenchStudioApp } from './WorkbenchStudioApp';
 
@@ -270,5 +271,6 @@ export default function App() {
   const currentPath = path();
   const route = policies[currentPath];
   if (route) return <PolicyPage route={route} />;
+  if (currentPath === '/examples/fox-and-hen') return <FoxHenCollectionPage />;
   return currentPath === '/' ? <WorkbenchStudioApp /> : <NotFoundPage />;
 }

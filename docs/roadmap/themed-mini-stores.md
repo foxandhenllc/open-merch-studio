@@ -36,8 +36,8 @@ Artwork and products must belong to exactly one organization by default. Sharing
 
 1. Saved designs/products for one owner, with no public storefront.
 2. Themed collections and internal preview URLs.
-3. Hosted read-only mini-stores while OMS checkout remains closed.
+3. Hosted read-only mini-store previews, isolated from the existing public OMS checkout configuration.
 4. Domain/embed support and per-store analytics.
-5. Per-organization commerce, legal, tax, support, and Printful-store configuration only after each owner passes its own launch review.
+5. Per-organization commerce, legal, tax, support, and Printful-store configuration only after each owner passes its own launch review. The existing Fox & Hen-operated checkout does not automatically authorize commerce for FanHarmon, RCR, or another client organization.
 
 This sequence lets the library become useful immediately without coupling the feature to public payments or unattended fulfillment.

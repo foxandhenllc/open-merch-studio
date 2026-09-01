@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2700" height="1050" viewBox="0 0 2700 1050">
+  <rect width="2700" height="1050" fill="#fbf8f3"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="160" y="180" fill="#222e27" font-size="78" font-weight="700" letter-spacing="12">FOX &amp; HEN / CONNECTED SYSTEMS</text>
+    <g font-size="130" font-weight="900" text-anchor="middle">
+      <text x="430" y="610" fill="#222e27" font-size="115">WEBSITE</text>
+      <text x="1270" y="610" fill="#222e27" font-size="115">WORKFLOW</text>
+      <text x="2240" y="565" fill="#b4532a" font-size="112">CONNECTED</text>
+      <text x="2240" y="710" fill="#b4532a" font-size="112">SYSTEM</text>
+    </g>
+  </g>
+  <g fill="none" stroke="#b4532a" stroke-width="24">
+    <path d="M720 560h220"/>
+    <path d="m890 500 70 60-70 60"/>
+    <path d="M1600 560h180"/>
+    <path d="m1730 500 70 60-70 60"/>
+  </g>
+  <g fill="#222e27">
+    <circle cx="430" cy="850" r="32"/>
+    <circle cx="1270" cy="850" r="32"/>
+    <circle cx="2240" cy="850" r="32"/>
+  </g>
+</svg>

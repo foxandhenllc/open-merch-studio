@@ -6,7 +6,14 @@ export const STATIC_ROUTES = [
     output: 'index.html',
     title: 'Open Merch Studio | Create Original Custom Merch',
     description:
-      'Create original AI-assisted artwork, preview it on curated products, and prepare a custom order in Open Merch Studio.',
+      'Upload artwork, create from references, improve photos for print, preview placements, and order custom merchandise in Open Merch Studio.',
+  },
+  {
+    path: '/examples/fox-and-hen',
+    output: 'examples/fox-and-hen/index.html',
+    title: 'One Clear System | Fox & Hen Collection',
+    description:
+      'See a five-product Fox & Hen capsule built with direct artwork, reference-led creation, print-file cleanup, and multi-placement printing in Open Merch Studio.',
   },
   {
     path: '/privacy',
