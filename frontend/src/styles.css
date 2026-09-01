@@ -3418,10 +3418,9 @@ input:focus {
 .example-hero__art img {
   position: relative;
   z-index: 1;
-  width: 105%;
-  max-width: none;
+  width: min(70%, 520px);
   filter: drop-shadow(0 30px 42px rgb(0 0 0 / 34%));
-  transform: rotate(-3deg);
+  transform: none;
 }
 .example-hero__art > span {
   position: absolute;
@@ -3432,17 +3431,6 @@ input:focus {
   font: 700 11px/1 'Geist Mono', monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-.example-hero__art strong {
-  position: absolute;
-  z-index: 2;
-  right: 28px;
-  bottom: 26px;
-  color: var(--example-paper);
-  font-size: 54px;
-  line-height: 0.82;
-  letter-spacing: -0.07em;
-  text-align: right;
 }
 .example-methods,
 .example-products {
@@ -3754,9 +3742,6 @@ input:focus {
   }
   .example-hero__art {
     min-height: 400px;
-  }
-  .example-hero__art strong {
-    font-size: 40px;
   }
   .example-methods,
   .example-products {

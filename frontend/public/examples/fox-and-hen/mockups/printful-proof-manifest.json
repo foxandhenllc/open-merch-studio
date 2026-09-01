@@ -1,0 +1,178 @@
+{
+  "baseUrl": "https://openmerchstudio.com",
+  "sessionId": "sess_mtixm7ci_fyuc4ko9",
+  "generatedAt": "2026-09-01T17:19:12.378Z",
+  "products": [
+    {
+      "id": "workbench-tee",
+      "productId": "df8b8554-c205-4f83-ae08-495bc54711de",
+      "variantId": "printful-variant-4017",
+      "mockupTaskId": "gt-963890671",
+      "primaryImageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/7be7e1c49f27f044740b0b67c2fd9bb1/unisex-staple-t-shirt-black-front-6a97091e8661d.png",
+      "placements": [
+        {
+          "code": "front",
+          "file": "workbench-tee-front.png",
+          "assetId": "9426dc08-1ff3-4734-be93-f541962e739a",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/9426dc08-1ff3-4734-be93-f541962e739a/print.png",
+          "width": 4500,
+          "height": 5100
+        },
+        {
+          "code": "back",
+          "file": "workbench-tee-back.png",
+          "assetId": "f24c4743-45d8-4893-b77f-e5a7a858895b",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/f24c4743-45d8-4893-b77f-e5a7a858895b/print.png",
+          "width": 4500,
+          "height": 5100
+        }
+      ],
+      "views": [
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/7be7e1c49f27f044740b0b67c2fd9bb1/unisex-staple-t-shirt-black-front-6a97091e8661d.png",
+          "filename": "workbench-tee-01-product-view.png"
+        },
+        {
+          "label": "Front · Flat",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/e7011cbe1da797356324e741bace2e08/unisex-staple-t-shirt-black-front-6a97091e86cb1.png",
+          "filename": "workbench-tee-02-front-flat.png"
+        },
+        {
+          "label": "Left · Ghost",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/cf1b3a178d539df1f5e7907fe04cac2e/unisex-staple-t-shirt-black-left-6a97091e8717c.png",
+          "filename": "workbench-tee-03-left-ghost.png"
+        },
+        {
+          "label": "Right · Ghost",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/54e7ec892519b64f67a357a793449393/unisex-staple-t-shirt-black-right-6a97091e875bd.png",
+          "filename": "workbench-tee-04-right-ghost.png"
+        },
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/aafe681fe0fd095bc735bf9d5ff4fd43/unisex-staple-t-shirt-black-back-6a97091e878fc.png",
+          "filename": "workbench-tee-05-product-view.png"
+        }
+      ]
+    },
+    {
+      "id": "studio-notes-tote",
+      "productId": "7a1c0013-0655-4cc9-af8b-e26fa78acbc4",
+      "variantId": "printful-variant-10458",
+      "mockupTaskId": "gt-963890745",
+      "primaryImageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/a0a114da8c5ddd505712b38aa4dd04af/eco-tote-bag-oyster-front-6a97093015c98.png",
+      "placements": [
+        {
+          "code": "front",
+          "file": "studio-notes-tote-front.png",
+          "assetId": "77677138-3af0-4373-b93b-12d27712c204",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/77677138-3af0-4373-b93b-12d27712c204/print.png",
+          "width": 4500,
+          "height": 5100
+        },
+        {
+          "code": "back",
+          "file": "studio-notes-tote-back.png",
+          "assetId": "5e3ac67d-3965-4600-9709-9b02b563cbf1",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/5e3ac67d-3965-4600-9709-9b02b563cbf1/print.png",
+          "width": 4500,
+          "height": 5100
+        }
+      ],
+      "views": [
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/a0a114da8c5ddd505712b38aa4dd04af/eco-tote-bag-oyster-front-6a97093015c98.png",
+          "filename": "studio-notes-tote-01-product-view.png"
+        },
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/16f817617119266e2fdc97dc231df2c2/eco-tote-bag-oyster-back-6a97093016d42.png",
+          "filename": "studio-notes-tote-02-product-view.png"
+        }
+      ]
+    },
+    {
+      "id": "connected-systems-mug",
+      "productId": "052e3ae7-4027-4367-93d7-42cd4373a341",
+      "variantId": "printful-variant-1320",
+      "mockupTaskId": "gt-963890810",
+      "primaryImageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/757441f90b3989b44cc984be7771633a/white-glossy-mug-white-11-oz-front-view-6a97093b7dc2b.png",
+      "placements": [
+        {
+          "code": "default",
+          "file": "connected-systems-mug-wrap.png",
+          "assetId": "f002e53d-549d-4019-89e3-f65ca2814220",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/f002e53d-549d-4019-89e3-f65ca2814220/print.png",
+          "width": 4050,
+          "height": 1680
+        }
+      ],
+      "views": [
+        {
+          "label": "Front view · Default",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/757441f90b3989b44cc984be7771633a/white-glossy-mug-white-11-oz-front-view-6a97093b7dc2b.png",
+          "filename": "connected-systems-mug-01-front-view-default.png"
+        },
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/dd870a4dad24ddd1e81036e7a0be1269/white-glossy-mug-white-11-oz-handle-on-right-6a97093b7d84a.png",
+          "filename": "connected-systems-mug-02-product-view.png"
+        },
+        {
+          "label": "Handle on Left · Default",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/4940092def673e92f5ccdd3d89f22268/white-glossy-mug-white-11-oz-handle-on-left-6a97093b7dbae.png",
+          "filename": "connected-systems-mug-03-handle-on-left-default.png"
+        }
+      ]
+    },
+    {
+      "id": "system-map-poster",
+      "productId": "88792ee3-f35b-4aa8-9fb8-c401863f65c6",
+      "variantId": "printful-variant-3876",
+      "mockupTaskId": "gt-963890869",
+      "primaryImageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/399486fd97fc4dc61c00f5c9711a7f37/enhanced-matte-paper-poster-(in)-12x18-front-6a97094a8cf2e.png",
+      "placements": [
+        {
+          "code": "default",
+          "file": "system-map-poster.png",
+          "assetId": "cbd93fc0-4288-4c85-adf5-da5d01434042",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/cbd93fc0-4288-4c85-adf5-da5d01434042/print.png",
+          "width": 3600,
+          "height": 5400
+        }
+      ],
+      "views": [
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/399486fd97fc4dc61c00f5c9711a7f37/enhanced-matte-paper-poster-(in)-12x18-front-6a97094a8cf2e.png",
+          "filename": "system-map-poster-01-product-view.png"
+        }
+      ]
+    },
+    {
+      "id": "studio-mark-sticker",
+      "productId": "b4a367e8-e61c-494c-9aa8-609b258b6da4",
+      "variantId": "printful-variant-10163",
+      "mockupTaskId": "gt-963890915",
+      "primaryImageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/024c7689c827a86b91a523a80fcfde0b/kiss-cut-stickers-white-3x3-default-6a9709584f20e.png",
+      "placements": [
+        {
+          "code": "default",
+          "file": "studio-mark-sticker.png",
+          "assetId": "9db155ca-8246-4ea1-a0b5-e4cd88b7a332",
+          "imageUrl": "https://evhhtsrfmjixlobajlib.supabase.co/storage/v1/object/public/open-merch-artwork/uploads/9db155ca-8246-4ea1-a0b5-e4cd88b7a332/print.png",
+          "width": 1800,
+          "height": 1800
+        }
+      ],
+      "views": [
+        {
+          "label": "Product view",
+          "imageUrl": "https://printful-upload.s3-accelerate.amazonaws.com/tmp/024c7689c827a86b91a523a80fcfde0b/kiss-cut-stickers-white-3x3-default-6a9709584f20e.png",
+          "filename": "studio-mark-sticker-01-product-view.png"
+        }
+      ]
+    }
+  ]
+}

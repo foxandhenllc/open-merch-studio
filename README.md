@@ -32,7 +32,7 @@ The live curated catalog currently contains five focused products: a Bella + Can
 
 ## Example Collection
 
-The [Fox & Hen “One Clear System” collection](https://openmerchstudio.com/examples/fox-and-hen) demonstrates the current product surface with five coordinated pieces. It includes supplied brand art, a reference-led emblem, production-sized print files, a mug wrap, and separate front/back artwork for the tee and tote. Suggested retail on that page is planning guidance until the companion storefront is published.
+The [Fox & Hen “One Clear System” collection](https://openmerchstudio.com/examples/fox-and-hen) demonstrates the current product surface with five coordinated pieces. It uses the approved horizontal, stacked, ampersand, and circular Fox & Hen marks from the live business site, plus production-sized print files, a mug wrap, and separate front/back artwork for the tee and tote. Suggested retail on that page is planning guidance until the companion storefront is published.
 
 ## Stack
 

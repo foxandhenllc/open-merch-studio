@@ -43,8 +43,8 @@ export function FoxHenCollectionPage() {
           <h1>One clear system,<br />printed five ways.</h1>
           <p>
             A real five-product capsule built from the catalog already available in Open Merch
-            Studio. It uses direct artwork, an original reference-led emblem, print-file cleanup,
-            and front-and-back placements.
+            Studio. Every piece starts with the approved Fox &amp; Hen identity used on the live
+            website—horizontal, stacked, ampersand, and circular marks—then adapts it for print.
           </p>
           <div className="example-hero__actions">
             <a className="example-button" href="/">Make your own merch</a>
@@ -55,8 +55,7 @@ export function FoxHenCollectionPage() {
         </div>
         <div className="example-hero__art" aria-hidden="true">
           <span>Collection 001</span>
-          <img src="/examples/fox-and-hen/field-emblem-web.png" alt="" />
-          <strong>FOX<br />&amp; HEN</strong>
+          <img src="/examples/fox-and-hen/brand/fox-and-hen-logo-primary-stacked-light.svg" alt="" />
         </div>
       </header>
 
@@ -67,7 +66,7 @@ export function FoxHenCollectionPage() {
         </div>
         <ol>
           <li><span>01</span><strong>Use supplied artwork</strong><p>Approved Fox &amp; Hen marks were prepared directly for products.</p></li>
-          <li><span>02</span><strong>Build from references</strong><p>A bespoke fox-and-hen emblem was developed from the brand palette and visual direction.</p></li>
+          <li><span>02</span><strong>Keep the identity intact</strong><p>The live header, footer, ampersand, and social marks stay recognizable across five print formats.</p></li>
           <li><span>03</span><strong>Make it printworthy</strong><p>Transparency, safe areas, output dimensions, and legibility were verified before handoff.</p></li>
           <li><span>04</span><strong>Control each placement</strong><p>The tee and tote use separate front and back print files with visible cost impact.</p></li>
         </ol>

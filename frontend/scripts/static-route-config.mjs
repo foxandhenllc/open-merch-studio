@@ -13,7 +13,7 @@ export const STATIC_ROUTES = [
     output: 'examples/fox-and-hen/index.html',
     title: 'One Clear System | Fox & Hen Collection',
     description:
-      'See a five-product Fox & Hen capsule built with direct artwork, reference-led creation, print-file cleanup, and multi-placement printing in Open Merch Studio.',
+      'See a five-product Fox & Hen capsule built from the studio’s approved logo system, production-ready print files, and multi-placement printing in Open Merch Studio.',
   },
   {
     path: '/privacy',
