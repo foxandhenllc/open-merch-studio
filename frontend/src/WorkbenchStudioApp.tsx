@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogPanel } from '@components/CatalogPanel';
 import { CheckoutPanel } from '@components/CheckoutPanel';
+import { ConfigurationPanel } from '@components/ConfigurationPanel';
 import { ErrorNote } from '@components/ErrorNote';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
@@ -8,15 +9,12 @@ import { OpenSourceAttribution } from '@components/OpenSourceAttribution';
 import { ReadinessChecks } from '@components/ReadinessChecks';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
-import { VariantSelector } from '@components/VariantSelector';
 import { publicConfig } from './config';
 import { api } from './services/api';
 import { useStudioViewModel } from './studio-view-model';
 import type { CheckoutConfirmation } from './types/catalog';
 import { trackEvent } from './utils/analytics';
-
-const money = (cents: number, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+import { formatMoney } from './utils/currency';
 
 const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
 const pendingCheckoutSession = (): string | null => {
@@ -317,8 +315,9 @@ export function WorkbenchStudioApp() {
             {checkoutReturn.order && (
               <p>
                 {checkoutReturn.order.orderNumber} ·{' '}
-                {money(checkoutReturn.order.totalCents, checkoutReturn.order.currency)} including{' '}
-                {money(checkoutReturn.order.taxCents, checkoutReturn.order.currency)} tax
+                {formatMoney(checkoutReturn.order.totalCents, checkoutReturn.order.currency)}{' '}
+                including {formatMoney(checkoutReturn.order.taxCents, checkoutReturn.order.currency)}{' '}
+                tax
               </p>
             )}
           </StatusNote>
@@ -418,115 +417,20 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'configure' && selected && (
-              <div className="panel-stack">
-                <VariantSelector
-                  product={vm.selectedProduct!}
-                  selectedVariant={vm.selectedVariant!}
-                  onChange={vm.setSelectedVariantId}
-                />
-                {vm.selectedProduct!.placements.length > 1 && (
-                  <fieldset className="print-area-picker">
-                    <legend>Print areas</legend>
-                    <p className="selection-help">
-                      Your first print is included in the product price. Add the other side for a
-                      second production charge.
-                    </p>
-                    <div className="placement-options compact-options print-area-options">
-                      {vm.selectedProduct!.placements.map((placement) => (
-                        <button
-                          key={placement.code}
-                          type="button"
-                          aria-pressed={vm.selectedPlacements.includes(placement.code)}
-                          onClick={() => vm.togglePlacement(placement.code)}
-                        >
-                          <b>{placement.displayName}</b>
-                          <small>
-                            {vm.selectedPlacements[0] === placement.code
-                              ? 'First print included'
-                              : vm.selectedPlacements.includes(placement.code) &&
-                                  !vm.quoteStale &&
-                                  quoteItem?.placements.find(
-                                    (item) => item.code === placement.code
-                                  )?.additionalCostCents
-                                ? `+${money(
-                                    quoteItem.placements.find(
-                                      (item) => item.code === placement.code
-                                    )!.additionalCostCents,
-                                    vm.quote?.currency
-                                  )} production`
-                                : placement.additionalPriceCents
-                                  ? `About +${money(placement.additionalPriceCents)} when added`
-                                  : 'Additional print charge when added'}
-                          </small>
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
-                )}
-                {vm.selectedProduct!.categorySlug === 'drinkware' && (
-                  <fieldset className="mug-layout-picker">
-                    <legend>Artwork position around the mug</legend>
-                    <p className="selection-help">
-                      This moves one design inside the mug’s wraparound print area and does not add
-                      another print charge.
-                    </p>
-                    <div className="placement-options compact-options">
-                      {(
-                        [
-                          ['center', 'Centered'],
-                          ['left', 'Shift left'],
-                          ['right', 'Shift right'],
-                        ] as const
-                      ).map(([layout, label]) => (
-                        <button
-                          key={layout}
-                          type="button"
-                          aria-pressed={vm.mugLayout === layout}
-                          onClick={() => vm.setMugLayout(layout)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
-                )}
-                {vm.selectedProduct!.categorySlug === 'wall-art' && (
-                  <fieldset>
-                    <legend>Orientation</legend>
-                    <div className="placement-options compact-options">
-                      {vm.selectedOrientation === 'square' ? (
-                        <button type="button" aria-pressed="true">
-                          Square
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            aria-pressed={vm.selectedOrientation === 'landscape'}
-                            onClick={() => vm.setSelectedOrientation('landscape')}
-                          >
-                            Landscape
-                          </button>
-                          <button
-                            type="button"
-                            aria-pressed={vm.selectedOrientation === 'portrait'}
-                            onClick={() => vm.setSelectedOrientation('portrait')}
-                          >
-                            Portrait
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </fieldset>
-                )}
-                <button
-                  className="button button--primary button--wide"
-                  type="button"
-                  onClick={vm.continueFromConfigure}
-                >
-                  Continue
-                </button>
-              </div>
+              <ConfigurationPanel
+                product={vm.selectedProduct!}
+                variant={vm.selectedVariant!}
+                selectedPlacements={vm.selectedPlacements}
+                quote={vm.quote}
+                quoteStale={vm.quoteStale}
+                mugLayout={vm.mugLayout}
+                orientation={vm.selectedOrientation}
+                onVariantChange={vm.setSelectedVariantId}
+                onTogglePlacement={vm.togglePlacement}
+                onMugLayoutChange={vm.setMugLayout}
+                onOrientationChange={vm.setSelectedOrientation}
+                onContinue={vm.continueFromConfigure}
+              />
             )}
 
             {vm.workbenchMode === 'describe' && selected && (
@@ -762,7 +666,7 @@ export function WorkbenchStudioApp() {
                 {!reviewSettling && vm.quote ? (
                   <div className="review-total">
                     <span>Estimated total before tax</span>
-                    <strong>{money(vm.quote.totalCents, vm.quote.currency)}</strong>
+                    <strong>{formatMoney(vm.quote.totalCents, vm.quote.currency)}</strong>
                   </div>
                 ) : !reviewSettling ? (
                   <p className="muted-copy">Price unavailable right now.</p>
@@ -778,7 +682,7 @@ export function WorkbenchStudioApp() {
                         </b>
                         <small>
                           {vm.quote?.placementCostCents
-                            ? `${money(vm.quote.placementCostCents, vm.quote.currency)} for additional printing`
+                            ? `${formatMoney(vm.quote.placementCostCents, vm.quote.currency)} for additional printing`
                             : vm.selectedProduct?.categorySlug === 'drinkware'
                               ? 'One wraparound print area'
                               : 'First print included'}
@@ -809,7 +713,7 @@ export function WorkbenchStudioApp() {
                                 {index === 0
                                   ? 'First print included'
                                   : quotePlacement?.additionalCostCents
-                                    ? `+${money(
+                                    ? `+${formatMoney(
                                         quotePlacement.additionalCostCents,
                                         vm.quote?.currency
                                       )} production`

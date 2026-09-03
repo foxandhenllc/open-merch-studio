@@ -322,3 +322,26 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, npm 10 production audit, lint, typecheck, production
 build/static-route checks, and the complete 11-viewport browser suite across five products plus
 upload/reference and recoverable checkout flows.
+
+## Configuration mode component checkpoint
+
+Completed September 3, 2026:
+
+- Added `components/ConfigurationPanel.tsx` with an adjacent typed prop contract for variants,
+  multi-print placement selection, mug positioning, wall-art orientation, and continuation.
+- Kept all selection transitions, remembered configuration, quote invalidation, artwork assignment,
+  analytics, and persistence in the studio view model.
+- Centralized currency display in `utils/currency.ts`, removing duplicated presentation formatting
+  while preserving the existing locale, currency, and cent conversion.
+- Preserved the quoted additional-print price preference and its fallback estimate copy, with the
+  same buttons and accessible pressed states exercised by the customer browser journeys.
+
+`WorkbenchStudioApp.tsx` moved from 974 to 878 lines. The configuration component is 123 lines,
+its prop contract is 22 lines, and the currency formatter is three lines. The next cohesive UI seam
+is the artwork-source/description mode, whose file selection, preview URL, rights assent, and
+reference inputs can move together without moving provider commands.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.
