@@ -297,3 +297,28 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Checkout mode component checkpoint
+
+Completed September 3, 2026:
+
+- Added `components/CheckoutPanel.tsx` with an adjacent public prop contract. The component owns
+  only its form-local touched, submitted, and policy-assent state; quote, readiness, payment, and
+  order state remain in the studio view model.
+- Moved the reusable customer error presentation into `components/ErrorNote.tsx` so checkout and
+  the remaining modes share one recovery treatment.
+- Preserved the checkout DOM labels, readiness message IDs, legal links, policy version, retry
+  guard, and button behavior exercised by the responsive browser suite.
+- Repaired the production dependency override shape discovered by hosted CI: `qs` is now a global
+  transitive override, which npm 10 recognizes as a valid package tree while retaining 6.16.0 and
+  a zero-vulnerability production audit.
+
+`WorkbenchStudioApp.tsx` moved from 1,094 to 974 lines, below the maintained-source target. The
+checkout component is 130 lines, its prop contract is 25 lines, and the shared error note is 16
+lines. Continue the UI-mode sequence one cohesive mode at a time; do not combine those extractions
+with cart, quantity, or reorder product work.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, npm 10 production audit, lint, typecheck, production
+build/static-route checks, and the complete 11-viewport browser suite across five products plus
+upload/reference and recoverable checkout flows.

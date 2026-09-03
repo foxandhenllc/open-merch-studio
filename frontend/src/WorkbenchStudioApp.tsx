@@ -1,16 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogPanel } from '@components/CatalogPanel';
+import { CheckoutPanel } from '@components/CheckoutPanel';
+import { ErrorNote } from '@components/ErrorNote';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
 import { OpenSourceAttribution } from '@components/OpenSourceAttribution';
-import { QuoteLedger } from '@components/QuoteLedger';
 import { ReadinessChecks } from '@components/ReadinessChecks';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
 import { VariantSelector } from '@components/VariantSelector';
 import { publicConfig } from './config';
 import { api } from './services/api';
-import { useStudioViewModel, type SurfaceError } from './studio-view-model';
+import { useStudioViewModel } from './studio-view-model';
 import type { CheckoutConfirmation } from './types/catalog';
 import { trackEvent } from './utils/analytics';
 
@@ -18,8 +19,6 @@ const money = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 
 const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
-const CHECKOUT_POLICY_VERSION = '2026-09-03';
-
 const pendingCheckoutSession = (): string | null => {
   try {
     const value = window.sessionStorage.getItem(PENDING_CHECKOUT_KEY);
@@ -57,20 +56,6 @@ const checkoutHandoff = (): { state: string | null; sessionId: string | null } =
     sessionId: validUrlSessionId ?? savedSessionId,
   };
 };
-
-function ErrorNote({ error, onRetry }: { error?: SurfaceError; onRetry: () => void }) {
-  if (!error) return null;
-  return (
-    <StatusNote
-      tone="error"
-      title={error.title}
-      primaryAction={error.retryable ? { label: 'Try again', onClick: onRetry } : undefined}
-    >
-      <p>{error.message}</p>
-      <p>{error.recovery}</p>
-    </StatusNote>
-  );
-}
 
 function Footer({ onStartFresh }: { onStartFresh: () => void }) {
   return (
@@ -110,9 +95,6 @@ export function WorkbenchStudioApp() {
   const [checkoutPolling, setCheckoutPolling] = useState(false);
   const [checkoutAttempt, setCheckoutAttempt] = useState(0);
   const [designOptionsOpen, setDesignOptionsOpen] = useState(false);
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [checkoutSubmitted, setCheckoutSubmitted] = useState(false);
-  const [checkoutPoliciesAccepted, setCheckoutPoliciesAccepted] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
@@ -226,13 +208,6 @@ export function WorkbenchStudioApp() {
     return () => URL.revokeObjectURL(url);
   }, [uploadFile]);
 
-  useEffect(() => {
-    if (vm.workbenchMode !== 'checkout') {
-      setCheckoutPoliciesAccepted(false);
-      setCheckoutSubmitted(false);
-    }
-  }, [vm.workbenchMode]);
-
   if (vm.flow === 'booting') {
     return (
       <main className="loading-shell" aria-busy="true">
@@ -267,17 +242,6 @@ export function WorkbenchStudioApp() {
       vm.busy.quoting ||
       (vm.artworkQuoteEligible && !vm.quote && !vm.errors.mockup && !vm.errors.quote));
   const hasDesignOptions = vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother;
-  const showEmailError =
-    vm.workbenchMode === 'checkout' &&
-    (emailTouched || checkoutSubmitted) &&
-    !vm.checkoutReadiness.emailValid;
-  const emailBlocker = vm.checkoutReadiness.blocker === 'Enter a valid email for your receipt.';
-  const visibleCheckoutBlocker =
-    showEmailError && emailBlocker
-      ? vm.checkoutReadiness.blocker
-      : emailBlocker
-        ? ''
-        : vm.checkoutReadiness.blocker;
   const activePlacement = vm.selectedProduct?.placements.find(
     (placement) => placement.code === vm.activePlacementCode
   );
@@ -983,105 +947,21 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'checkout' && (
-              <div className="panel-stack checkout-panel">
-                <QuoteLedger
-                  quote={vm.quote}
-                  loading={vm.busy.quoting}
-                  stale={vm.quoteStale}
-                  expired={vm.quoteExpired}
-                  onRefresh={vm.createQuote}
-                  embedded
-                />
-                <label className="email-field">
-                  <span>Email for receipt</span>
-                  <input
-                    type="email"
-                    value={vm.email}
-                    onChange={(event) => vm.setEmail(event.target.value)}
-                    onBlur={() => setEmailTouched(true)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                    aria-invalid={showEmailError}
-                    aria-describedby="checkout-readiness-message"
-                  />
-                </label>
-                <p
-                  id="checkout-readiness-message"
-                  className={`checkout-gate ${visibleCheckoutBlocker ? 'is-blocked' : ''}`}
-                >
-                  {visibleCheckoutBlocker || vm.checkoutReadiness.fulfillmentReview}
-                </p>
-                <details className="checkout-trust">
-                  <summary>Delivery and returns</summary>
-                  <p>
-                    Stripe shows the final charge, including applicable tax, before payment. Custom
-                    items can only be changed before production; damaged or misprinted items are
-                    covered by our <a href="/returns">returns policy</a>.
-                  </p>
-                </details>
-                <label className="checkout-assent">
-                  <input
-                    type="checkbox"
-                    checked={checkoutPoliciesAccepted}
-                    onChange={(event) => setCheckoutPoliciesAccepted(event.target.checked)}
-                    required
-                  />
-                  <span>
-                    I confirm that I am at least 18, have reviewed the product, size, color, and
-                    artwork, and agree to the{' '}
-                    <a href="/terms" target="_blank" rel="noreferrer">
-                      Terms of Use
-                    </a>
-                    ,{' '}
-                    <a href="/returns" target="_blank" rel="noreferrer">
-                      Returns and Refunds Policy
-                    </a>
-                    ,{' '}
-                    <a href="/privacy" target="_blank" rel="noreferrer">
-                      Privacy Policy
-                    </a>
-                    , and{' '}
-                    <a href="/content-policy" target="_blank" rel="noreferrer">
-                      Content Policy
-                    </a>
-                    . I will review the shipping details and final tax shown by Stripe before
-                    payment.
-                  </span>
-                </label>
-                <button
-                  className="button button--primary button--wide"
-                  type="button"
-                  onClick={() => {
-                    setCheckoutSubmitted(true);
-                    if (vm.checkoutReadiness.emailValid && checkoutPoliciesAccepted) {
-                      vm.createCheckout(true, CHECKOUT_POLICY_VERSION);
-                    }
-                  }}
-                  disabled={
-                    !vm.checkoutReadiness.canOpen || !checkoutPoliciesAccepted || vm.busy.checkout
-                  }
-                  aria-describedby="checkout-readiness-message"
-                >
-                  {vm.busy.checkout ? 'Opening checkout…' : 'Continue to secure checkout'}
-                </button>
-                {!publicConfig.enablePublicCheckout && (
-                  <p className="disabled-reason">
-                    Secure checkout is temporarily unavailable. Your design and price stay saved.
-                  </p>
-                )}
-                <ErrorNote
-                  error={vm.errors.checkout}
-                  onRetry={() => {
-                    if (checkoutPoliciesAccepted) {
-                      vm.createCheckout(true, CHECKOUT_POLICY_VERSION);
-                    }
-                  }}
-                />
-                <button className="text-action" type="button" onClick={vm.showReview}>
-                  Back to design
-                </button>
-              </div>
+              <CheckoutPanel
+                quote={vm.quote}
+                quoting={vm.busy.quoting}
+                quoteStale={vm.quoteStale}
+                quoteExpired={vm.quoteExpired}
+                onRefreshQuote={vm.createQuote}
+                email={vm.email}
+                onEmailChange={vm.setEmail}
+                readiness={vm.checkoutReadiness}
+                checkoutEnabled={publicConfig.enablePublicCheckout}
+                checkoutBusy={vm.busy.checkout}
+                checkoutError={vm.errors.checkout}
+                onCheckout={vm.createCheckout}
+                onBack={vm.showReview}
+              />
             )}
 
             {vm.workbenchMode === 'order' && vm.order && <OrderTimeline order={vm.order} />}
