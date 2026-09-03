@@ -82,3 +82,24 @@ Checkpoint verification passed lint, 84 backend tests (81 passed and three datab
 typecheck, production build/static-route checks, the local multi-placement fixture contract, and the
 complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Order repository checkpoint
+
+Completed September 3, 2026:
+
+- Added `order-repository.service.ts` as the typed fixture/PostgreSQL boundary for quote and order
+  reads, persisted-to-runtime mapping, order upserts, checkout-session and payment-intent recovery,
+  admin read projections, and fulfillment-retry loading.
+- Kept raw Prisma payloads inside the repository. The retry workflow receives a narrow typed record
+  containing only eligibility fields and its mapped runtime order.
+- Preserved every public `order.service.ts` export used by controllers and tests.
+
+`order.service.ts` moved from 2,084 to 1,716 lines; the new repository is 423 lines. The orchestrator
+remains above 1,000 lines because signed Stripe reconciliation, payment/refund event mutation,
+Printful fulfillment-attempt mutation, and provider recovery still share one module. The next safe
+bundle is Stripe event persistence and reconciliation support; after that, extract Printful attempt
+state and draft submission. Do not combine either extraction with cart or quantity behavior.
+
+This checkpoint passed lint, 84 backend tests (81 passed and three database-only skips), the explicit
+fixture smoke, typecheck, production build/static-route checks, the local multi-placement contract,
+and the complete 11-viewport browser suite.
