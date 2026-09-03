@@ -22,3 +22,8 @@ from the repository root with:
 ```bash
 npx prisma migrate deploy --schema backend/prisma/schema.prisma
 ```
+
+The uploaded-artwork migration expects Supabase Storage's `storage.buckets` table to exist. Supabase
+projects provide it automatically. The GitHub Actions PostgreSQL service is intentionally plain
+PostgreSQL, so CI applies `ci-storage-bootstrap.sql` first to create only the minimal bucket catalog
+shape needed by the migration. Do not run that test bootstrap against Supabase or production.
