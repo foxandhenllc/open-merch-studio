@@ -203,3 +203,28 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Studio artwork transition checkpoint
+
+Completed September 3, 2026:
+
+- Added `studio-artwork.transitions.ts` for the pure state rules shared by direct uploads,
+  reference-led generation, new drafts, revisions, and undo.
+- Centralized the five-reference cap, reference ID filtering, history deduplication, targeted
+  placement assignment, revision replacement, undo restoration, and generated-draft acceptance.
+- Documented the key multi-placement invariant next to the implementation: revising one artwork
+  asset replaces only placements using that asset, so independent front/back artwork survives.
+- Preserved functional React history updates after async requests; provider calls, progress phases,
+  cancellation, analytics, error presentation, and mockup refreshes remain in the view model.
+
+`studio-view-model.ts` moved from 1,489 to 1,473 lines; the new transition module is 97 lines. It
+remains above 1,000 lines because the provider command lifecycles still coordinate multiple pieces
+of React-owned state. The next safe studio extraction is typed mockup request preparation and
+result interpretation, followed by a cohesive artwork command hook only if that boundary avoids a
+large callback surface. After the studio hook is below 1,000 lines, move one workbench mode at a
+time out of `WorkbenchStudioApp.tsx`.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

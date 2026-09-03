@@ -7,6 +7,16 @@ import {
   togglePlacementConfiguration,
 } from '../src/studio-configuration.transitions.ts';
 import {
+  acceptArtworkDraft,
+  appendDesignHistory,
+  appendReferenceAssets,
+  assertUsableGeneratedDraft,
+  referenceAssetIds,
+  replaceDraftAssignments,
+  selectReferenceFiles,
+  undoArtworkRevision,
+} from '../src/studio-artwork.transitions.ts';
+import {
   artworkAssignmentsForDraft,
   buildPlacementSelections,
   deriveArtworkState,
@@ -182,6 +192,71 @@ const reusedAssignment = reusePlacementAssignment({
   design: front,
 });
 assert.equal(reusedAssignment?.back?.id, front.id);
+
+assert.deepEqual(selectReferenceFiles([1, 2, 3], 4), [1]);
+assert.deepEqual(
+  appendReferenceAssets([front, back], [front, back, front, back]),
+  [front, back, front, back, front],
+  'reference assets must remain capped at five even when async uploads finish together'
+);
+assert.deepEqual(referenceAssetIds([front, { ...back, id: null }]), [front.id]);
+
+const history = appendDesignHistory([], front);
+assert.deepEqual(appendDesignHistory(history, front), history, 'history must not duplicate a draft');
+
+const targetedArtwork = acceptArtworkDraft({
+  draft: back,
+  activePlacementCode: 'back',
+  selectedPlacements: ['front', 'back'],
+  placementArtwork: { front, back: front },
+});
+assert.equal(targetedArtwork.front?.id, front.id);
+assert.equal(targetedArtwork.back?.id, back.id);
+
+const revisedFront = { ...front, id: 'revised-front' };
+const replacedArtwork = replaceDraftAssignments(
+  { front, back },
+  front.id,
+  revisedFront
+);
+assert.equal(replacedArtwork.front?.id, revisedFront.id);
+assert.equal(
+  replacedArtwork.back?.id,
+  back.id,
+  'revising the front must preserve independent back artwork'
+);
+
+const undoneArtwork = undoArtworkRevision({
+  history: [front],
+  currentDesign: revisedFront,
+  placementArtwork: { front: revisedFront, back },
+});
+assert.equal(undoneArtwork?.design.id, front.id);
+assert.equal(undoneArtwork?.placementArtwork.front?.id, front.id);
+assert.equal(undoneArtwork?.placementArtwork.back?.id, back.id);
+assert.deepEqual(undoneArtwork?.history, []);
+
+assert.throws(
+  () =>
+    assertUsableGeneratedDraft({
+      ...front,
+      policy: { status: 'blocked', reasons: ['Policy rejected this request.'] },
+    }),
+  (error: unknown) =>
+    error instanceof ApiError && error.status === 400 && error.code === 'policy_blocked'
+);
+assert.throws(
+  () =>
+    assertUsableGeneratedDraft({
+      ...front,
+      generationStatus: 'failed',
+      policy: { status: 'needs_review', reasons: ['Provider did not finish.'] },
+    }),
+  (error: unknown) =>
+    error instanceof ApiError &&
+    error.status === 503 &&
+    error.code === 'design_generation_failed'
+);
 
 assert.deepEqual(
   mapStudioError(new ApiError('Request budget reached.', 429, 'rate_limit'), 'generation'),

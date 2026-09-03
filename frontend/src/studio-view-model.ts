@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ApiError, type DataSource, type Sourced } from '@services/api';
+import { api, type DataSource, type Sourced } from '@services/api';
 import { canUseCustomerCheckout } from './config';
 import type {
   CatalogCategory,
@@ -33,7 +33,6 @@ import type {
   WorkbenchMode,
 } from './studio-view-model.types';
 import {
-  artworkAssignmentsForDraft,
   buildPlacementSelections,
   deriveArtworkState,
   deriveCheckoutReadiness,
@@ -52,6 +51,16 @@ import {
   togglePlacementConfiguration,
   type RememberedProductSelection,
 } from './studio-configuration.transitions';
+import {
+  acceptArtworkDraft,
+  appendDesignHistory,
+  appendReferenceAssets,
+  assertUsableGeneratedDraft,
+  referenceAssetIds,
+  replaceDraftAssignments,
+  selectReferenceFiles,
+  undoArtworkRevision,
+} from './studio-artwork.transitions';
 
 export type {
   ActionKey,
@@ -395,9 +404,7 @@ export function useStudioViewModel() {
       orientation: selectedOrientation,
       prompt,
       designId: design?.id ?? undefined,
-      referenceAssetIds: referenceAssets
-        .map((asset) => asset.id)
-        .filter((id): id is string => Boolean(id)),
+      referenceAssetIds: referenceAssetIds(referenceAssets),
       mockup: mockup?.status === 'complete' ? mockup : undefined,
       mockupViewIndex: activeMockupViewIndex,
       quoteId: quote?.id ?? undefined,
@@ -792,16 +799,14 @@ export function useStudioViewModel() {
         removeBackground,
       });
       const draft = consumeSource(result);
-      const nextPlacementArtwork = artworkAssignmentsForDraft({
+      const nextPlacementArtwork = acceptArtworkDraft({
         draft,
         activePlacementCode,
         selectedPlacements,
         placementArtwork,
       });
       if (design?.id) {
-        setDesignHistory((current) =>
-          current.some((item) => item.id === design.id) ? current : [...current, design]
-        );
+        setDesignHistory((current) => appendDesignHistory(current, design));
       }
       setPrompt(draft.prompt);
       setDesign(draft);
@@ -838,8 +843,7 @@ export function useStudioViewModel() {
   };
 
   const addReferenceImages = async (files: File[]) => {
-    const remaining = Math.max(0, 5 - referenceAssets.length);
-    const selectedFiles = files.slice(0, remaining);
+    const selectedFiles = selectReferenceFiles(files, referenceAssets.length);
     if (!selectedFiles.length) return;
     setAction('generating', true);
     setGenerationPhase('Uploading references');
@@ -856,7 +860,7 @@ export function useStudioViewModel() {
         });
         results.push(consumeSource(result));
       }
-      setReferenceAssets((current) => [...current, ...results].slice(0, 5));
+      setReferenceAssets((current) => appendReferenceAssets(current, results));
       setAnnouncement(`${results.length} reference image${results.length === 1 ? '' : 's'} ready.`);
     } catch (error) {
       fail('generation', error);
@@ -925,9 +929,7 @@ export function useStudioViewModel() {
           ? api.designFromReferences(
               {
                 prompt,
-                referenceAssetIds: referenceAssets
-                  .map((asset) => asset.id)
-                  .filter((id): id is string => Boolean(id)),
+                referenceAssetIds: referenceAssetIds(referenceAssets),
                 sessionId: session?.id,
                 productId: selectedProduct.id,
                 variantId: selectedVariant.id,
@@ -949,29 +951,16 @@ export function useStudioViewModel() {
       ]);
       completionSource = result.source === 'live' ? 'api' : 'fixture';
       const draft = consumeSource(result);
-      if (draft.policy.status === 'blocked')
-        throw new ApiError(
-          draft.policy.reasons[0] || 'The prompt was blocked by content policy.',
-          400,
-          'policy_blocked'
-        );
-      if (draft.generationStatus === 'failed')
-        throw new ApiError(
-          draft.policy.reasons[0] || 'Artwork generation did not complete. Please retry.',
-          503,
-          'design_generation_failed'
-        );
-      if (design?.id) {
-        setDesignHistory((current) =>
-          current.some((item) => item.id === design.id) ? current : [...current, design]
-        );
-      }
-      const nextPlacementArtwork = artworkAssignmentsForDraft({
+      assertUsableGeneratedDraft(draft);
+      const nextPlacementArtwork = acceptArtworkDraft({
         draft,
         activePlacementCode,
         selectedPlacements,
         placementArtwork,
       });
+      if (design?.id) {
+        setDesignHistory((current) => appendDesignHistory(current, design));
+      }
       setDesign(draft);
       setPlacementArtwork(nextPlacementArtwork);
       setActivePlacementCode('');
@@ -1051,15 +1040,12 @@ export function useStudioViewModel() {
         sessionId: session?.id,
       });
       const revised = consumeSource(result);
-      const nextPlacementArtwork = Object.fromEntries(
-        Object.entries(placementArtwork).map(([code, assigned]) => [
-          code,
-          assigned.id === design.id ? revised : assigned,
-        ])
+      const nextPlacementArtwork = replaceDraftAssignments(
+        placementArtwork,
+        design.id,
+        revised
       );
-      setDesignHistory((current) =>
-        current.some((item) => item.id === design.id) ? current : [...current, design]
-      );
+      setDesignHistory((current) => appendDesignHistory(current, design));
       setDesign(revised);
       setPlacementArtwork(nextPlacementArtwork);
       setMockup(null);
@@ -1095,17 +1081,15 @@ export function useStudioViewModel() {
     }
   };
   const undoDraft = async () => {
-    const previous = designHistory[designHistory.length - 1];
-    if (!previous) return;
-    const nextPlacementArtwork = Object.fromEntries(
-      Object.entries(placementArtwork).map(([code, assigned]) => [
-        code,
-        assigned.id === design?.id ? previous : assigned,
-      ])
-    );
-    setDesignHistory((current) => current.slice(0, -1));
-    setDesign(previous);
-    setPlacementArtwork(nextPlacementArtwork);
+    const undone = undoArtworkRevision({
+      history: designHistory,
+      currentDesign: design,
+      placementArtwork,
+    });
+    if (!undone) return;
+    setDesignHistory(undone.history);
+    setDesign(undone.design);
+    setPlacementArtwork(undone.placementArtwork);
     setRevision('');
     setQuoteStale(Boolean(quote));
     setCheckout(null);
@@ -1113,15 +1097,15 @@ export function useStudioViewModel() {
     setAnnouncement('Previous artwork restored. Rebuilding its product preview.');
     trackEvent('design_revision_completed', {
       result: 'undone',
-      remaining: revisionBand(previous.allowance.editsRemaining),
+      remaining: revisionBand(undone.design.allowance.editsRemaining),
     });
     if (selectedProduct && selectedVariant) {
       await requestMockup({
         product: selectedProduct,
         variant: selectedVariant,
         placements: selectedPlacements,
-        draft: previous,
-        artworkByCode: nextPlacementArtwork,
+        draft: undone.design,
+        artworkByCode: undone.placementArtwork,
         orientation: selectedOrientation,
       });
     }
