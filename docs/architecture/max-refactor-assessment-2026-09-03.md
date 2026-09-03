@@ -56,3 +56,29 @@ requires simultaneously changing behavior and module boundaries, stop and split 
 Cart, reorder, customer accounts, tracking, transactional email, merchant configuration, and a
 ChatGPT plugin are product capabilities. Specify them against the cleaner seams, but do not label
 their implementation as cleanup.
+
+## First implementation checkpoint
+
+Completed September 3, 2026:
+
+1. Extracted the pure order-state boundary into `order-state.service.ts`: persisted/runtime status
+   mapping, Stripe event and refund decisions, Printful retry eligibility, operator-review
+   normalization, and admin attention filters.
+2. Extracted the checkout-validation boundary into `checkout-validation.service.ts`: artwork
+   readiness checks, distinct placement artwork collection, and catalog/provider quote validation.
+3. Preserved the former `order.service.ts` exports so controllers and existing consumers did not
+   change.
+4. Added characterization coverage for unknown persisted values failing closed, artwork validation,
+   and distinct multi-placement design IDs.
+
+`order.service.ts` moved from 2,287 to 2,084 lines. It remains above the 1,000-line target because the
+database persistence, Stripe reconciliation, Printful submission/recovery, and admin mutation paths
+still share transaction and failure-handling context. The next extraction target is a typed order
+repository that owns Prisma includes, persisted/runtime mapping, and order reads/writes without
+changing route or service contracts. Provider orchestration should move only after that boundary is
+green.
+
+Checkpoint verification passed lint, 84 backend tests (81 passed and three database-only skips),
+typecheck, production build/static-route checks, the local multi-placement fixture contract, and the
+complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.
