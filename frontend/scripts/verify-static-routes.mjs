@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CANONICAL_ORIGIN, NOT_FOUND_ROUTE, STATIC_ROUTES } from './static-route-config.mjs';
+import {
+  CANONICAL_ORIGIN,
+  DEFAULT_SOCIAL_IMAGE,
+  NOT_FOUND_ROUTE,
+  STATIC_ROUTES,
+} from './static-route-config.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const frontendDirectory = path.resolve(scriptDirectory, '..');
@@ -44,6 +49,19 @@ for (const route of STATIC_ROUTES) {
     ),
     `${route.path} Open Graph description`
   );
+  const socialImageUrl = `${CANONICAL_ORIGIN}${route.socialImage ?? DEFAULT_SOCIAL_IMAGE}`;
+  assert.ok(
+    html.includes(`<meta property="og:image" content="${socialImageUrl}" />`),
+    `${route.path} Open Graph image`
+  );
+  assert.ok(
+    html.includes(`<meta name="twitter:title" content="${escapeHtml(route.title)}" />`),
+    `${route.path} Twitter title`
+  );
+  assert.ok(
+    html.includes(`<meta name="twitter:image" content="${socialImageUrl}" />`),
+    `${route.path} Twitter image`
+  );
   assert.equal(occurrences(html, /rel="canonical"/g), 1, `${route.path} canonical count`);
   assert.equal(occurrences(html, /property="og:url"/g), 1, `${route.path} og:url count`);
   assert.match(html, /<meta\s+name="robots"\s+content="index,follow"\s*\/>/i);
@@ -67,6 +85,14 @@ assert.deepEqual(
   sitemapUrls,
   STATIC_ROUTES.map((route) => `${CANONICAL_ORIGIN}${route.path}`)
 );
+
+const manifest = JSON.parse(await readFile(path.join(distDirectory, 'manifest.webmanifest'), 'utf8'));
+assert.ok(
+  manifest.icons?.some((icon) => icon.src === '/icon.svg' && icon.type === 'image/svg+xml'),
+  'the web app manifest must expose the OMS icon'
+);
+await access(path.join(distDirectory, 'icon.svg'));
+await access(path.join(distDirectory, DEFAULT_SOCIAL_IMAGE.replace(/^\//, '')));
 
 const vercelConfig = JSON.parse(await readFile(path.join(repositoryDirectory, 'vercel.json'), 'utf8'));
 const rewrites = vercelConfig.rewrites ?? [];

@@ -18,7 +18,7 @@ const money = (cents: number, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 
 const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
-const CHECKOUT_POLICY_VERSION = '2026-07-17';
+const CHECKOUT_POLICY_VERSION = '2026-09-03';
 
 const pendingCheckoutSession = (): string | null => {
   try {
@@ -79,6 +79,7 @@ function Footer({ onStartFresh }: { onStartFresh: () => void }) {
         <summary>Help &amp; session</summary>
         <div className="workspace-menu__content">
           <nav aria-label="Footer links">
+            <a href="/examples/fox-and-hen">Example shop</a>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
             <a href="/returns">Returns</a>
@@ -286,6 +287,13 @@ export function WorkbenchStudioApp() {
     ) ?? [];
   const primaryPlacement = selectedPlacementOptions[0];
   const quoteItem = vm.quote?.items[0];
+  const primaryArtworkId = primaryPlacement
+    ? (vm.placementArtwork[primaryPlacement.code] ?? vm.design)?.id
+    : vm.design?.id;
+  const hasSeparatePlacementArtwork = selectedPlacementOptions.slice(1).some((placement) => {
+    const artworkId = (vm.placementArtwork[placement.code] ?? vm.design)?.id;
+    return Boolean(artworkId && primaryArtworkId && artworkId !== primaryArtworkId);
+  });
   const panelTitle = {
     product: 'Choose a product',
     configure: 'Choose color and size',
@@ -311,7 +319,12 @@ export function WorkbenchStudioApp() {
             {publicConfig.enablePublicCheckout && <small>Now accepting orders</small>}
           </span>
         </a>
-        <a href="/support">Support</a>
+        <div className="compact-header__actions">
+          <a href="/support">Support</a>
+          <button className="text-action" type="button" onClick={vm.startFresh}>
+            Start fresh
+          </button>
+        </div>
       </header>
 
       {checkoutReturn ? (
@@ -873,6 +886,12 @@ export function WorkbenchStudioApp() {
                         );
                       })}
                     </div>
+                    {hasSeparatePlacementArtwork && (
+                      <p className="separate-artwork-note">
+                        Different artwork can add design work. Reuse the front artwork to remove
+                        any duplicate design charge; the additional print charge still applies.
+                      </p>
+                    )}
                     {vm.selectedProduct?.categorySlug === 'drinkware' && (
                       <p className="mug-layout-summary">
                         Position:{' '}

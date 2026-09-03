@@ -1,0 +1,8 @@
+# Local-only audit and design artifacts are not part of the runtime bundle.
+output/
+design_handoff_designing_phase_fun/
+frontend/scripts/capture-social-storyboards.mjs
+
+# Repository documentation is published through GitHub, not the application.
+docs/
+AGENTS.md

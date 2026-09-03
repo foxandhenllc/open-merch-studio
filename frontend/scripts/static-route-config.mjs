@@ -1,4 +1,5 @@
 export const CANONICAL_ORIGIN = 'https://openmerchstudio.com';
+export const DEFAULT_SOCIAL_IMAGE = '/open-merch-studio-share.png';
 
 export const STATIC_ROUTES = [
   {
@@ -14,6 +15,8 @@ export const STATIC_ROUTES = [
     title: 'One Clear System | Fox & Hen Collection',
     description:
       'See a five-product Fox & Hen capsule built from the studio’s approved logo system, production-ready print files, and multi-placement printing in Open Merch Studio.',
+    socialImage: '/examples/fox-and-hen/collection-share.png',
+    socialImageAlt: 'Fox & Hen collection printed five ways with Open Merch Studio',
   },
   {
     path: '/privacy',

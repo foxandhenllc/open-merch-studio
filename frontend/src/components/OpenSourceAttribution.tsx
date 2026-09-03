@@ -4,7 +4,13 @@ const licenseUrl = `${sourceUrl}/blob/main/LICENSE`;
 export function OpenSourceAttribution() {
   return (
     <p className="open-source-attribution">
-      <span>Open Merch Studio is an open-source product by Fox &amp; Hen.</span>
+      <span>
+        Open Merch Studio is an open-source product by{' '}
+        <a href="https://foxandhenllc.com/merch" target="_blank" rel="noreferrer">
+          Fox &amp; Hen
+        </a>
+        .
+      </span>
       <a href={sourceUrl} target="_blank" rel="noreferrer">
         Source on GitHub
       </a>

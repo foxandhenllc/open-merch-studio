@@ -1,7 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CANONICAL_ORIGIN, NOT_FOUND_ROUTE, STATIC_ROUTES } from './static-route-config.mjs';
+import {
+  CANONICAL_ORIGIN,
+  DEFAULT_SOCIAL_IMAGE,
+  NOT_FOUND_ROUTE,
+  STATIC_ROUTES,
+} from './static-route-config.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const frontendDirectory = path.resolve(scriptDirectory, '..');
@@ -22,15 +27,48 @@ const replaceOrInsertHeadTag = (html, pattern, tag) => {
 
 const removeHeadTag = (html, pattern) => html.replace(pattern, '');
 
-const renderDocument = ({ title, description, canonicalUrl }) => {
+const renderDocument = ({
+  title,
+  description,
+  canonicalUrl,
+  socialImage = DEFAULT_SOCIAL_IMAGE,
+  socialImageAlt = 'Open Merch Studio with real custom product proofs',
+}) => {
   const safeTitle = escapeHtml(title);
   const safeDescription = escapeHtml(description);
+  const safeSocialImageAlt = escapeHtml(socialImageAlt);
+  const socialImageUrl = `${CANONICAL_ORIGIN}${socialImage}`;
   let html = baseDocument.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`);
 
   html = replaceOrInsertHeadTag(
     html,
     /<meta\s+[^>]*name=["']description["'][^>]*>/i,
     `<meta name="description" content="${safeDescription}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*property=["']og:image["'][^>]*>/i,
+    `<meta property="og:image" content="${socialImageUrl}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*property=["']og:image:alt["'][^>]*>/i,
+    `<meta property="og:image:alt" content="${safeSocialImageAlt}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*name=["']twitter:title["'][^>]*>/i,
+    `<meta name="twitter:title" content="${safeTitle}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*name=["']twitter:description["'][^>]*>/i,
+    `<meta name="twitter:description" content="${safeDescription}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<meta\s+[^>]*name=["']twitter:image["'][^>]*>/i,
+    `<meta name="twitter:image" content="${socialImageUrl}" />`
   );
   html = replaceOrInsertHeadTag(
     html,

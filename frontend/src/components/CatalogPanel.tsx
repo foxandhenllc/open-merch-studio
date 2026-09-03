@@ -47,6 +47,9 @@ export function CatalogPanel({
           </button>
         )}
       </div>
+      <a className="catalog-proof-link" href="/examples/fox-and-hen">
+        See a real five-product collection →
+      </a>
       <div className="category-tabs" aria-label="Product categories">
         <button type="button" aria-pressed={!category} onClick={() => onCategory('')}>
           All

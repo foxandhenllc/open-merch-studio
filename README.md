@@ -120,6 +120,9 @@ npm run dev:frontend
 ## Product Roadmap
 
 - Uploaded/reference artwork architecture: [docs/architecture/uploaded-artwork-flow.md](./docs/architecture/uploaded-artwork-flow.md)
+- Current post-payment customer experience: [docs/architecture/current-post-payment-experience.md](./docs/architecture/current-post-payment-experience.md)
+- Staged Max Refactor assessment: [docs/architecture/max-refactor-assessment-2026-09-03.md](./docs/architecture/max-refactor-assessment-2026-09-03.md)
+- Cart, reorder, reusable distribution, plugin, and service roadmap: [docs/roadmap/open-source-commerce-next.md](./docs/roadmap/open-source-commerce-next.md)
 - Themed saved products and embeddable mini-stores: [docs/roadmap/themed-mini-stores.md](./docs/roadmap/themed-mini-stores.md)
 
 ## Printful References

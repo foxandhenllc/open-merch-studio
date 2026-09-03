@@ -350,6 +350,47 @@ async function exerciseFixtureJourney(browser) {
       'front and back quote data should preserve distinct artwork IDs'
     );
 
+    const reuseArtwork = page.getByRole('button', { name: 'Use same as Front print' });
+    await reuseArtwork.scrollIntoViewIfNeeded();
+    const [reuseBox, reviewActionBox] = await Promise.all([
+      reuseArtwork.boundingBox(),
+      page.getByRole('button', { name: 'Review and checkout', exact: true }).boundingBox(),
+    ]);
+    assert.ok(reuseBox && reviewActionBox, 'mobile reuse and checkout actions should be visible');
+    assert.ok(
+      reuseBox.y + reuseBox.height <= reviewActionBox.y,
+      `the mobile checkout tray must not cover placement reuse: ${JSON.stringify({ reuseBox, reviewActionBox })}`
+    );
+    const nextMockupRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname === '/api/design/mockups'
+    );
+    const nextQuoteRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname === '/api/catalog/quotes'
+    );
+    await reuseArtwork.click();
+    const [reusedMockupRequest, reusedQuoteRequest] = await Promise.all([
+      nextMockupRequest,
+      nextQuoteRequest,
+    ]);
+    const reusedMockupBody = reusedMockupRequest.postDataJSON();
+    const reusedQuoteBody = reusedQuoteRequest.postDataJSON();
+    assert.equal(
+      reusedMockupBody.placements[0].designAssetId,
+      reusedMockupBody.placements[1].designAssetId,
+      'reusing the front artwork must update the next mockup request'
+    );
+    assert.equal(
+      reusedQuoteBody.items[0].placements[0].designAssetId,
+      reusedQuoteBody.items[0].placements[1].designAssetId,
+      'reusing the front artwork must update the next quote request'
+    );
+    await page.getByText(/Same artwork as Front print/).waitFor();
+    assert.equal(
+      await page.getByText(/Different artwork can add design work/).count(),
+      0,
+      'the separate-artwork pricing note should clear after artwork is reused'
+    );
+
     const mobileRail = page.locator('.mockup-viewer__rail--mobile');
     const desktopRail = page.locator('.mockup-viewer__rail--desktop');
     await mobileRail.waitFor();
@@ -717,7 +758,7 @@ async function exercisePolicyPages(browser) {
         await assertNoHorizontalOverflow(page, `${label} ${route}`);
         assert.equal(
           await page
-            .getByText('Effective July 17, 2026. Last updated July 17, 2026.', {
+            .getByText('Effective July 17, 2026. Last updated September 3, 2026.', {
               exact: true,
             })
             .count(),
@@ -744,7 +785,7 @@ async function exercisePolicyPages(browser) {
       await page.goto(`${origin}/support`, { waitUntil: 'networkidle' });
       assert.equal(
         await page
-          .getByText('Open Merch Studio is operated by FoxAndHen LLC.', {
+          .getByText('Open Merch Studio is operated by Fox&Hen, LLC.', {
             exact: false,
           })
           .count(),

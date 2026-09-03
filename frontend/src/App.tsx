@@ -6,8 +6,8 @@ import { WorkbenchStudioApp } from './WorkbenchStudioApp';
 
 const path = () => window.location.pathname.replace(/\/+$/, '') || '/';
 const section = (heading: string, body: string) => ({ heading, body });
-const effectiveDate = 'Effective July 17, 2026. Last updated July 17, 2026.';
-const operatorDisclosure = 'Open Merch Studio is operated by FoxAndHen LLC.';
+const effectiveDate = 'Effective July 17, 2026. Last updated September 3, 2026.';
+const operatorDisclosure = 'Open Merch Studio is operated by Fox&Hen, LLC.';
 
 const policies: Record<string, PolicyRoute> = {
   '/privacy': {
@@ -80,7 +80,7 @@ const policies: Record<string, PolicyRoute> = {
       ),
       section(
         'Prices, payment, and taxes',
-        'The studio displays a pre-tax estimate. Stripe Checkout shows the final charge, including applicable tax, before you pay. FoxAndHen LLC remains responsible for applicable tax registration, filing, and remittance. Completing payment places the order subject to Open Merch Studio\'s post-payment artwork and fulfillment review; payment does not guarantee acceptance for production.'
+        'The studio displays a pre-tax estimate. Stripe Checkout shows the final charge, including applicable tax, before you pay. Fox&Hen, LLC remains responsible for applicable tax registration, filing, and remittance. Completing payment places the order subject to Open Merch Studio\'s post-payment artwork and fulfillment review; payment does not guarantee acceptance for production.'
       ),
       section(
         'Fulfillment review',

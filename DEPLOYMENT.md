@@ -17,9 +17,9 @@ Open Merch Studio can be deployed as a split frontend/backend app or as separate
 
 Store all provider values in deployment-managed storage. Do not commit provider values or screenshots of provider dashboards.
 
-## Live Provider Gates
+## Safe Defaults And Live Provider Gates
 
-Keep commerce authorization disabled until the private OPS checklist is complete. Provider capability
+New installations must keep commerce authorization disabled until their private OPS checklist is complete. Provider capability
 switches are separate from money/order authorization: production may enable OpenAI generation,
 Stripe webhook/reconciliation access, and Printful mockups while the commerce gates below remain
 closed.
@@ -47,6 +47,12 @@ The current Vercel deployment serves the static frontend and routes `/api/*` thr
 Provider Checkout requires the quote, artwork, selected variants, and order to be retrievable from PostgreSQL. Stripe Checkout is card-only, US-only, and uses automatic tax. Subscribe the signed webhook endpoint to `checkout.session.completed`, `checkout.session.expired`, and `charge.refunded`.
 
 Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider polling. Paid orders create an editable draft with the OMS order number as the external ID; `PRINTFUL_AUTO_CONFIRM_ORDERS` must remain false for the supervised launch.
+
+The Open Merch Studio production deployment was rechecked on September 3, 2026 with
+`CHECKOUT_ACCESS_MODE=public`, live Stripe and Printful adapters enabled, payment and fulfillment
+authorization enabled, and `PRINTFUL_AUTO_CONFIRM_ORDERS=false`. Transactional email delivery and
+automatic shipment tracking are not part of that launch contract; see
+[the current post-payment experience](./docs/architecture/current-post-payment-experience.md).
 
 `gpt-image-2` is the default design model. Because that model does not emit transparent backgrounds, set `REMOVE_BG_API_KEY` to enable the automatic post-generation background-removal stage. Without it, generation and mockups still work, but print readiness shows a warning until a transparent file is prepared.
 

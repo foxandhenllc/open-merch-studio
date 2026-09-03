@@ -7,6 +7,7 @@ import type {
   DesignIdea,
   DesignMockup,
   OrderSummary,
+  PlacementSelection,
   QuoteBreakdown,
   StudioPass,
   StudioSession,
@@ -337,8 +338,11 @@ let localSession: StudioSession | null = null;
 let localPass: StudioPass | null = null;
 let localOrder: OrderSummary | null = null;
 let localDraftCount = 0;
+let localSequence = 0;
+const localArtworkUrls = new Map<string, string>();
 
-const localId = (prefix: string) => `${prefix}_${Date.now().toString(36)}`;
+const localId = (prefix: string) =>
+  `${prefix}_${Date.now().toString(36)}_${(++localSequence).toString(36)}`;
 
 export function localProductsForCategory(category?: string): CatalogProduct[] {
   const products = category
@@ -596,7 +600,7 @@ export function createLocalDesignDraft(
   <text x="512" y="505" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="700" fill="#111827">Open Merch</text>
   <text x="512" y="575" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="30" fill="#334155">${safePrompt}</text>
 </svg>`;
-  return {
+  const draft: DesignDraft = {
     id: localId('draft'),
     sessionId: sessionId ?? session.id,
     provider: 'mock',
@@ -652,16 +656,35 @@ export function createLocalDesignDraft(
     },
     createdAt: new Date().toISOString(),
   };
+  if (draft.id) localArtworkUrls.set(draft.id, draft.imageUrl);
+  return draft;
 }
 
 export function createLocalMockup(params: {
   productId: string;
   variantId: string;
   placementCodes: string[];
+  placements?: PlacementSelection[];
   designAssetId?: string;
   imageUrl?: string;
   orientation?: 'portrait' | 'landscape' | 'square';
 }): DesignMockup {
+  const product = localProducts.find((candidate) => candidate.id === params.productId);
+  const placementSelections = params.placements?.length
+    ? params.placements
+    : params.placementCodes.map((code) => ({ code, designAssetId: params.designAssetId }));
+  const fallbackImageUrl =
+    params.imageUrl ??
+    (params.designAssetId ? localArtworkUrls.get(params.designAssetId) : undefined) ??
+    '';
+  const views = placementSelections.map((placement) => ({
+    label:
+      product?.placements.find((candidate) => candidate.code === placement.code)?.displayName ??
+      placement.code,
+    imageUrl:
+      (placement.designAssetId ? localArtworkUrls.get(placement.designAssetId) : undefined) ??
+      fallbackImageUrl,
+  }));
   return {
     id: localId('mockup'),
     status: 'complete',
@@ -671,7 +694,8 @@ export function createLocalMockup(params: {
     placementCodes: params.placementCodes,
     designAssetId: params.designAssetId,
     orientation: params.orientation,
-    imageUrl: params.imageUrl ?? createLocalDesignDraft('Mockup preview').imageUrl,
+    imageUrl: views[0]?.imageUrl ?? fallbackImageUrl,
+    views,
     createdAt: new Date().toISOString(),
   };
 }

@@ -1,4 +1,4 @@
-export const CURRENT_CHECKOUT_POLICY_VERSION = '2026-07-17' as const;
+export const CURRENT_CHECKOUT_POLICY_VERSION = '2026-09-03' as const;
 
 export type CheckoutPolicyAcceptance = {
   policyAccepted: boolean;

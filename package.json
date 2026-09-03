@@ -1,7 +1,7 @@
 {
   "name": "open-merch-studio",
   "version": "0.1.0",
-  "description": "Open-source AI-first custom merch studio for curated Printful catalog fulfillment.",
+  "description": "Open-source custom merch studio for uploads, assisted artwork, previews, checkout, and curated fulfillment.",
   "private": false,
   "license": "MIT",
   "packageManager": "npm@10.9.2",
@@ -14,7 +14,13 @@
     "npm": ">=10"
   },
   "overrides": {
-    "form-data": "^4.0.6"
+    "form-data": "^4.0.6",
+    "express": {
+      "qs": "6.16.0",
+      "body-parser": {
+        "qs": "6.16.0"
+      }
+    }
   },
   "scripts": {
     "dev": "concurrently \"node \\\"$npm_execpath\\\" --workspace open-merch-studio-backend run dev\" \"node \\\"$npm_execpath\\\" --workspace open-merch-studio-frontend run dev\"",
@@ -24,7 +30,7 @@
     "start": "node \"$npm_execpath\" --workspace open-merch-studio-backend run start",
     "lint": "node \"$npm_execpath\" --workspace open-merch-studio-backend run lint && node \"$npm_execpath\" --workspace open-merch-studio-frontend run lint",
     "type-check": "node \"$npm_execpath\" --workspace open-merch-studio-backend run type-check && node \"$npm_execpath\" --workspace open-merch-studio-frontend run type-check",
-    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test",
+    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test && node --import tsx frontend/scripts/local-fixture-contract.mts",
     "test:browser": "node frontend/scripts/responsive-smoke.mjs",
     "smoke:fixture": "node --import tsx backend/src/tests/fixture-smoke.test.ts",
     "smoke:live-upload": "node scripts/verify-live-upload.mjs",
