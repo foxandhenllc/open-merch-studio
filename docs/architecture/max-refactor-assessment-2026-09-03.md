@@ -152,3 +152,29 @@ fixture smoke, typecheck, production build/static-route checks, the local multi-
 and the complete 11-viewport browser suite across five products. The next staged target is
 `frontend/src/studio-view-model.ts` (1,696 lines), beginning with pure selectors and typed commands;
 the 1,273-line Printful provider service remains a later transport/transformation split.
+
+## Studio selector checkpoint
+
+Completed September 3, 2026:
+
+- Added `studio-view-model.selectors.ts` for product defaults, orientation, mockup cache identity,
+  artwork assignment/readiness, checkout readiness, design allowance, placement payloads, and step
+  state derivation.
+- Added `studio-view-model.types.ts` and preserved the former type exports from
+  `studio-view-model.ts`, so the workbench consumer contract did not change.
+- Moved `ApiError` to a dependency-light module and re-exported it from the API service, preserving
+  runtime class identity while allowing selector tests to run without booting browser configuration.
+- Added a runnable selector contract covering same-as-front placement payloads, targeted placement
+  customization, warning artwork, stale quote and email blockers, stable mockup cache keys, and
+  provider-capacity error messaging.
+
+`studio-view-model.ts` moved from 1,696 to 1,506 lines. It remains above the 1,000-line target because
+React state/effect ownership and the product, artwork, mockup, quote, and checkout command clusters
+are still colocated. The next safe bundle is the product/configuration command cluster (currently
+beginning around line 571), expressed as pure state transitions or narrowly typed commands while the
+hook retains React setters, request controllers, unsaved input, and persistence effects.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

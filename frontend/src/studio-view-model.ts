@@ -10,180 +10,53 @@ import type {
   DesignDraft,
   DesignIdea,
   DesignMockup,
-  PlacementOption,
   PlacementLayout,
-  PlacementSelection,
   QuoteBreakdown,
   StudioCapabilities,
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
-import type { StepState, StudioStep } from '@components/StepRail.types';
+import type { StudioStep } from '@components/StepRail.types';
 import {
   clearStudioResumeState,
   readStudioResumeState,
   writeStudioResumeState,
 } from './studio-persistence';
 import { productType, revisionBand, totalBand, trackEvent } from './utils/analytics';
-import { customerPrintReadiness } from './utils/print-readiness';
+import type {
+  ActionKey,
+  CreationPath,
+  FlowState,
+  PreviewOrientation,
+  Surface,
+  SurfaceError,
+  WorkbenchMode,
+} from './studio-view-model.types';
+import {
+  artworkAssignmentsForDraft,
+  buildPlacementSelections,
+  deriveArtworkState,
+  deriveCheckoutReadiness,
+  deriveDesignAllowance,
+  deriveStepStates,
+  emptyBusy,
+  firstPlacement,
+  firstVariant,
+  mapStudioError,
+  mockupKey,
+  placementArtworkKey,
+  previewOrientation,
+} from './studio-view-model.selectors';
 
-export type FlowState =
-  | 'booting'
-  | 'boot_failed'
-  | 'configuring'
-  | 'refining'
-  | 'generating'
-  | 'drafted'
-  | 'previewing'
-  | 'quoted'
-  | 'quote_stale'
-  | 'quote_expired'
-  | 'ordering'
-  | 'redirecting'
-  | 'confirmed';
-export type WorkbenchMode =
-  | 'product'
-  | 'configure'
-  | 'describe'
-  | 'generating'
-  | 'review'
-  | 'checkout'
-  | 'order';
-export type ActionKey =
-  | 'catalog'
-  | 'refining'
-  | 'generating'
-  | 'revising'
-  | 'mockup'
-  | 'quoting'
-  | 'pass'
-  | 'checkout';
-export type Surface = 'boot' | 'catalog' | 'generation' | 'mockup' | 'quote' | 'checkout' | 'order';
-export type SurfaceError = {
-  cause: string;
-  title: string;
-  message: string;
-  recovery: string;
-  retryable: boolean;
-};
-export type PreviewOrientation = 'portrait' | 'landscape' | 'square';
-export type CreationPath = 'generate' | 'upload' | 'reference';
-
-const firstVariant = (product: CatalogProduct): CatalogVariant | null =>
-  product.variants.find((variant) => variant.isAvailable) ?? product.variants[0] ?? null;
-const firstPlacement = (product: CatalogProduct): PlacementOption | null =>
-  product.placements.find((placement) => placement.isDefault) ?? product.placements[0] ?? null;
-const previewOrientation = (
-  product: CatalogProduct,
-  variant: CatalogVariant | null
-): PreviewOrientation | undefined => {
-  if (product.categorySlug !== 'wall-art') return undefined;
-  const dimensions = variant?.size?.match(/([\d.]+)\s*[x×]\s*([\d.]+)/i);
-  return dimensions && dimensions[1] === dimensions[2] ? 'square' : 'landscape';
-};
-const mockupKey = (params: {
-  productId: string;
-  variantId: string;
-  placements: string[];
-  draftId: string;
-  placementDesigns?: Record<string, string>;
-  mugLayout?: PlacementLayout;
-  orientation?: PreviewOrientation;
-}) =>
-  [
-    params.draftId,
-    params.productId,
-    params.variantId,
-    [...params.placements].sort().join(','),
-    Object.entries(params.placementDesigns ?? {})
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([code, assetId]) => `${code}:${assetId}`)
-      .join(','),
-    params.mugLayout ?? 'center',
-    params.orientation ?? 'default',
-  ].join('|');
-const emptyBusy: Record<ActionKey, boolean> = {
-  catalog: false,
-  refining: false,
-  generating: false,
-  revising: false,
-  mockup: false,
-  quoting: false,
-  pass: false,
-  checkout: false,
-};
-
-function mapError(error: unknown, surface: Surface): SurfaceError {
-  const message = error instanceof Error ? error.message : 'The request could not be completed.';
-  const status = error instanceof ApiError ? error.status : 0;
-  const code = error instanceof ApiError ? error.code : undefined;
-  const normalized = `${code || ''} ${message}`.toLowerCase();
-  if (code === 'revision_allowance_required')
-    return {
-      cause: 'revision_allowance_required',
-      title: 'No more variations are available in this studio session',
-      message,
-      recovery: 'Your current artwork, mockup, and price are unchanged.',
-      retryable: false,
-    };
-  if (status === 429 || normalized.includes('rate') || normalized.includes('budget'))
-    return {
-      cause: 'rate_limited',
-      title: 'Generation is temporarily at capacity',
-      message: 'Your place and prompt are saved.',
-      recovery: 'Wait a moment, then retry this same request.',
-      retryable: true,
-    };
-  if (normalized.includes('policy') || normalized.includes('blocked'))
-    return {
-      cause: 'policy_blocked',
-      title: 'This prompt needs a change',
-      message,
-      recovery: 'Edit the flagged wording and review the content policy before retrying.',
-      retryable: false,
-    };
-  if (normalized.includes('payment') || normalized.includes('stripe'))
-    return {
-      cause: 'payment_failed',
-      title: 'Checkout did not complete',
-      message,
-      recovery:
-        'Retry with the same quote. Checkout creation is idempotent, so you cannot be double-charged.',
-      retryable: true,
-    };
-  if (surface === 'mockup')
-    return {
-      cause: 'mockup_failed',
-      title: 'The product preview failed',
-      message,
-      recovery: 'Retry the preview or continue to price without it. Your artwork is unchanged.',
-      retryable: true,
-    };
-  if (surface === 'quote')
-    return {
-      cause: 'quote_failed',
-      title: 'The price could not be calculated',
-      message,
-      recovery: 'Retry with the current product selection.',
-      retryable: true,
-    };
-  if (surface === 'generation')
-    return {
-      cause: 'provider_failed',
-      title: 'The draft was not generated',
-      message,
-      recovery:
-        'Retry with the same prompt. Failed provider requests are reconciled automatically.',
-      retryable: true,
-    };
-  return {
-    cause: 'network',
-    title: 'The studio server is unreachable',
-    message,
-    recovery: 'Check your connection. Self-hosters should also check the backend and VITE_API_URL.',
-    retryable: true,
-  };
-}
+export type {
+  ActionKey,
+  CreationPath,
+  FlowState,
+  PreviewOrientation,
+  Surface,
+  SurfaceError,
+  WorkbenchMode,
+} from './studio-view-model.types';
 
 const delay = (milliseconds: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -263,74 +136,24 @@ export function useStudioViewModel() {
     [selectedProduct, selectedVariantId]
   );
   const quoteExpired = Boolean(quote && new Date(quote.expiresAt).getTime() <= Date.now());
-  const selectedArtwork = selectedPlacements.map((code) => placementArtwork[code] ?? design);
-  const uniqueSelectedArtwork = Array.from(
-    new Map(
-      selectedArtwork
-        .filter((draft): draft is DesignDraft => Boolean(draft?.id))
-        .map((draft) => [draft.id!, draft])
-    ).values()
+  const { artworkReady, artworkQuoteEligible } = deriveArtworkState({
+    selectedPlacements,
+    placementArtwork,
+    design,
+  });
+  const checkoutReadiness = useMemo(
+    () =>
+      deriveCheckoutReadiness({
+        artworkReady,
+        quote,
+        quoteStale,
+        quoteExpired,
+        email,
+        paymentAvailable: canUseCustomerCheckout,
+      }),
+    [artworkReady, email, quote, quoteExpired, quoteStale]
   );
-  const allPlacementsAssigned =
-    selectedPlacements.length > 0 && selectedArtwork.every((draft) => Boolean(draft?.id));
-  const artworkReady = Boolean(
-    allPlacementsAssigned &&
-      uniqueSelectedArtwork.every(
-        (draft) =>
-          draft.generationStatus === 'complete' &&
-          draft.policy.status === 'pass' &&
-          customerPrintReadiness(draft.readiness).status === 'pass'
-      )
-  );
-  const artworkQuoteEligible = Boolean(
-    allPlacementsAssigned &&
-      uniqueSelectedArtwork.every((draft) => {
-        const readiness = customerPrintReadiness(draft.readiness);
-        return (
-          draft.generationStatus === 'complete' &&
-          draft.policy.status === 'pass' &&
-          (readiness.status === 'pass' || readiness.status === 'warning')
-        );
-      })
-  );
-  const emailValid = /^\S+@\S+\.\S+$/.test(email.trim());
-  const checkoutReadiness = useMemo(() => {
-    const quoteReady = Boolean(quote && !quoteStale && !quoteExpired);
-    const canOpen = artworkReady && quoteReady && canUseCustomerCheckout;
-    const blocker = !artworkReady
-      ? 'Finish artwork checks before checkout.'
-      : !quote
-        ? 'Preparing your price estimate.'
-        : quoteExpired
-          ? 'Refresh the expired estimate before checkout.'
-          : quoteStale
-            ? 'Updating the estimate for your current selection.'
-            : !canUseCustomerCheckout
-              ? 'Secure checkout is temporarily unavailable.'
-              : !emailValid
-                ? 'Enter a valid email for your receipt.'
-                : '';
-    return {
-      artworkReady,
-      quoteReady,
-      emailValid,
-      paymentAvailable: canUseCustomerCheckout,
-      fulfillmentReview: 'Your order is reviewed for print quality before production.',
-      canOpen,
-      ready: canOpen && emailValid,
-      blocker,
-    };
-  }, [artworkReady, emailValid, quote, quoteExpired, quoteStale]);
-  const canGenerateAnother = Boolean(
-    !design || design.allowance.freeDraftsRemaining + design.allowance.roughDraftsRemaining > 0
-  );
-  const canRevise = Boolean(
-    design?.id &&
-      design.allowance.editsRemaining +
-        design.allowance.freeDraftsRemaining +
-        design.allowance.roughDraftsRemaining >
-        0
-  );
+  const { canGenerateAnother, canRevise } = deriveDesignAllowance(design);
 
   const consumeSource = useCallback(<T>(result: Sourced<T>): T => {
     setDataSource(result.source);
@@ -342,19 +165,7 @@ export function useStudioViewModel() {
   const clearError = (surface: Surface) =>
     setErrors((current) => ({ ...current, [surface]: undefined }));
   const fail = (surface: Surface, error: unknown) =>
-    setErrors((current) => ({ ...current, [surface]: mapError(error, surface) }));
-
-  const buildPlacementSelections = (
-    codes: string[],
-    fallbackDraft: DesignDraft,
-    artworkByCode: Record<string, DesignDraft> = placementArtwork,
-    layout: PlacementLayout = mugLayout
-  ): PlacementSelection[] =>
-    codes.map((code) => ({
-      code,
-      designAssetId: artworkByCode[code]?.id ?? fallbackDraft.id ?? undefined,
-      layout: code === 'default' ? layout : undefined,
-    }));
+    setErrors((current) => ({ ...current, [surface]: mapStudioError(error, surface) }));
 
   const boot = useCallback(async () => {
     setFlow('booting');
@@ -654,8 +465,8 @@ export function useStudioViewModel() {
     const placementSelections = buildPlacementSelections(
       params.placements,
       params.draft,
-      params.artworkByCode,
-      params.mugLayout
+      params.artworkByCode ?? placementArtwork,
+      params.mugLayout ?? mugLayout
     );
     if (placementSelections.some((placement) => !placement.designAssetId)) return;
     const placementDesigns = Object.fromEntries(
@@ -760,12 +571,6 @@ export function useStudioViewModel() {
     else setFlow(design ? 'drafted' : 'configuring');
     setCheckout(null);
     setOrder(null);
-  };
-  const artworkAssignmentsForDraft = (draft: DesignDraft): Record<string, DesignDraft> => {
-    if (activePlacementCode && selectedPlacements.includes(activePlacementCode)) {
-      return { ...placementArtwork, [activePlacementCode]: draft };
-    }
-    return Object.fromEntries(selectedPlacements.map((code) => [code, draft]));
   };
   const selectProduct = (product: CatalogProduct) => {
     setRecoveryMessage('');
@@ -1004,7 +809,12 @@ export function useStudioViewModel() {
         removeBackground,
       });
       const draft = consumeSource(result);
-      const nextPlacementArtwork = artworkAssignmentsForDraft(draft);
+      const nextPlacementArtwork = artworkAssignmentsForDraft({
+        draft,
+        activePlacementCode,
+        selectedPlacements,
+        placementArtwork,
+      });
       if (design?.id) {
         setDesignHistory((current) =>
           current.some((item) => item.id === design.id) ? current : [...current, design]
@@ -1173,7 +983,12 @@ export function useStudioViewModel() {
           current.some((item) => item.id === design.id) ? current : [...current, design]
         );
       }
-      const nextPlacementArtwork = artworkAssignmentsForDraft(draft);
+      const nextPlacementArtwork = artworkAssignmentsForDraft({
+        draft,
+        activePlacementCode,
+        selectedPlacements,
+        placementArtwork,
+      });
       setDesign(draft);
       setPlacementArtwork(nextPlacementArtwork);
       setActivePlacementCode('');
@@ -1340,9 +1155,11 @@ export function useStudioViewModel() {
       orientation: selectedOrientation,
     });
   };
-  const placementArtworkKey = selectedPlacements
-    .map((code) => `${code}:${placementArtwork[code]?.id ?? design?.id ?? ''}`)
-    .join('|');
+  const placementArtworkSignature = placementArtworkKey(
+    selectedPlacements,
+    placementArtwork,
+    design
+  );
   const createQuote = async (options: { automatic?: boolean } = {}) => {
     if (!selectedProduct || !selectedVariant || !artworkQuoteEligible || !design?.id) return;
     const requestId = ++quoteRequestId.current;
@@ -1362,7 +1179,12 @@ export function useStudioViewModel() {
               variantId: selectedVariant.id,
               quantity: 1,
               placementCodes: selectedPlacements,
-              placements: buildPlacementSelections(selectedPlacements, design),
+              placements: buildPlacementSelections(
+                selectedPlacements,
+                design,
+                placementArtwork,
+                mugLayout
+              ),
               orientation: selectedOrientation,
               designAssetId: design.id,
             },
@@ -1412,7 +1234,7 @@ export function useStudioViewModel() {
     quote,
     quoteExpired,
     quoteStale,
-    placementArtworkKey,
+    placementArtworkSignature,
     mugLayout,
     selectedOrientation,
     selectedPlacements,
@@ -1564,20 +1386,8 @@ export function useStudioViewModel() {
     }
   };
 
-  const stepStates = useMemo<Record<StudioStep, StepState>>(
-    () => ({
-      product: workbenchMode === 'product' ? 'active' : selectedProduct ? 'done' : 'todo',
-      make:
-        workbenchMode === 'configure' ||
-        workbenchMode === 'describe' ||
-        workbenchMode === 'generating' ||
-        workbenchMode === 'review'
-          ? 'active'
-          : design
-            ? 'done'
-            : 'todo',
-      order: workbenchMode === 'checkout' || workbenchMode === 'order' ? 'active' : 'todo',
-    }),
+  const stepStates = useMemo(
+    () => deriveStepStates({ workbenchMode, selectedProduct, design }),
     [selectedProduct, design, workbenchMode]
   );
   const navigate = (step: StudioStep) => {
