@@ -7,6 +7,7 @@ import { ErrorNote } from '@components/ErrorNote';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
 import { OpenSourceAttribution } from '@components/OpenSourceAttribution';
+import { PrintAreaReview } from '@components/PrintAreaReview';
 import { ReadinessChecks } from '@components/ReadinessChecks';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
@@ -244,19 +245,6 @@ export function WorkbenchStudioApp() {
   const activePlacement = vm.selectedProduct?.placements.find(
     (placement) => placement.code === vm.activePlacementCode
   );
-  const selectedPlacementOptions =
-    vm.selectedProduct?.placements.filter((placement) =>
-      vm.selectedPlacements.includes(placement.code)
-    ) ?? [];
-  const primaryPlacement = selectedPlacementOptions[0];
-  const quoteItem = vm.quote?.items[0];
-  const primaryArtworkId = primaryPlacement
-    ? (vm.placementArtwork[primaryPlacement.code] ?? vm.design)?.id
-    : vm.design?.id;
-  const hasSeparatePlacementArtwork = selectedPlacementOptions.slice(1).some((placement) => {
-    const artworkId = (vm.placementArtwork[placement.code] ?? vm.design)?.id;
-    return Boolean(artworkId && primaryArtworkId && artworkId !== primaryArtworkId);
-  });
   const panelTitle = {
     product: 'Choose a product',
     configure: 'Choose color and size',
@@ -507,108 +495,19 @@ export function WorkbenchStudioApp() {
                 ) : !reviewSettling ? (
                   <p className="muted-copy">Price unavailable right now.</p>
                 ) : null}
-                {!reviewSettling && selectedPlacementOptions.length > 0 && (
-                  <section className="print-area-review" aria-labelledby="print-area-review-title">
-                    <header>
-                      <div>
-                        <b id="print-area-review-title">
-                          {vm.selectedProduct?.categorySlug === 'drinkware'
-                            ? 'Mug artwork'
-                            : 'Print areas'}
-                        </b>
-                        <small>
-                          {vm.quote?.placementCostCents
-                            ? `${formatMoney(vm.quote.placementCostCents, vm.quote.currency)} for additional printing`
-                            : vm.selectedProduct?.categorySlug === 'drinkware'
-                              ? 'One wraparound print area'
-                              : 'First print included'}
-                        </small>
-                      </div>
-                      <button className="text-action" type="button" onClick={vm.showConfigure}>
-                        Edit areas
-                      </button>
-                    </header>
-                    <div className="print-area-list">
-                      {selectedPlacementOptions.map((placement, index) => {
-                        const assignedArtwork = vm.placementArtwork[placement.code] ?? vm.design;
-                        const primaryArtwork = primaryPlacement
-                          ? (vm.placementArtwork[primaryPlacement.code] ?? vm.design)
-                          : vm.design;
-                        const usesPrimaryArtwork = Boolean(
-                          assignedArtwork?.id && assignedArtwork.id === primaryArtwork?.id
-                        );
-                        const quotePlacement = quoteItem?.placements.find(
-                          (item) => item.code === placement.code
-                        );
-                        return (
-                          <article key={placement.code} className="print-area-row">
-                            <img src={assignedArtwork.imageUrl} alt="" />
-                            <div>
-                              <b>{placement.displayName}</b>
-                              <small>
-                                {index === 0
-                                  ? 'First print included'
-                                  : quotePlacement?.additionalCostCents
-                                    ? `+${formatMoney(
-                                        quotePlacement.additionalCostCents,
-                                        vm.quote?.currency
-                                      )} production`
-                                    : 'Additional print charge'}
-                                {index > 0 && usesPrimaryArtwork
-                                  ? ` · Same artwork as ${primaryPlacement?.displayName}`
-                                  : index > 0
-                                    ? ' · Different artwork'
-                                    : ''}
-                              </small>
-                            </div>
-                            <div className="print-area-row__actions">
-                              <button
-                                className="text-action"
-                                type="button"
-                                onClick={() => vm.customizePlacement(placement.code)}
-                              >
-                                {index > 0 && usesPrimaryArtwork
-                                  ? 'Create different artwork'
-                                  : 'Replace artwork'}
-                              </button>
-                              {index > 0 && !usesPrimaryArtwork && primaryPlacement && (
-                                <button
-                                  className="text-action"
-                                  type="button"
-                                  onClick={() =>
-                                    vm.reusePlacementArtwork(
-                                      primaryPlacement.code,
-                                      placement.code
-                                    )
-                                  }
-                                >
-                                  Use same as {primaryPlacement.displayName}
-                                </button>
-                              )}
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                    {hasSeparatePlacementArtwork && (
-                      <p className="separate-artwork-note">
-                        Different artwork can add design work. Reuse the front artwork to remove
-                        any duplicate design charge; the additional print charge still applies.
-                      </p>
-                    )}
-                    {vm.selectedProduct?.categorySlug === 'drinkware' && (
-                      <p className="mug-layout-summary">
-                        Position:{' '}
-                        <b>
-                          {vm.mugLayout === 'left'
-                            ? 'Shifted left'
-                            : vm.mugLayout === 'right'
-                              ? 'Shifted right'
-                              : 'Centered'}
-                        </b>
-                      </p>
-                    )}
-                  </section>
+                {!reviewSettling && vm.selectedProduct && (
+                  <PrintAreaReview
+                    categorySlug={vm.selectedProduct.categorySlug}
+                    placements={vm.selectedProduct.placements}
+                    selectedPlacementCodes={vm.selectedPlacements}
+                    placementArtwork={vm.placementArtwork}
+                    defaultArtwork={vm.design}
+                    quote={vm.quote}
+                    mugLayout={vm.mugLayout}
+                    onEditAreas={vm.showConfigure}
+                    onCustomizePlacement={vm.customizePlacement}
+                    onReusePlacementArtwork={vm.reusePlacementArtwork}
+                  />
                 )}
                 <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
                 {!reviewSettling && (

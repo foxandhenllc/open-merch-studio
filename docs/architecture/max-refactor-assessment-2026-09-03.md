@@ -370,3 +370,27 @@ responsibilities until a later controller-hook checkpoint has a smaller, cohesiv
 This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
 contracts, lint, typecheck, production build/static-route checks, and the complete 11-viewport
 browser suite across five products plus upload/reference and recoverable checkout flows.
+
+## Print-area review component checkpoint
+
+Completed September 3, 2026:
+
+- Added `components/PrintAreaReview.tsx` with an adjacent typed prop contract for selected print
+  areas, their artwork assignments, production-price details, and mug positioning.
+- Moved presentation-only derivation of primary artwork, same-versus-different artwork labels, and
+  the separate-artwork note out of the workbench shell.
+- Kept placement selection, artwork reuse, customization, quote invalidation, persistence, and
+  provider operations in the studio view model behind explicit intent callbacks.
+- Preserved the exact `Use same as …` action exercised by the multi-placement browser journey, so
+  its visible success state still comes from the updated placement-artwork assignment rather than
+  component-local optimism.
+
+`WorkbenchStudioApp.tsx` moved from 714 to 613 lines. The print-area review component is 124 lines
+and its prop contract is 19 lines. The remaining review shell can now be assessed separately from
+multi-placement assignment; prefer a compact review-summary component before considering a broad
+controller hook.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.
