@@ -50,6 +50,33 @@ import {
   CURRENT_CHECKOUT_POLICY_VERSION,
 } from '../config/policies.js';
 import { productionPrintReadiness } from '../utils/print-readiness.js';
+import {
+  filterAdminOrderItems,
+  normalizeOperatorReviewStatus,
+  persistedOrderStatus,
+  printfulRetryBlocker,
+  restoreRuntimeOrderStatus,
+  runtimeFulfillmentStatus,
+  stripeChargeRefundState,
+  stripeEventClaimDecision,
+  stripeEventStatusIsTerminal,
+} from './order-state.service.js';
+import type { AdminOrderFilters, StripeRefundState } from './order-state.service.js';
+
+export {
+  filterAdminOrderItems,
+  persistedOrderStatus,
+  printfulRetryBlocker,
+  restoreRuntimeOrderStatus,
+  stripeChargeRefundState,
+  stripeEventClaimDecision,
+  stripeEventStatusIsTerminal,
+} from './order-state.service.js';
+export type {
+  AdminOrderFilters,
+  PrintfulRetryEligibility,
+  StripeRefundState,
+} from './order-state.service.js';
 
 type CheckoutInput = {
   quoteId?: string | null;
@@ -73,22 +100,6 @@ export class OrderRecoveryError extends Error {
   }
 }
 
-export type StripeRefundState = {
-  state: 'unrefunded' | 'partial' | 'full' | 'unavailable';
-  refundedCents: number;
-};
-
-export function stripeChargeRefundState(
-  charge: Pick<Stripe.Charge, 'amount' | 'amount_refunded' | 'refunded'>
-): StripeRefundState {
-  const refundedCents = Math.max(0, charge.amount_refunded ?? 0);
-  if (charge.refunded || (charge.amount > 0 && refundedCents >= charge.amount)) {
-    return { state: 'full', refundedCents };
-  }
-  if (refundedCents > 0) return { state: 'partial', refundedCents };
-  return { state: 'unrefunded', refundedCents: 0 };
-}
-
 async function stripeSessionRefundState(
   session: Stripe.Checkout.Session
 ): Promise<StripeRefundState> {
@@ -104,10 +115,6 @@ async function stripeSessionRefundState(
 }
 
 const analyticsTrackedStripeEvents = new Set<string>();
-
-export function stripeEventStatusIsTerminal(status?: string | null): boolean {
-  return Boolean(status && !['processing', 'retrying'].includes(status));
-}
 
 export async function wasStripeEventProcessed(providerEventId: string): Promise<boolean> {
   if (analyticsTrackedStripeEvents.has(providerEventId)) return true;
@@ -159,75 +166,6 @@ const orderInclude = {
 } satisfies Prisma.OrderInclude;
 
 type PersistedOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
-
-export const persistedOrderStatus = (status: OrderSummary['status']) => {
-  if (status === 'checkout_pending') return 'PENDING_PAYMENT';
-  if (status === 'paid') return 'PAID';
-  if (status === 'fulfillment_validating') return 'FULFILLMENT_VALIDATING';
-  if (status === 'needs_review') return 'NEEDS_REVIEW';
-  if (status === 'failed') return 'FAILED';
-  if (status === 'submitted') return 'SUBMITTED';
-  if (status === 'in_production') return 'IN_PRODUCTION';
-  if (status === 'shipped') return 'SHIPPED';
-  if (status === 'delivered') return 'DELIVERED';
-  if (status === 'cancelled') return 'CANCELLED';
-  if (status === 'refunded') return 'REFUNDED';
-  if (status === 'quoted') return 'QUOTED';
-  return 'DRAFT';
-};
-
-export function restoreRuntimeOrderStatus(
-  status: string,
-  fulfillmentStatus?: string | null
-): OrderSummary['status'] {
-  switch (status) {
-    case 'PENDING_PAYMENT':
-      return 'checkout_pending';
-    case 'PAID':
-      // Preserve the visible result for rows created before dedicated recovery
-      // statuses existed.
-      if (fulfillmentStatus === 'failed') return 'failed';
-      if (fulfillmentStatus === 'needs_review') return 'needs_review';
-      return 'paid';
-    case 'FULFILLMENT_VALIDATING':
-      return 'fulfillment_validating';
-    case 'NEEDS_REVIEW':
-      return 'needs_review';
-    case 'FAILED':
-      return 'failed';
-    case 'SUBMITTED':
-      return 'submitted';
-    case 'IN_PRODUCTION':
-      return 'in_production';
-    case 'SHIPPED':
-      return 'shipped';
-    case 'DELIVERED':
-      return 'delivered';
-    case 'CANCELLED':
-      return 'cancelled';
-    case 'REFUNDED':
-      return 'refunded';
-    case 'QUOTED':
-      return 'quoted';
-    case 'DRAFT':
-    default:
-      return 'draft';
-  }
-}
-
-function runtimeFulfillmentStatus(
-  status: string | null | undefined
-): OrderSummary['fulfillment']['status'] {
-  switch (status) {
-    case 'validated':
-    case 'submitted':
-    case 'failed':
-    case 'needs_review':
-      return status;
-    default:
-      return 'not_submitted';
-  }
-}
 
 function jsonArray<T>(value: Prisma.JsonValue | null | undefined, fallback: T[]): T[] {
   return Array.isArray(value) ? (value as T[]) : fallback;
@@ -1069,15 +1007,6 @@ async function getArtworkUrls(order: OrderSummary): Promise<Record<string, strin
 
 type StripeEventClaim = 'claimed' | 'duplicate' | 'busy';
 
-export function stripeEventClaimDecision(
-  status: string,
-  updatedAt: Date,
-  now = Date.now()
-): 'duplicate' | 'busy' | 'reclaim' {
-  if (!['processing', 'retrying'].includes(status)) return 'duplicate';
-  return updatedAt.getTime() < now - 2 * 60 * 1000 ? 'reclaim' : 'busy';
-}
-
 export class StripeEventBusyError extends Error {
   constructor() {
     super('Stripe event reconciliation is already in progress.');
@@ -1788,49 +1717,6 @@ const adminOrderInclude = {
 
 type AdminPersistedOrder = Prisma.OrderGetPayload<{ include: typeof adminOrderInclude }>;
 
-export type AdminOrderFilters = {
-  status?: OrderSummary['status'];
-  fulfillmentStatus?: OrderSummary['fulfillment']['status'];
-  attention?: 'failed' | 'needs_review' | 'missing_printful';
-  reviewStatus?: OperatorReviewStatus;
-  limit?: number;
-};
-
-export type PrintfulRetryEligibility = {
-  paidAt?: Date | string | null;
-  stripeSessionId?: string | null;
-  refundedCents?: number | null;
-  status: string;
-};
-
-export function printfulRetryBlocker(
-  order: PrintfulRetryEligibility
-): { message: string; errorCode: string } | null {
-  if (!order.paidAt || !order.stripeSessionId) {
-    return {
-      message: 'Only a durably paid Stripe order can be retried.',
-      errorCode: 'paid_order_required',
-    };
-  }
-  if ((order.refundedCents ?? 0) > 0) {
-    return {
-      message: 'Refunded payments require operator review and cannot be submitted to Printful.',
-      errorCode: 'payment_refunded',
-    };
-  }
-  if (!['PAID', 'FAILED', 'NEEDS_REVIEW'].includes(order.status)) {
-    return {
-      message: 'This order state cannot be submitted to Printful.',
-      errorCode: 'order_not_fulfillable',
-    };
-  }
-  return null;
-}
-
-function operatorReviewStatus(value: string): OperatorReviewStatus {
-  return value === 'acknowledged' || value === 'resolved' ? value : 'unreviewed';
-}
-
 function adminListItemFromPersisted(order: AdminPersistedOrder): AdminOrderListItem {
   return {
     id: order.id,
@@ -1846,7 +1732,7 @@ function adminListItemFromPersisted(order: AdminPersistedOrder): AdminOrderListI
     createdAt: order.createdAt.toISOString(),
     printfulOrderId: order.printfulOrderId ?? undefined,
     failureReason: order.failureReason ?? undefined,
-    operatorReviewStatus: operatorReviewStatus(order.operatorReviewStatus),
+    operatorReviewStatus: normalizeOperatorReviewStatus(order.operatorReviewStatus),
     operatorReviewedAt: order.operatorReviewedAt?.toISOString(),
   };
 }
@@ -1870,30 +1756,6 @@ function adminListItemFromRuntime(order: OrderSummary): AdminOrderListItem {
         : undefined,
     operatorReviewStatus: 'unreviewed',
   };
-}
-
-export function filterAdminOrderItems(
-  items: AdminOrderListItem[],
-  filters: AdminOrderFilters
-): AdminOrderListItem[] {
-  const limited = items.filter((item) => {
-    if (filters.status && item.status !== filters.status) return false;
-    if (filters.fulfillmentStatus && item.fulfillmentStatus !== filters.fulfillmentStatus)
-      return false;
-    if (filters.reviewStatus && item.operatorReviewStatus !== filters.reviewStatus) return false;
-    if (filters.attention === 'failed' && item.status !== 'failed') return false;
-    if (filters.attention === 'needs_review' && item.status !== 'needs_review') return false;
-    if (
-      filters.attention === 'missing_printful' &&
-      (!item.paidAt ||
-        item.printfulOrderId ||
-        item.status === 'refunded' ||
-        item.status === 'cancelled')
-    )
-      return false;
-    return true;
-  });
-  return limited.slice(0, Math.min(Math.max(filters.limit ?? 50, 1), 100));
 }
 
 export async function listAdminOrderRecords(

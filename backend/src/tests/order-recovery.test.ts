@@ -6,13 +6,15 @@ import { sampleCatalog } from '../services/catalog-fixtures.js';
 import { buildQuoteBreakdown } from '../services/pricing.service.js';
 import {
   filterAdminOrderItems,
+  normalizeOperatorReviewStatus,
   persistedOrderStatus,
   printfulRetryBlocker,
   restoreRuntimeOrderStatus,
+  runtimeFulfillmentStatus,
   stripeChargeRefundState,
   stripeEventClaimDecision,
   stripeEventStatusIsTerminal,
-} from '../services/order.service.js';
+} from '../services/order-state.service.js';
 import {
   classifyPrintfulFailure,
   submitPrintfulDraftOrderWithClient,
@@ -40,6 +42,16 @@ test('durable order statuses survive a cold restore', () => {
   }
   assert.equal(restoreRuntimeOrderStatus('PAID', 'failed'), 'failed');
   assert.equal(restoreRuntimeOrderStatus('PAID', 'needs_review'), 'needs_review');
+  assert.equal(restoreRuntimeOrderStatus('UNKNOWN'), 'draft');
+});
+
+test('persisted fulfillment and review values fail closed to safe runtime defaults', () => {
+  assert.equal(runtimeFulfillmentStatus('submitted'), 'submitted');
+  assert.equal(runtimeFulfillmentStatus('unknown'), 'not_submitted');
+  assert.equal(runtimeFulfillmentStatus(null), 'not_submitted');
+  assert.equal(normalizeOperatorReviewStatus('acknowledged'), 'acknowledged');
+  assert.equal(normalizeOperatorReviewStatus('resolved'), 'resolved');
+  assert.equal(normalizeOperatorReviewStatus('unknown'), 'unreviewed');
 });
 
 test('Stripe event claims distinguish duplicates, active work, and stale recovery', () => {
