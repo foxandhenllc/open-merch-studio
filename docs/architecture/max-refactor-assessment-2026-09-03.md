@@ -228,3 +228,27 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Studio mockup boundary checkpoint
+
+Completed September 3, 2026:
+
+- Added `studio-mockup.ts` as the deterministic boundary for mockup request preparation, cache
+  identity, and provider-result classification.
+- Built the provider payload and cache key from the same normalized placement assignments. This
+  prevents a cached preview from being reused after front/back artwork, mug layout, variant, or
+  orientation changes.
+- Kept request sequencing, stale-response suppression, cache storage, React state, error surfaces,
+  and provider calls in `studio-view-model.ts`.
+- Added contract coverage for distinct front/back IDs, session forwarding, blocked-artwork refusal,
+  cache identity, fixture success classification, and live-provider failure messages.
+
+`studio-view-model.ts` moved from 1,473 to 1,454 lines; `studio-mockup.ts` is 106 lines. The next
+safe seam is quote request preparation and quote-result formatting. After the deterministic command
+boundaries are extracted, reassess whether a cohesive controller hook can own request lifecycle
+without requiring a large callback interface.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

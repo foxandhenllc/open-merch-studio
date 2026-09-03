@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { createLocalDesignDraft, localProducts } from '../src/services/local-fixtures.ts';
+import {
+  createLocalDesignDraft,
+  createLocalMockup,
+  localProducts,
+} from '../src/services/local-fixtures.ts';
 import {
   reusePlacementAssignment,
   selectProductConfiguration,
@@ -16,6 +20,7 @@ import {
   selectReferenceFiles,
   undoArtworkRevision,
 } from '../src/studio-artwork.transitions.ts';
+import { classifyMockupResult, prepareMockupRequest } from '../src/studio-mockup.ts';
 import {
   artworkAssignmentsForDraft,
   buildPlacementSelections,
@@ -257,6 +262,53 @@ assert.throws(
     error.status === 503 &&
     error.code === 'design_generation_failed'
 );
+
+const preparedMockup = prepareMockupRequest(
+  {
+    product: tee,
+    variant: tee.variants[0]!,
+    placements: ['front', 'back'],
+    draft: front,
+    artworkByCode: { front, back },
+    mugLayout: 'center',
+  },
+  'fixture-session'
+);
+assert.ok(preparedMockup);
+assert.equal(preparedMockup.body.sessionId, 'fixture-session');
+assert.deepEqual(
+  preparedMockup.body.placements.map((placement) => placement.designAssetId),
+  [front.id, back.id],
+  'mockup requests must preserve distinct front/back artwork IDs'
+);
+assert.match(preparedMockup.cacheKey, new RegExp(`front:${front.id}`));
+assert.match(preparedMockup.cacheKey, new RegExp(`back:${back.id}`));
+assert.equal(
+  prepareMockupRequest({
+    product: tee,
+    variant: tee.variants[0]!,
+    placements: ['front'],
+    draft: { ...front, readiness: { status: 'blocked', checks: [] } },
+    artworkByCode: { front },
+    mugLayout: 'center',
+  }),
+  null,
+  'blocked artwork must never be submitted for a provider mockup'
+);
+
+const fixtureMockup = createLocalMockup(preparedMockup.body);
+assert.deepEqual(classifyMockupResult(fixtureMockup, 'fallback'), {
+  failed: false,
+  analyticsSource: 'fallback',
+  announcement: 'Product mockup ready. Your price estimate is updating automatically.',
+});
+const failedMockup = classifyMockupResult(
+  { ...fixtureMockup, status: 'failed', provider: 'printful', errorMessage: 'Provider timed out.' },
+  'live'
+);
+assert.equal(failedMockup.failed, true);
+assert.equal(failedMockup.analyticsSource, 'printful');
+assert.equal(failedMockup.error?.message, 'Provider timed out.');
 
 assert.deepEqual(
   mapStudioError(new ApiError('Request budget reached.', 429, 'rate_limit'), 'generation'),

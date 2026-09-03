@@ -61,6 +61,7 @@ import {
   selectReferenceFiles,
   undoArtworkRevision,
 } from './studio-artwork.transitions';
+import { classifyMockupResult, prepareMockupRequest } from './studio-mockup';
 
 export type {
   ActionKey,
@@ -471,28 +472,21 @@ export function useStudioViewModel() {
     orientation?: PreviewOrientation;
     revealReview?: boolean;
   }) => {
-    if (!params.draft.id || params.draft.readiness.status === 'blocked') return;
-    const placementSelections = buildPlacementSelections(
-      params.placements,
-      params.draft,
-      params.artworkByCode ?? placementArtwork,
-      params.mugLayout ?? mugLayout
+    const prepared = prepareMockupRequest(
+      {
+        product: params.product,
+        variant: params.variant,
+        placements: params.placements,
+        draft: params.draft,
+        artworkByCode: params.artworkByCode ?? placementArtwork,
+        mugLayout: params.mugLayout ?? mugLayout,
+        orientation: params.orientation,
+      },
+      session?.id
     );
-    if (placementSelections.some((placement) => !placement.designAssetId)) return;
-    const placementDesigns = Object.fromEntries(
-      placementSelections.map((placement) => [placement.code, placement.designAssetId!])
-    );
+    if (!prepared) return;
     const requestId = ++mockupRequestId.current;
-    const key = mockupKey({
-      productId: params.product.id,
-      variantId: params.variant.id,
-      placements: params.placements,
-      draftId: params.draft.id,
-      placementDesigns,
-      mugLayout: params.mugLayout ?? mugLayout,
-      orientation: params.orientation,
-    });
-    const cached = mockupCache.current.get(key);
+    const cached = mockupCache.current.get(prepared.cacheKey);
     if (cached) {
       setAction('mockup', false);
       setOperationStartedAt(null);
@@ -512,43 +506,30 @@ export function useStudioViewModel() {
     setOperationStartedAt(Date.now());
     clearError('mockup');
     try {
-      const sourced = await api.mockup({
-        sessionId: session?.id,
-        productId: params.product.id,
-        variantId: params.variant.id,
-        placementCodes: params.placements,
-        placements: placementSelections,
-        designAssetId: params.draft.id,
-        imageUrl: params.draft.imageUrl,
-        orientation: params.orientation,
-      });
+      const sourced = await api.mockup(prepared.body);
       const result = consumeSource(sourced);
       if (requestId !== mockupRequestId.current) return;
       setMockup(result);
       setActiveMockupViewIndex(0);
       setMockupStale(false);
-      if (result.status === 'failed') {
+      const outcome = classifyMockupResult(result, sourced.source);
+      if (outcome.failed) {
         trackEvent('mockup_completed', {
           result: 'failed',
-          source: sourced.source === 'live' ? 'printful' : 'fallback',
+          source: outcome.analyticsSource,
         });
-        fail(
-          'mockup',
-          new Error(result.errorMessage || 'The fulfillment provider could not build this mockup.')
-        );
+        fail('mockup', outcome.error);
         setFlow(quote ? 'quote_stale' : 'drafted');
-        setAnnouncement(
-          'The product preview failed. Your artwork is safe; retry the preview or continue without it.'
-        );
+        setAnnouncement(outcome.announcement);
         if (params.revealReview !== false) setWorkbenchMode('review');
       } else {
         trackEvent('mockup_completed', {
           result: 'success',
-          source: result.provider === 'printful' ? 'printful' : 'fallback',
+          source: outcome.analyticsSource,
         });
-        mockupCache.current.set(key, result);
+        mockupCache.current.set(prepared.cacheKey, result);
         setFlow(quote ? 'quote_stale' : 'drafted');
-        setAnnouncement('Product mockup ready. Your price estimate is updating automatically.');
+        setAnnouncement(outcome.announcement);
         if (params.revealReview !== false) setWorkbenchMode('review');
       }
     } catch (error) {
