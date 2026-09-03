@@ -394,3 +394,26 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Review mode component checkpoint
+
+Completed September 3, 2026:
+
+- Added `components/ReviewPanel.tsx` with grouped typed status, design-option, and action contracts
+  instead of a flat callback list.
+- Composed the isolated print-area review with readiness, price, checkout handoff, and artwork
+  refinement presentation in one mode-level component.
+- Kept review-settling derivation, quote and mockup lifecycle, checkout authorization, revision and
+  history mutation, analytics, and mode transitions in the studio view model and workbench shell.
+- Documented in code that the checkout button is a presentation guard only; server authorization
+  and fresh-artwork validation remain the security boundary.
+
+`WorkbenchStudioApp.tsx` moved from 613 to 538 lines. The review component is 140 lines and its
+grouped prop contract is 55 lines. The main workbench is now a readable composition root for its
+mode panels; further UI extraction should target only genuinely reusable shell elements, while the
+next high-value reassessment returns to cohesive view-model lifecycle ownership.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

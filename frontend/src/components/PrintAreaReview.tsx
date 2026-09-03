@@ -20,6 +20,8 @@ export function PrintAreaReview({
   const primaryArtwork = primaryPlacement
     ? (placementArtwork[primaryPlacement.code] ?? defaultArtwork)
     : defaultArtwork;
+  // Assignment IDs are the source of truth for the label and action state. This intentionally
+  // avoids showing an optimistic "same artwork" result before the view model persists the reuse.
   const hasSeparatePlacementArtwork = selectedPlacements.slice(1).some((placement) => {
     const artworkId = (placementArtwork[placement.code] ?? defaultArtwork).id;
     return Boolean(artworkId && primaryArtwork.id && artworkId !== primaryArtwork.id);

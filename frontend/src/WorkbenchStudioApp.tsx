@@ -7,8 +7,7 @@ import { ErrorNote } from '@components/ErrorNote';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
 import { OpenSourceAttribution } from '@components/OpenSourceAttribution';
-import { PrintAreaReview } from '@components/PrintAreaReview';
-import { ReadinessChecks } from '@components/ReadinessChecks';
+import { ReviewPanel } from '@components/ReviewPanel';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
 import { publicConfig } from './config';
@@ -465,124 +464,50 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'review' && vm.design && (
-              <div className="panel-stack review-panel">
-                {reviewSettling ? (
-                  <div className="review-preparing" role="status" aria-live="polite">
-                    <span className="progress-orbit" aria-hidden="true" />
-                    <div>
-                      <b>Preparing the finished product view</b>
-                      <p>We’ll show checkout actions as soon as the preview and price are ready.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={`ready-confirmation is-${vm.design.readiness.status}`}>
-                    <span aria-hidden="true">{vm.artworkReady ? '✓' : '!'}</span>
-                    <div>
-                      <b>{vm.artworkReady ? 'Print ready' : 'Needs a quick review'}</b>
-                      <p>
-                        {vm.artworkReady
-                          ? 'Your artwork is saved and ready to order.'
-                          : 'Review the checks below before checkout.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {!reviewSettling && vm.quote ? (
-                  <div className="review-total">
-                    <span>Estimated total before tax</span>
-                    <strong>{formatMoney(vm.quote.totalCents, vm.quote.currency)}</strong>
-                  </div>
-                ) : !reviewSettling ? (
-                  <p className="muted-copy">Price unavailable right now.</p>
-                ) : null}
-                {!reviewSettling && vm.selectedProduct && (
-                  <PrintAreaReview
-                    categorySlug={vm.selectedProduct.categorySlug}
-                    placements={vm.selectedProduct.placements}
-                    selectedPlacementCodes={vm.selectedPlacements}
-                    placementArtwork={vm.placementArtwork}
-                    defaultArtwork={vm.design}
-                    quote={vm.quote}
-                    mugLayout={vm.mugLayout}
-                    onEditAreas={vm.showConfigure}
-                    onCustomizePlacement={vm.customizePlacement}
-                    onReusePlacementArtwork={vm.reusePlacementArtwork}
-                  />
-                )}
-                <ErrorNote error={vm.errors.quote} onRetry={vm.createQuote} />
-                {!reviewSettling && (
-                  <div className="review-actions">
-                    <button
-                      className="button button--primary button--wide"
-                      type="button"
-                      onClick={vm.showCheckout}
-                      disabled={
-                        !vm.quote ||
-                        vm.quoteStale ||
-                        vm.quoteExpired ||
-                        vm.busy.quoting ||
-                        vm.busy.mockup ||
-                        (vm.mockup?.status !== 'complete' && !vm.errors.mockup) ||
-                        !vm.artworkReady
-                      }
-                    >
-                      Review and checkout
-                    </button>
-                    <button
-                      className="button button--secondary button--wide"
-                      type="button"
-                      onClick={() => {
-                        if (hasDesignOptions) setDesignOptionsOpen(true);
-                        else vm.showDescribe();
-                      }}
-                    >
-                      Make changes
-                    </button>
-                    <button className="text-action" type="button" onClick={vm.showProduct}>
-                      Try it on another product
-                    </button>
-                  </div>
-                )}
-                {!reviewSettling && <ReadinessChecks draft={vm.design} />}
-                {!reviewSettling && hasDesignOptions && (
-                  <details
-                    className="refine-panel"
-                    open={designOptionsOpen}
-                    onToggle={(event) => setDesignOptionsOpen(event.currentTarget.open)}
-                  >
-                    <summary>More design options</summary>
-                    {vm.canRevise && (
-                      <label className="revision-field">
-                        <span>Create a variation</span>
-                        <textarea
-                          rows={3}
-                          value={vm.revision}
-                          onChange={(event) => vm.setRevision(event.target.value)}
-                          placeholder="Make the main subject larger…"
-                        />
-                        <button
-                          className="button button--secondary"
-                          type="button"
-                          onClick={vm.reviseDraft}
-                          disabled={!vm.revision.trim() || vm.busy.revising}
-                        >
-                          Create variation
-                        </button>
-                      </label>
-                    )}
-                    {vm.designHistory.length > 0 && (
-                      <button className="text-action" type="button" onClick={vm.undoDraft}>
-                        Restore previous artwork
-                      </button>
-                    )}
-                    {vm.canGenerateAnother && (
-                      <button className="text-action" type="button" onClick={vm.showDescribe}>
-                        Generate another design
-                      </button>
-                    )}
-                  </details>
-                )}
-              </div>
+              <ReviewPanel
+                product={vm.selectedProduct!}
+                design={vm.design}
+                quote={vm.quote}
+                placementArtwork={vm.placementArtwork}
+                selectedPlacementCodes={vm.selectedPlacements}
+                mugLayout={vm.mugLayout}
+                status={{
+                  settling: reviewSettling,
+                  artworkReady: vm.artworkReady,
+                  quoteStale: vm.quoteStale,
+                  quoteExpired: vm.quoteExpired,
+                  quoting: vm.busy.quoting,
+                  mockupBusy: vm.busy.mockup,
+                  mockupComplete: vm.mockup?.status === 'complete',
+                  mockupErrorPresent: Boolean(vm.errors.mockup),
+                  revising: vm.busy.revising,
+                  quoteError: vm.errors.quote,
+                }}
+                designOptions={{
+                  open: designOptionsOpen,
+                  canRevise: vm.canRevise,
+                  hasHistory: vm.designHistory.length > 0,
+                  canGenerateAnother: vm.canGenerateAnother,
+                  revision: vm.revision,
+                }}
+                actions={{
+                  onEditAreas: vm.showConfigure,
+                  onCustomizePlacement: vm.customizePlacement,
+                  onReusePlacementArtwork: vm.reusePlacementArtwork,
+                  onRetryQuote: vm.createQuote,
+                  onCheckout: vm.showCheckout,
+                  onMakeChanges: () => {
+                    if (hasDesignOptions) setDesignOptionsOpen(true);
+                    else vm.showDescribe();
+                  },
+                  onTryAnotherProduct: vm.showProduct,
+                  onOptionsToggle: setDesignOptionsOpen,
+                  onRevisionChange: vm.setRevision,
+                  onRevise: vm.reviseDraft,
+                  onUndo: vm.undoDraft,
+                  onGenerateAnother: vm.showDescribe,
+                }}
+              />
             )}
 
             {vm.workbenchMode === 'checkout' && (
