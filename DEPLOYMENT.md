@@ -76,7 +76,7 @@ The first generated migration is `backend/prisma/migrations/20260529180000_paid_
 Before public deployment:
 
 ```bash
-npm audit --audit-level=high
+npm run audit:production
 npm run lint
 npm run type-check
 npm test

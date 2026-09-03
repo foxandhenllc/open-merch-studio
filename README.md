@@ -63,7 +63,7 @@ Leave `VITE_API_URL` empty locally so Vite proxies `/api/*` to that backend.
 ## Useful Commands
 
 ```bash
-npm audit --audit-level=high
+npm run audit:production
 npm run lint
 npm run type-check
 npm test

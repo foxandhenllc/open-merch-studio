@@ -73,7 +73,7 @@ Do not enable these gates until the matching private OPS tickets are reviewed, t
 ## Fixture Smoke Test
 
 ```bash
-npm audit --audit-level=high
+npm run audit:production
 npm run lint
 npm test
 npm run type-check

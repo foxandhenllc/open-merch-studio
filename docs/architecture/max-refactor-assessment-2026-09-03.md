@@ -417,3 +417,21 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Production dependency audit checkpoint
+
+Completed September 3, 2026:
+
+- Added `scripts/audit-production-lock.mjs` and the documented `npm run audit:production` command.
+  It inventories non-development package versions directly from the committed lockfile and queries
+  OSV's batch API, avoiding npm's retiring quick-audit endpoint and its intermittent invalid-tree
+  responses for this otherwise reproducible workspace install.
+- The script validates complete result coverage, rejects unexpected pagination, retries bounded
+  transport failures, fetches each applicable vulnerability record, and fails closed for high,
+  critical, or unclassified advisories.
+- Updated CI, README, contribution guidance, deployment steps, and the paid-launch runbook to use
+  the same developer-visible command. Vercel continues to install exclusively with `npm ci`.
+
+The replacement audit inspected 150 production package versions and found no applicable OSV
+advisories. This gate supplements the clean install and application test matrix; it does not make
+dependency installation permissive or convert advisory-service failure into success.

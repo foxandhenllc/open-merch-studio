@@ -41,7 +41,7 @@ jobs:
             exit 1
           fi
       - name: Audit production dependencies for high-severity vulnerabilities
-        run: npm audit --omit=dev --audit-level=high --package-lock-only
+        run: npm run audit:production
       - name: Prepare the Supabase Storage contract in plain PostgreSQL
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/prisma/ci-storage-bootstrap.sql
       - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
