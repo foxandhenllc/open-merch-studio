@@ -103,3 +103,27 @@ state and draft submission. Do not combine either extraction with cart or quanti
 This checkpoint passed lint, 84 backend tests (81 passed and three database-only skips), the explicit
 fixture smoke, typecheck, production build/static-route checks, the local multi-placement contract,
 and the complete 11-viewport browser suite.
+
+## Stripe persistence checkpoint
+
+Completed September 3, 2026:
+
+- Added `stripe-order-repository.service.ts` as the durable Stripe reconciliation boundary for
+  event leases and duplicate detection, Studio Pass purchase persistence, payment completion,
+  checkout expiry, orphan audit records, monotonic refund writes, and Stripe recipient mapping.
+- Kept signed webhook orchestration, Stripe retrieval calls, fulfillment gating, Printful draft
+  creation, operational logging, and customer-email decisions in their existing services.
+- Preserved the public `order.service.ts` exports consumed by controllers and tests, including the
+  event-tracking and recipient helpers.
+- Preserved terminal-refund precedence, stale-event recovery, paid-after-expiry reconciliation,
+  fulfillment-attempt updates, and fixture fallback behavior.
+
+`order.service.ts` moved from 1,716 to 1,337 lines; the new Stripe persistence module is 421 lines.
+The orchestrator remains above 1,000 lines because Printful fulfillment-attempt acquisition, draft
+submission/recovery, and operator retry mutations still share provider-specific state. The next safe
+bundle is that Printful attempt and draft-submission boundary. Cart, quantity, reorder, and merchant
+store capabilities remain product work outside the refactor.
+
+This checkpoint passed lint, 84 backend tests (81 passed and three database-only skips), the explicit
+fixture smoke, typecheck, production build/static-route checks, the local multi-placement contract,
+and the complete 11-viewport browser suite across five products.
