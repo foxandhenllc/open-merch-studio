@@ -14,8 +14,9 @@ Completed September 3, 2026:
 - multiple-package tracking in the customer-safe order response and responsive UI;
 - order-received, refund, shipment, and delivery email templates.
 
-Activation remains intentionally supervised: verify the sender domain, configure the Printful
-webhook key pair, run signed production fixtures, and add scheduled reconciliation before describing
+The Printful subscription and signed production fixtures are complete. Activation remains
+intentionally supervised for email: verify the sender domain and one inbox receipt before enabling
+delivery. Add scheduled reconciliation and observe a real shipment lifecycle before describing
 shipment communication as guaranteed.
 
 ## 1. Quantity, cart, and buy again

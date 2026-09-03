@@ -11,9 +11,11 @@ Open Merch Studio can be deployed as a split frontend/backend app or as separate
 ## Optional Provider Inputs
 
 - Printful bearer value and store ID for live catalog sync, draft-order creation, and fulfillment review
+- Printful v2 webhook public and secret keys for signed shipment and delivery updates
 - OpenAI key for guarded provider-backed design generation
 - remove.bg key for converting `gpt-image-2` output into transparent print-ready PNGs
 - Stripe key and webhook signing value for Checkout Sessions and webhook reconciliation
+- Resend API key plus a verified sender and Reply-To for optional OMS transactional email
 
 Store all provider values in deployment-managed storage. Do not commit provider values or screenshots of provider dashboards.
 
@@ -51,7 +53,9 @@ Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider pol
 The Open Merch Studio production deployment was rechecked on September 3, 2026 with
 `CHECKOUT_ACCESS_MODE=public`, live Stripe and Printful adapters enabled, payment and fulfillment
 authorization enabled, and `PRINTFUL_AUTO_CONFIRM_ORDERS=false`. Transactional email delivery and
-automatic shipment tracking are not part of that launch contract; see
+scheduled shipment reconciliation are not part of that launch contract. Signed Printful shipment
+and delivery webhooks are active and production-fixture verified; OMS transactional email remains
+disabled until its sender is verified and an inbox receipt passes. See
 [the current post-payment experience](./docs/architecture/current-post-payment-experience.md).
 
 `gpt-image-2` is the default design model. Because that model does not emit transparent backgrounds, set `REMOVE_BG_API_KEY` to enable the automatic post-generation background-removal stage. Without it, generation and mockups still work, but print readiness shows a warning until a transparent file is prepared.

@@ -1,10 +1,14 @@
 # Paid Beta Runbook
 
-**Status:** Branded closed-gate production active; supervised commerce smoke passed
+**Status:** Public review-first commerce active; payment, fulfillment draft, and signed shipment paths verified
 **Visibility:** Public  
 **Private ops companion:** Maintained outside this public repository
 
-Open Merch Studio now has a fixture-mode paid beta path: curated catalog, idea refinement, draft generation, mockup generation, quote, checkout simulation, order confirmation, fixture fulfillment, admin reporting, and launch gates. The backend also has guarded provider adapters for OpenAI image generation, Stripe Checkout/webhooks, Printful mockup tasks, and Printful draft orders. It is suitable for OSS/product review and supervised provider testing, not unattended real-money launch.
+Open Merch Studio has a fixture-mode development path covering curated catalog, idea refinement,
+draft generation, mockups, quotes, checkout simulation, order confirmation, fulfillment, admin
+reporting, and launch gates. The guarded production adapters support public Stripe Checkout,
+review-first Printful draft creation, and signed shipment updates. It is not an unattended
+auto-fulfillment system: an operator still reviews and confirms every Printful draft.
 
 As of July 17, 2026, the branded Stripe webhook is active at
 `https://openmerchstudio.com/api/stripe/webhook` for completed, expired, and refunded events; the
@@ -14,7 +18,7 @@ products. The Google Workspace alias domain is verified and Gmail, MX, and SPF a
 external inbound-and-reply test passed. A branded outbound test from
 `Open Merch Studio Support <support@openmerchstudio.com>` passed SPF, DKIM for
 `openmerchstudio.com`, and DMARC. Public open-source indexing was approved on July 17, 2026; public
-checkout, payment authorization, and fulfillment authorization remain closed.
+checkout, payment authorization, and fulfillment authorization were still closed at that point.
 Both support members use `Each email`; Chris Fox's first external member-delivery probe was marked
 `Not spam`, and Chris Henrich should do the same once if Gmail classifies his first group message as
 Spam. Production application defaults, Vercel support variables, and Stripe's public support email now
@@ -28,9 +32,19 @@ rotated and verified without recording it. Production was then returned to close
 reports checkout and fulfillment as `available`, meaning configured but not authorized. Stripe-hosted
 successful-payment and refund customer emails are enabled.
 
+On September 3, 2026, the owner opened public checkout and the corresponding server-side payment
+and fulfillment gates. Paid orders still create editable Printful drafts and are never automatically
+confirmed. The production Printful v2 subscription now sends signed `shipment_sent` and
+`shipment_delivered` events to OMS. A zero-dollar signed fixture verified shipped and delivered
+transitions, customer-safe tracking output, disabled email queuing, and retry deduplication; all
+fixture records were removed afterward. OMS transactional email remains disabled pending branded
+sender verification and an inbox receipt test. This paragraph supersedes the historical closed-gate
+state recorded above.
+
 ## Provider Gates
 
-Live provider behavior must stay behind explicit environment gates.
+Live provider behavior must stay behind explicit environment gates. The values below are safe
+defaults for a new install or pause procedure, not a statement of the current production values.
 
 - `CHECKOUT_ACCESS_MODE=closed` blocks every Stripe Session until an explicit supervised window.
 - `CHECKOUT_ALLOWED_EMAILS=` is read only in `allowlist` mode. Use normalized operator emails and remove them after the smoke.

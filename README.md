@@ -97,6 +97,7 @@ npm run dev:frontend
 - `POST /api/studio-passes/checkout`
 - `POST /api/checkout/sessions`
 - `POST /api/stripe/webhook`
+- `POST /api/printful/webhook`
 - `GET /api/orders/:orderId`
 - `POST /api/admin/catalog/sync`
 - `GET /api/admin/settings`

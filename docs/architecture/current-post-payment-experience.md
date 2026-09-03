@@ -41,6 +41,11 @@ customer promise:
 The three new tables have RLS enabled and no `anon` or `authenticated` grants. They are accessed
 only by the server-side database role.
 
+The production Printful v2 subscription is active for `shipment_sent` and
+`shipment_delivered`. On September 3, 2026, a zero-dollar signed fixture verified both transitions,
+customer-safe tracking output, queued-but-disabled notification records, and semantic deduplication
+of a provider retry. The fixture and every associated database record were removed after the test.
+
 ## What is not yet guaranteed
 
 - **An OMS confirmation email.** The durable delivery service and templates now exist, but
@@ -49,9 +54,9 @@ only by the server-side database role.
 - **A Stripe receipt email.** Stripe can send one when Successful payments is enabled in Stripe's
   Customer emails settings. The Checkout request supplies the customer email, but that Dashboard
   setting is outside the repository and must be verified separately.
-- **Automatic production or shipment updates.** The receiver exists, but Printful is not subscribed
-  until its one-time public/secret key pair is stored in deployment secrets and a signed fixture is
-  verified against production.
+- **Recovery from a missed Printful webhook.** Live signed shipment events now update the order
+  automatically, but scheduled reconciliation is not yet present. An outage spanning all provider
+  retries would still require operator recovery.
 - **Shipment item allocation and reconciliation.** Printful's shipment webhook carries tracking and
   order data but not the full shipment-item list. A scheduled status/shipments reconciliation is
   still required for item allocation and missed-event recovery.
@@ -66,14 +71,14 @@ The customer should receive and be able to revisit this sequence:
    specific items in that shipment.
 4. A delivered or exception update when provider evidence supports it.
 
-The durable `Shipment` record, signed webhook endpoint, reduced payload storage, and unique
-order/event email ledger are complete. Remaining release work is:
+The durable `Shipment` record, signed webhook endpoint and subscription, reduced payload storage,
+unique order/event email ledger, and signed production fixture are complete. Remaining release work
+is:
 
 1. Verify a branded Resend sender and enable delivery during a supervised test.
-2. Register the production Printful v2 webhook and store its keys without logging them.
-3. Run a signed webhook fixture, then one supervised real shipment lifecycle.
-4. Add scheduled reconciliation for missed events and shipment-item allocation.
-5. Replace the public order lookup boundary with a revocable opaque access token.
+2. Observe one supervised real shipment lifecycle.
+3. Add scheduled reconciliation for missed events and shipment-item allocation.
+4. Replace the public order lookup boundary with a revocable opaque access token.
 
 Official references:
 
