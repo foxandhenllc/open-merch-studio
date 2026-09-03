@@ -1,6 +1,6 @@
 # Paid Beta Runbook
 
-**Status:** Public review-first commerce active; payment, fulfillment draft, and signed shipment paths verified
+**Status:** Public review-first commerce active; payment, fulfillment draft, signed shipment, and transactional email paths verified
 **Visibility:** Public  
 **Private ops companion:** Maintained outside this public repository
 
@@ -37,9 +37,15 @@ and fulfillment gates. Paid orders still create editable Printful drafts and are
 confirmed. The production Printful v2 subscription now sends signed `shipment_sent` and
 `shipment_delivered` events to OMS. A zero-dollar signed fixture verified shipped and delivered
 transitions, customer-safe tracking output, disabled email queuing, and retry deduplication; all
-fixture records were removed afterward. OMS transactional email remains disabled pending branded
-sender verification and an inbox receipt test. This paragraph supersedes the historical closed-gate
-state recorded above.
+fixture records were removed afterward. At that checkpoint, OMS transactional email remained
+disabled pending branded sender verification and an inbox receipt test. This paragraph supersedes
+the historical closed-gate state recorded above.
+
+Later on September 3, the existing Resend resource was connected to the production Vercel project.
+The branded sender and reply-to configuration passed a no-order external delivery test, Resend
+reported the message `Delivered`, and app-owned transactional email was enabled. The temporary smoke
+route, token, and deployment were removed. Customer mail remains event-keyed and idempotent; the next
+supervised paid order should verify the complete order-received-to-shipment sequence in practice.
 
 ## Provider Gates
 

@@ -8,7 +8,8 @@ Last verified from repository behavior and production configuration: September 3
 2. Stripe Checkout collects payment and a US shipping address. The browser returns to the studio,
    but the signed Stripe webhook remains the authoritative payment event.
 3. OMS records the paid order durably and displays an OMS order number, items, charged total, and a
-   customer-safe timeline.
+   customer-safe timeline. It also sends an idempotent OMS order-received email from the branded
+   `orders@openmerchstudio.com` sender.
 4. OMS validates the saved product, artwork, print areas, and shipping data, then creates an editable
    Printful draft.
 5. The draft stays in manual review. It is not automatically confirmed for production.
@@ -20,6 +21,7 @@ launch contract.
 ## What the customer can rely on now
 
 - An on-site payment confirmation after OMS reconciles the Checkout Session.
+- An OMS order-received email after the signed Stripe completion event is reconciled.
 - An OMS order number and safe status language such as Received or Under review.
 - A support path that uses the order number rather than exposing provider identifiers.
 - A manual artwork and fulfillment review before money is committed to Printful production.
@@ -46,11 +48,15 @@ The production Printful v2 subscription is active for `shipment_sent` and
 customer-safe tracking output, queued-but-disabled notification records, and semantic deduplication
 of a provider retry. The fixture and every associated database record were removed after the test.
 
+Later on September 3, the Vercel-managed Resend resource was connected only to the production
+project. DKIM and the isolated `send.openmerchstudio.com` SPF/MX records were verified without
+changing Google Workspace's apex inbound mail. A no-order message from
+`Open Merch Studio <orders@openmerchstudio.com>` to an owner-approved external inbox was accepted by
+Resend and reported `Delivered`. The temporary token-guarded test route, token, and deployment were
+then removed before `EMAIL_PROVIDER=resend` and `TRANSACTIONAL_EMAILS_ENABLED=true` were deployed.
+
 ## What is not yet guaranteed
 
-- **An OMS confirmation email.** The durable delivery service and templates now exist, but
-  `TRANSACTIONAL_EMAILS_ENABLED` remains disabled until the sender domain, From address, Reply-To,
-  and delivery behavior are verified together.
 - **A Stripe receipt email.** Stripe can send one when Successful payments is enabled in Stripe's
   Customer emails settings. The Checkout request supplies the customer email, but that Dashboard
   setting is outside the repository and must be verified separately.
@@ -75,10 +81,9 @@ The durable `Shipment` record, signed webhook endpoint and subscription, reduced
 unique order/event email ledger, and signed production fixture are complete. Remaining release work
 is:
 
-1. Verify a branded Resend sender and enable delivery during a supervised test.
-2. Observe one supervised real shipment lifecycle.
-3. Add scheduled reconciliation for missed events and shipment-item allocation.
-4. Replace the public order lookup boundary with a revocable opaque access token.
+1. Observe one supervised real order and shipment lifecycle, including each customer email.
+2. Add scheduled reconciliation for missed events and shipment-item allocation.
+3. Replace the public order lookup boundary with a revocable opaque access token.
 
 Official references:
 
