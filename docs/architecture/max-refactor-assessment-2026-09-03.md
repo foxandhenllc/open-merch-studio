@@ -178,3 +178,28 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Studio configuration transition checkpoint
+
+Completed September 3, 2026:
+
+- Added `studio-configuration.transitions.ts` as the pure product/configuration boundary for
+  remembered product options, available-variant fallback, wall-art orientation, placement toggles,
+  last-placement protection, inherited artwork assignment, and same-as-front reuse.
+- Kept React state ownership, analytics, request cancellation, quote invalidation, persistence, and
+  mockup provider calls in `studio-view-model.ts`.
+- Added characterization coverage for restored two-placement selections, unavailable remembered
+  variants, portrait wall art, add/remove placement behavior, last-placement protection, and
+  explicit front-to-back artwork reuse.
+
+`studio-view-model.ts` moved from 1,506 to 1,489 lines; the transition module is 112 lines. The
+parent remains above 1,000 lines because mockup orchestration, artwork upload/generation/revision,
+quote creation, and checkout still share React-owned lifecycle state. The next safe extraction is
+the artwork command cluster beginning with upload/reference handling. Mockup request lifecycle and
+cache ownership should remain in the parent until that command boundary is stable; avoid replacing
+it with a callback-heavy generic controller.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

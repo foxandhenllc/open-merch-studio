@@ -40,13 +40,18 @@ import {
   deriveDesignAllowance,
   deriveStepStates,
   emptyBusy,
-  firstPlacement,
-  firstVariant,
   mapStudioError,
   mockupKey,
   placementArtworkKey,
   previewOrientation,
 } from './studio-view-model.selectors';
+import {
+  reusePlacementAssignment,
+  selectProductConfiguration,
+  selectVariantConfiguration,
+  togglePlacementConfiguration,
+  type RememberedProductSelection,
+} from './studio-configuration.transitions';
 
 export type {
   ActionKey,
@@ -123,9 +128,7 @@ export function useStudioViewModel() {
   const mockupRequestId = useRef(0);
   const startingFresh = useRef(false);
   const mockupCache = useRef(new Map<string, DesignMockup>());
-  const productSelections = useRef(
-    new Map<string, { variantId: string; placements: string[]; orientation?: PreviewOrientation }>()
-  );
+  const productSelections = useRef(new Map<string, RememberedProductSelection>());
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -581,31 +584,16 @@ export function useStudioViewModel() {
         orientation: selectedOrientation,
       });
     }
-    const remembered = productSelections.current.get(product.id);
-    const variant =
-      product.variants.find(
-        (candidate) => candidate.id === remembered?.variantId && candidate.isAvailable
-      ) ?? firstVariant(product);
-    const placement = firstPlacement(product);
-    const placements = remembered?.placements.length
-      ? remembered.placements.filter((code) =>
-          product.placements.some((candidate) => candidate.code === code)
-        )
-      : placement
-        ? [placement.code]
-        : [];
-    const orientation = remembered?.orientation ?? previewOrientation(product, variant);
+    const { variant, placements, orientation, placementArtwork: nextPlacementArtwork } =
+      selectProductConfiguration({
+        product,
+        remembered: productSelections.current.get(product.id),
+        design,
+      });
     setSelectedProductId(product.id);
     setSelectedVariantIdState(variant?.id ?? '');
-    const nextPlacementArtwork = design
-      ? Object.fromEntries(placements.map((code) => [code, design]))
-      : {};
     setSelectedPlacements(placements);
-    if (design) {
-      setPlacementArtwork(nextPlacementArtwork);
-    } else {
-      setPlacementArtwork({});
-    }
+    setPlacementArtwork(nextPlacementArtwork);
     setActivePlacementCode('');
     setMugLayoutState('center');
     setSelectedOrientationState(orientation);
@@ -642,18 +630,13 @@ export function useStudioViewModel() {
     setSelectedVariantIdState(id);
     trackEvent('configuration_changed', { field: 'variant', value: 'selected' });
     markStale();
-    const variant = selectedProduct?.variants.find((candidate) => candidate.id === id);
-    const derivedOrientation = selectedProduct
-      ? previewOrientation(selectedProduct, variant ?? null)
-      : undefined;
-    const orientation =
-      derivedOrientation === 'square'
-        ? 'square'
-        : derivedOrientation
-          ? selectedOrientation === 'portrait'
-            ? 'portrait'
-            : 'landscape'
-          : undefined;
+    const { variant, orientation } = selectedProduct
+      ? selectVariantConfiguration({
+          product: selectedProduct,
+          variantId: id,
+          selectedOrientation,
+        })
+      : { variant: undefined, orientation: undefined };
     setSelectedOrientationState(orientation);
     if (selectedProduct) {
       productSelections.current.set(selectedProduct.id, {
@@ -675,19 +658,15 @@ export function useStudioViewModel() {
     }
   };
   const togglePlacement = (code: string) => {
-    const next = selectedPlacements.includes(code)
-      ? selectedPlacements.length === 1
-        ? selectedPlacements
-        : selectedPlacements.filter((item) => item !== code)
-      : [...selectedPlacements, code];
-    if (next === selectedPlacements) return;
-    const nextPlacementArtwork = next.includes(code)
-      ? design
-        ? { ...placementArtwork, [code]: placementArtwork[code] ?? design }
-        : placementArtwork
-      : Object.fromEntries(
-          Object.entries(placementArtwork).filter(([placementCode]) => placementCode !== code)
-        );
+    const transition = togglePlacementConfiguration({
+      code,
+      selectedPlacements,
+      placementArtwork,
+      design,
+    });
+    if (!transition.changed) return;
+    const next = transition.placements;
+    const nextPlacementArtwork = transition.placementArtwork;
     setSelectedPlacements(next);
     setPlacementArtwork(nextPlacementArtwork);
     trackEvent('configuration_changed', {
@@ -765,9 +744,13 @@ export function useStudioViewModel() {
     setAnnouncement(`Create different artwork for ${label ?? code}.`);
   };
   const reusePlacementArtwork = (sourceCode: string, targetCode: string) => {
-    const source = placementArtwork[sourceCode] ?? design;
-    if (!source) return;
-    const next = { ...placementArtwork, [targetCode]: source };
+    const next = reusePlacementAssignment({
+      sourceCode,
+      targetCode,
+      placementArtwork,
+      design,
+    });
+    if (!next) return;
     setPlacementArtwork(next);
     setActivePlacementCode('');
     markStale();
