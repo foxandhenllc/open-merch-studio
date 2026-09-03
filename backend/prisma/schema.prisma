@@ -324,33 +324,36 @@ model QuoteItem {
 }
 
 model Order {
-  id                    String               @id @default(uuid())
-  orderNumber           String               @unique
-  quoteId               String?
-  email                 String?
-  status                OrderStatus          @default(DRAFT)
-  stripeSessionId       String?
-  stripePaymentIntentId String?              @unique
-  printfulOrderId       String?
-  fulfillmentStatus     String               @default("not_submitted")
-  failureReason         String?
-  recipient             Json?
-  operatorReviewStatus  String               @default("unreviewed")
-  operatorReviewedAt    DateTime?
-  totalCents            Int
-  taxCents              Int                  @default(0)
-  refundedCents         Int                  @default(0)
-  paidAt                DateTime?
-  policyVersion         String?
-  policyAcceptedAt      DateTime?
-  currency              String               @default("USD")
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  quote                 Quote?               @relation(fields: [quoteId], references: [id], onDelete: SetNull)
-  items                 OrderItem[]
-  transitions           OrderTransition[]
-  paymentEvents         PaymentEvent[]
-  fulfillmentAttempts   FulfillmentAttempt[]
+  id                      String                  @id @default(uuid())
+  orderNumber             String                  @unique
+  quoteId                 String?
+  email                   String?
+  status                  OrderStatus             @default(DRAFT)
+  stripeSessionId         String?
+  stripePaymentIntentId   String?                 @unique
+  printfulOrderId         String?
+  fulfillmentStatus       String                  @default("not_submitted")
+  failureReason           String?
+  recipient               Json?
+  operatorReviewStatus    String                  @default("unreviewed")
+  operatorReviewedAt      DateTime?
+  totalCents              Int
+  taxCents                Int                     @default(0)
+  refundedCents           Int                     @default(0)
+  paidAt                  DateTime?
+  policyVersion           String?
+  policyAcceptedAt        DateTime?
+  currency                String                  @default("USD")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  quote                   Quote?                  @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  items                   OrderItem[]
+  transitions             OrderTransition[]
+  paymentEvents           PaymentEvent[]
+  fulfillmentAttempts     FulfillmentAttempt[]
+  shipments               Shipment[]
+  customerEmailDeliveries CustomerEmailDelivery[]
+  providerWebhookEvents   ProviderWebhookEvent[]
 
   @@index([status, createdAt])
   @@index([stripeSessionId])
@@ -400,6 +403,73 @@ model FulfillmentAttempt {
 
   @@index([orderId, createdAt])
   @@map("fulfillment_attempts")
+}
+
+model Shipment {
+  id                 String    @id @default(uuid())
+  orderId            String
+  provider           String    @default("printful")
+  providerShipmentId String
+  status             String
+  carrier            String?
+  service            String?
+  trackingNumber     String?
+  trackingUrl        String?
+  items              Json?
+  reshipment         Boolean   @default(false)
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerShipmentId])
+  @@index([orderId, shippedAt])
+  @@map("shipments")
+}
+
+model CustomerEmailDelivery {
+  id                String    @id @default(uuid())
+  orderId           String
+  eventKey          String    @unique
+  kind              String
+  recipientEmail    String
+  provider          String    @default("resend")
+  providerMessageId String?
+  status            String    @default("pending")
+  attempts          Int       @default(0)
+  lastError         String?
+  lastAttemptAt     DateTime?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([status, updatedAt])
+  @@map("customer_email_deliveries")
+}
+
+model ProviderWebhookEvent {
+  id                   String    @id @default(uuid())
+  orderId              String?
+  provider             String
+  eventHash            String
+  eventType            String
+  publicKeyFingerprint String?
+  storeId              String?
+  status               String    @default("processing")
+  attempts             Int       @default(1)
+  lastError            String?
+  processedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  order                Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, eventHash])
+  @@index([orderId, createdAt])
+  @@index([provider, status, updatedAt])
+  @@map("provider_webhook_events")
 }
 
 model OrderItem {

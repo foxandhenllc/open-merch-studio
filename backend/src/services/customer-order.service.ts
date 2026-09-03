@@ -147,6 +147,14 @@ export function toCustomerOrderConfirmation(
       message,
     },
     timeline: customerSafeTimeline(order),
+    shipments: (order.shipments ?? []).map((shipment) => ({
+      status: shipment.deliveredAt ? 'delivered' : 'shipped',
+      trackingNumber: shipment.trackingNumber,
+      trackingUrl: shipment.trackingUrl,
+      reshipment: shipment.reshipment,
+      shippedAt: shipment.shippedAt,
+      deliveredAt: shipment.deliveredAt,
+    })),
     support: { email: supportEmail },
     createdAt: order.createdAt,
   };

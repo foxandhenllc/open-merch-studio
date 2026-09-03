@@ -45,6 +45,7 @@ const timelineTone = (status: CustomerOrderConfirmation['status']) => {
 
 export function OrderTimeline({ order }: { order: CustomerOrderConfirmation }) {
   const chrome = orderChrome(order.status);
+  const shipments = order.shipments ?? [];
   return (
     <section className="order-confirmation">
       <span className={`success-seal ${chrome.tone}`} aria-hidden="true">
@@ -107,6 +108,27 @@ export function OrderTimeline({ order }: { order: CustomerOrderConfirmation }) {
           <p>{nextStep(order)}</p>
         </div>
       </div>
+      {shipments.length > 0 ? (
+        <div className="customer-order-shipments" aria-label="Shipment tracking">
+          <h3>{shipments.length === 1 ? 'Shipment' : 'Shipments'}</h3>
+          {shipments.map((shipment, index) => (
+            <div key={`${shipment.trackingNumber ?? 'shipment'}-${index}`}>
+              <div>
+                <strong>
+                  {shipment.reshipment ? 'Replacement shipment' : `Shipment ${index + 1}`}
+                </strong>
+                <span>{shipment.status === 'delivered' ? 'Delivered' : 'On the way'}</span>
+                {shipment.trackingNumber ? <small>{shipment.trackingNumber}</small> : null}
+              </div>
+              {shipment.trackingUrl ? (
+                <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">
+                  Track package
+                </a>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <p className="order-support-copy">
         Need help? Email <a href={`mailto:${order.support.email}`}>{order.support.email}</a> with
         your order number. Review the <a href="/returns">returns and cancellations policy</a> for

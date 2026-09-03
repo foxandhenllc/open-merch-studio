@@ -178,7 +178,22 @@ test('checkout confirmation ignores internal reconciliation messages and identif
 
 test('all prepared customer templates provide HTML and plain text without provider internals', () => {
   const confirmation = toCustomerOrderConfirmation(sensitiveOrder(), 'support@example.com');
-  for (const kind of ['order_received', 'refund_update', 'action_needed'] as const) {
+  confirmation.shipments = [
+    {
+      status: 'shipped',
+      trackingNumber: 'SAFE-TRACKING-123',
+      trackingUrl: 'https://carrier.example/track/SAFE-TRACKING-123',
+      reshipment: false,
+      shippedAt: '2026-07-16T12:00:00.000Z',
+    },
+  ];
+  for (const kind of [
+    'order_received',
+    'shipment_sent',
+    'shipment_delivered',
+    'refund_update',
+    'action_needed',
+  ] as const) {
     const rendered = renderCustomerEmail(kind, confirmation);
     assert.ok(rendered.subject);
     assert.match(rendered.html, /Open Merch Studio/);
@@ -187,6 +202,32 @@ test('all prepared customer templates provide HTML and plain text without provid
     assert.match(rendered.text, /Bella \+ Canvas Tee/);
     assert.doesNotMatch(JSON.stringify(rendered), privatePattern);
   }
+});
+
+test('customer confirmation exposes safe shipment tracking without provider identifiers', () => {
+  const order = sensitiveOrder();
+  order.shipments = [
+    {
+      id: 'internal-shipment-id',
+      status: 'shipped',
+      trackingNumber: 'SAFE-TRACKING-123',
+      trackingUrl: 'https://carrier.example/track/SAFE-TRACKING-123',
+      reshipment: false,
+      shippedAt: '2026-07-16T12:00:00.000Z',
+    },
+  ];
+  const confirmation = toCustomerOrderConfirmation(order, 'support@example.com');
+  assert.deepEqual(confirmation.shipments, [
+    {
+      status: 'shipped',
+      trackingNumber: 'SAFE-TRACKING-123',
+      trackingUrl: 'https://carrier.example/track/SAFE-TRACKING-123',
+      reshipment: false,
+      shippedAt: '2026-07-16T12:00:00.000Z',
+      deliveredAt: undefined,
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(confirmation), /internal-shipment-id/);
 });
 
 test('customer template escapes catalog text before placing it in HTML', () => {

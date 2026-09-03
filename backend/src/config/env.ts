@@ -77,6 +77,8 @@ export const env = {
     .filter(Boolean),
   printfulMaxLaunchProducts: numberFromEnv('PRINTFUL_MAX_LAUNCH_PRODUCTS', 6),
   printfulMockupTimeoutMs: numberFromEnv('PRINTFUL_MOCKUP_TIMEOUT_MS', 180000),
+  printfulWebhookPublicKey: process.env.PRINTFUL_WEBHOOK_PUBLIC_KEY?.trim() || undefined,
+  printfulWebhookSecret: process.env.PRINTFUL_WEBHOOK_SECRET?.trim() || undefined,
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiOrganizationId:
     process.env.OPENAI_ORG_ID?.trim() || process.env.OPENAI_ORGANIZATION_ID?.trim() || undefined,

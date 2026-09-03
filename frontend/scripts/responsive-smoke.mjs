@@ -919,6 +919,15 @@ async function exerciseCheckoutReloadRecovery(browser) {
                 note: 'Payment was received.',
               },
             ],
+            shipments: [
+              {
+                status: 'shipped',
+                trackingNumber: 'TRACK-RECOVERY-123',
+                trackingUrl: 'https://carrier.example/track/TRACK-RECOVERY-123',
+                reshipment: false,
+                shippedAt: new Date().toISOString(),
+              },
+            ],
             support: { email: 'support@example.com' },
             createdAt: new Date().toISOString(),
           },
@@ -946,6 +955,13 @@ async function exerciseCheckoutReloadRecovery(browser) {
     });
     await page.reload({ waitUntil: 'networkidle' });
     await page.getByRole('heading', { name: 'OMS-2026-RECOVERY' }).waitFor();
+    await page.getByRole('heading', { name: 'Shipment' }).waitFor();
+    const trackingLink = page.getByRole('link', { name: 'Track package' });
+    assert.equal(
+      await trackingLink.getAttribute('href'),
+      'https://carrier.example/track/TRACK-RECOVERY-123'
+    );
+    await assertNoHorizontalOverflow(page, 'shipment confirmation');
     assert.equal(
       await page.evaluate(() =>
         window.sessionStorage.getItem('open-merch-studio:pending-checkout:v1')

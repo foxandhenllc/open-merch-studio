@@ -153,6 +153,9 @@ const orderInclude = {
   transitions: {
     orderBy: { createdAt: 'asc' },
   },
+  shipments: {
+    orderBy: { shippedAt: 'asc' },
+  },
 } satisfies Prisma.OrderInclude;
 
 type PersistedOrder = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -351,6 +354,15 @@ function mapPersistedOrder(order: PersistedOrder): OrderSummary {
       at: transition.createdAt.toISOString(),
       status: transition.status,
       note: transition.note ?? '',
+    })),
+    shipments: order.shipments.map((shipment) => ({
+      id: shipment.id,
+      status: shipment.status,
+      trackingNumber: shipment.trackingNumber ?? undefined,
+      trackingUrl: shipment.trackingUrl ?? undefined,
+      reshipment: shipment.reshipment,
+      shippedAt: shipment.shippedAt?.toISOString(),
+      deliveredAt: shipment.deliveredAt?.toISOString(),
     })),
     createdAt: order.createdAt.toISOString(),
   };
@@ -1769,6 +1781,7 @@ export async function listOrderSummaries(limit = 50): Promise<OrderSummary[]> {
 const adminOrderInclude = {
   quote: { include: quoteInclude },
   transitions: { orderBy: { createdAt: 'asc' } },
+  shipments: { orderBy: { shippedAt: 'asc' } },
   paymentEvents: { orderBy: { createdAt: 'asc' } },
   fulfillmentAttempts: { orderBy: { createdAt: 'asc' } },
 } satisfies Prisma.OrderInclude;

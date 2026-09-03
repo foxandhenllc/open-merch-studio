@@ -772,6 +772,7 @@ export function getLocalCustomerOrder(supportEmail: string): CustomerOrderConfir
         note: 'The simulated order was received.',
       },
     ],
+    shipments: [],
     support: { email: supportEmail },
     createdAt: localOrder.createdAt,
   };

@@ -1573,6 +1573,43 @@ input:focus {
 .order-timeline .is-pending {
   opacity: 0.7;
 }
+.customer-order-shipments {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+.customer-order-shipments h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.customer-order-shipments > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.customer-order-shipments > div > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.customer-order-shipments span,
+.customer-order-shipments small {
+  color: var(--ink-soft);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.customer-order-shipments a {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 750;
+}
 .order-support-copy {
   margin: 18px 0 0;
   font-size: 11px;

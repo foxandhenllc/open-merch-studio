@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.routes.js';
 import commerceRoutes from './routes/commerce.routes.js';
 import { getCatalogHealth } from './controllers/catalog.controller.js';
 import { postStripeWebhook } from './controllers/commerce.controller.js';
+import { postPrintfulWebhook } from './controllers/printful-webhook.controller.js';
 import { redactRequestUrl } from './utils/operational-logger.js';
 
 morgan.token('safe-url', (req) => {
@@ -37,6 +38,7 @@ export function createApp() {
   );
   app.use(requestContext);
   app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), postStripeWebhook);
+  app.post('/api/printful/webhook', express.raw({ type: 'application/json' }), postPrintfulWebhook);
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '100kb', parameterLimit: 100 }));
   app.use(

@@ -20,6 +20,7 @@ import {
 import { trackServerEvent } from '../utils/analytics.js';
 import { logOperationalEvent } from '../utils/operational-logger.js';
 import { env } from '../config/env.js';
+import { safelyDeliverCustomerEmail } from '../services/customer-email-delivery.service.js';
 
 export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Response) => {
   const sessionId = String(req.body?.sessionId ?? '').trim();
@@ -106,6 +107,13 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
   if (event.type === 'checkout.session.completed') {
     const alreadyProcessed = await wasStripeEventProcessed(event.id);
     const order = await handleStripeCheckoutCompleted(event.data.object, event.id);
+    if (order) {
+      await safelyDeliverCustomerEmail(
+        order,
+        'order_received',
+        `stripe:${event.id}:order_received`
+      );
+    }
     if (order && !alreadyProcessed) {
       await trackServerEvent(
         'purchase_completed',
@@ -117,7 +125,10 @@ export const postStripeWebhook = asyncHandler(async (req: Request, res: Response
   } else if (event.type === 'checkout.session.expired') {
     await handleStripeCheckoutExpired(event.data.object, event.id);
   } else if (event.type === 'charge.refunded') {
-    await handleStripeChargeRefunded(event.data.object, event.id);
+    const order = await handleStripeChargeRefunded(event.data.object, event.id);
+    if (order) {
+      await safelyDeliverCustomerEmail(order, 'refund_update', `stripe:${event.id}:refund_update`);
+    }
   }
   logOperationalEvent('info', 'stripe_webhook_processed', {
     requestId: String(res.locals.requestId ?? ''),

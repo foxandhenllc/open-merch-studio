@@ -1,6 +1,11 @@
 import type { CustomerOrderConfirmation } from '../types/catalog.js';
 
-export type CustomerEmailKind = 'order_received' | 'refund_update' | 'action_needed';
+export type CustomerEmailKind =
+  | 'order_received'
+  | 'shipment_sent'
+  | 'shipment_delivered'
+  | 'refund_update'
+  | 'action_needed';
 
 export type RenderedCustomerEmail = {
   subject: string;
@@ -17,6 +22,16 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+const safeHttpUrl = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 const money = (cents: number, currency: string): string => {
   try {
@@ -63,6 +78,26 @@ const templateCopy = (
         ],
       };
     }
+    case 'shipment_sent': {
+      const latest = order.shipments.at(-1);
+      const tracking = latest?.trackingUrl
+        ? 'Use the secure tracking link below for the carrier’s latest update.'
+        : 'The carrier may need a little time before tracking details appear.';
+      return {
+        subject: `Order ${orderNumber} has shipped`,
+        heading: latest?.reshipment ? 'Your replacement has shipped' : 'Your order has shipped',
+        paragraphs: [tracking],
+      };
+    }
+    case 'shipment_delivered':
+      return {
+        subject: `Order ${orderNumber} was delivered`,
+        heading: 'Your order was delivered',
+        paragraphs: [
+          'The carrier marked your shipment delivered.',
+          'If anything is missing or damaged, contact support with your order number.',
+        ],
+      };
     case 'action_needed':
       return {
         subject: `Action needed for order ${orderNumber}`,
@@ -93,6 +128,19 @@ export function renderCustomerEmail(
   const htmlParagraphs = copy.paragraphs
     .map((paragraph) => `<p style="margin:0 0 16px">${escapeHtml(paragraph)}</p>`)
     .join('');
+  const latestShipment = order.shipments.at(-1);
+  const trackingUrl = safeHttpUrl(latestShipment?.trackingUrl);
+  const trackingText = latestShipment?.trackingNumber
+    ? `Tracking number: ${cleanText(latestShipment.trackingNumber)}`
+    : undefined;
+  const plainTracking = trackingUrl
+    ? [trackingText, `Track shipment: ${trackingUrl}`].filter(Boolean).join('\n')
+    : trackingText;
+  const htmlTracking = trackingUrl
+    ? `<p style="margin:0 0 20px"><a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 18px;background:#171814;color:#fff;text-decoration:none;border-radius:999px;font-weight:700">Track shipment</a>${trackingText ? `<br><span style="display:inline-block;margin-top:10px;color:#62645e">${escapeHtml(trackingText)}</span>` : ''}</p>`
+    : trackingText
+      ? `<p style="margin:0 0 20px;color:#62645e">${escapeHtml(trackingText)}</p>`
+      : '';
 
   return {
     subject: cleanText(copy.subject),
@@ -100,6 +148,7 @@ export function renderCustomerEmail(
       copy.heading,
       '',
       plainParagraphs,
+      ...(plainTracking ? ['', plainTracking] : []),
       '',
       `Order: ${orderNumber}`,
       plainItems,
@@ -117,6 +166,7 @@ export function renderCustomerEmail(
         <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Open Merch Studio</p>
         <h1 style="margin:0 0 20px;font-size:26px;line-height:1.2">${escapeHtml(copy.heading)}</h1>
         ${htmlParagraphs}
+        ${htmlTracking}
         <div style="margin:24px 0;padding:18px;background:#f7f7f4;border-radius:12px">
           <p style="margin:0 0 10px"><strong>Order ${escapeHtml(orderNumber)}</strong></p>
           <ul style="margin:0 0 12px;padding-left:20px">${htmlItems}</ul>

@@ -270,6 +270,15 @@ export type OrderSummary = {
     message: string;
   };
   timeline: Array<{ at: string; status: string; note: string }>;
+  shipments?: Array<{
+    id: string;
+    status: string;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    reshipment: boolean;
+    shippedAt?: string;
+    deliveredAt?: string;
+  }>;
   createdAt: string;
 };
 
@@ -308,6 +317,14 @@ export type CustomerOrderConfirmation = {
     at: string;
     status: CustomerOrderStatus;
     note: string;
+  }>;
+  shipments: Array<{
+    status: 'shipped' | 'delivered';
+    trackingNumber?: string;
+    trackingUrl?: string;
+    reshipment: boolean;
+    shippedAt?: string;
+    deliveredAt?: string;
   }>;
   support: {
     email: string;
