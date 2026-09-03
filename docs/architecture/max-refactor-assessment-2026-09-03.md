@@ -252,3 +252,23 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Studio quote boundary checkpoint
+
+Completed September 3, 2026:
+
+- Added `studio-quote.ts` for deterministic quote request construction and customer announcement
+  formatting.
+- Kept cancellation, request ordering, automatic refresh timing, analytics, and React state in the
+  view model.
+- Added contract coverage proving quote requests carry the same distinct front/back artwork IDs as
+  mockup requests, along with stable automatic/manual price announcement copy.
+
+`studio-view-model.ts` moved from 1,454 to 1,448 lines; `studio-quote.ts` is 49 lines. The next safe
+seam is checkout request/result interpretation. After that extraction, reassess the accumulated
+typed boundaries and move cohesive request lifecycle into hooks only where ownership is clear.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

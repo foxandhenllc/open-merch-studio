@@ -33,7 +33,6 @@ import type {
   WorkbenchMode,
 } from './studio-view-model.types';
 import {
-  buildPlacementSelections,
   deriveArtworkState,
   deriveCheckoutReadiness,
   deriveDesignAllowance,
@@ -62,6 +61,7 @@ import {
   undoArtworkRevision,
 } from './studio-artwork.transitions';
 import { classifyMockupResult, prepareMockupRequest } from './studio-mockup';
+import { prepareQuoteRequest, quoteAnnouncement } from './studio-quote';
 
 export type {
   ActionKey,
@@ -1117,27 +1117,20 @@ export function useStudioViewModel() {
     setAction('quoting', true);
     clearError('quote');
     try {
+      const request = prepareQuoteRequest({
+        sessionId: session?.id,
+        studioPassId: studioPass?.id,
+        product: selectedProduct,
+        variant: selectedVariant,
+        selectedPlacements,
+        design,
+        placementArtwork,
+        mugLayout,
+        orientation: selectedOrientation,
+      });
+      if (!request) return;
       const sourced = await api.quote(
-        {
-          sessionId: session?.id,
-          studioPassId: studioPass?.id,
-          items: [
-            {
-              productId: selectedProduct.id,
-              variantId: selectedVariant.id,
-              quantity: 1,
-              placementCodes: selectedPlacements,
-              placements: buildPlacementSelections(
-                selectedPlacements,
-                design,
-                placementArtwork,
-                mugLayout
-              ),
-              orientation: selectedOrientation,
-              designAssetId: design.id,
-            },
-          ],
-        },
+        request,
         controller.signal
       );
       const result = consumeSource(sourced);
@@ -1149,9 +1142,7 @@ export function useStudioViewModel() {
         source: sourced.source,
         total_band: totalBand(result.totalCents),
       });
-      setAnnouncement(
-        `${options.automatic ? 'Price estimate ready' : 'Price updated'}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: result.currency }).format(result.totalCents / 100)}.`
-      );
+      setAnnouncement(quoteAnnouncement(result, Boolean(options.automatic)));
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       if (requestId !== quoteRequestId.current) return;

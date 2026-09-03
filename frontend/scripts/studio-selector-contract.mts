@@ -21,6 +21,7 @@ import {
   undoArtworkRevision,
 } from '../src/studio-artwork.transitions.ts';
 import { classifyMockupResult, prepareMockupRequest } from '../src/studio-mockup.ts';
+import { prepareQuoteRequest, quoteAnnouncement } from '../src/studio-quote.ts';
 import {
   artworkAssignmentsForDraft,
   buildPlacementSelections,
@@ -309,6 +310,32 @@ const failedMockup = classifyMockupResult(
 assert.equal(failedMockup.failed, true);
 assert.equal(failedMockup.analyticsSource, 'printful');
 assert.equal(failedMockup.error?.message, 'Provider timed out.');
+
+const preparedQuote = prepareQuoteRequest({
+  sessionId: 'fixture-session',
+  studioPassId: 'fixture-pass',
+  product: tee,
+  variant: tee.variants[0]!,
+  selectedPlacements: ['front', 'back'],
+  design: front,
+  placementArtwork: { front, back },
+  mugLayout: 'center',
+});
+assert.ok(preparedQuote);
+assert.equal(preparedQuote.items[0]?.quantity, 1);
+assert.deepEqual(
+  preparedQuote.items[0]?.placements.map((placement) => placement.designAssetId),
+  [front.id, back.id],
+  'quote requests must price the same distinct artwork assignments used by mockups'
+);
+assert.equal(
+  quoteAnnouncement({ currency: 'USD', totalCents: 2855 } as QuoteBreakdown, true),
+  'Price estimate ready: $28.55.'
+);
+assert.equal(
+  quoteAnnouncement({ currency: 'USD', totalCents: 2855 } as QuoteBreakdown, false),
+  'Price updated: $28.55.'
+);
 
 assert.deepEqual(
   mapStudioError(new ApiError('Request budget reached.', 429, 'rate_limit'), 'generation'),
