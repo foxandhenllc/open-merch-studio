@@ -1,6 +1,6 @@
 import { env } from '../config/env.js';
 import { Prisma } from '@prisma/client';
-import { getProductBySlug, listProducts } from './catalog.service.js';
+import { getProductBySlug } from './catalog.service.js';
 import {
   buildPrintfulOrderPayload,
   classifyPrintfulFailure,
@@ -25,7 +25,6 @@ import type {
   CheckoutSession,
   AdminOrderDetail,
   AdminOrderListItem,
-  DesignDraft,
   MoneyLine,
   OperatorReviewStatus,
   OrderSummary,
@@ -49,7 +48,12 @@ import {
   checkoutPolicyAcceptanceIssue,
   CURRENT_CHECKOUT_POLICY_VERSION,
 } from '../config/policies.js';
-import { productionPrintReadiness } from '../utils/print-readiness.js';
+import {
+  checkoutDesignAssetIds,
+  checkoutDesignIssue,
+  validateQuoteForCheckout,
+} from './checkout-validation.service.js';
+import type { CheckoutDesignState } from './checkout-validation.service.js';
 import {
   filterAdminOrderItems,
   normalizeOperatorReviewStatus,
@@ -77,6 +81,7 @@ export type {
   PrintfulRetryEligibility,
   StripeRefundState,
 } from './order-state.service.js';
+export { validateQuoteForCheckout } from './checkout-validation.service.js';
 
 type CheckoutInput = {
   quoteId?: string | null;
@@ -316,16 +321,6 @@ async function loadOrder(orderId: string): Promise<OrderSummary | undefined> {
   return saveOrder(mapPersistedOrder(persisted));
 }
 
-type CheckoutDesignState = {
-  id: string;
-  purpose?: string;
-  imageUrl?: string | null;
-  generationStatus: string;
-  policyStatus: string;
-  readinessStatus: string;
-  readinessReport?: DesignDraft['readiness'];
-};
-
 async function loadDesignForCheckout(
   designAssetId: string
 ): Promise<CheckoutDesignState | undefined> {
@@ -339,7 +334,7 @@ async function loadDesignForCheckout(
       generationStatus: asset.generationStatus,
       policyStatus: asset.policyStatus,
       readinessStatus: asset.readinessStatus,
-      readinessReport: asset.readinessReport as DesignDraft['readiness'] | undefined,
+      readinessReport: asset.readinessReport as CheckoutDesignState['readinessReport'],
     };
   }
 
@@ -354,26 +349,6 @@ async function loadDesignForCheckout(
     readinessStatus: draft.readiness.status,
     readinessReport: draft.readiness,
   };
-}
-
-function checkoutDesignIssue(design: CheckoutDesignState | undefined): string | null {
-  if (!design) return 'Selected artwork could not be verified for checkout.';
-  if (design.purpose === 'reference')
-    return 'Reference images must be turned into print artwork first.';
-  if (!design.imageUrl) return 'Selected artwork is missing a generated or uploaded image.';
-  if (design.generationStatus !== 'complete') {
-    return 'Selected artwork has not completed generation successfully.';
-  }
-  if (design.policyStatus !== 'pass') {
-    return 'Selected artwork needs policy review before checkout.';
-  }
-  const readiness = design.readinessReport
-    ? productionPrintReadiness(design.readinessReport)
-    : null;
-  if (readiness ? readiness.status !== 'pass' : design.readinessStatus !== 'pass') {
-    return 'Selected artwork must pass print-readiness checks before checkout.';
-  }
-  return null;
 }
 
 function transition(
@@ -696,38 +671,6 @@ async function startFulfillmentAttempt(orderId: string): Promise<string | undefi
   return attempt.id;
 }
 
-export async function validateQuoteForCheckout(
-  quote: QuoteBreakdown,
-  requireProviderMetadata = false
-): Promise<string[]> {
-  const issues: string[] = [];
-  const products = await listProducts();
-  for (const item of quote.items) {
-    const product = products.find((candidate) => candidate.id === item.productId);
-    const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
-    if (!product) issues.push(`Product ${item.productId} is no longer sellable.`);
-    if (!variant) issues.push(`Variant ${item.variantId} is no longer available.`);
-    if (requireProviderMetadata && !item.printfulVariantId) {
-      issues.push(`Provider variant metadata is missing for ${item.title}.`);
-    }
-    const unavailablePlacement = item.placementCodes.find(
-      (placementCode) => !product?.placements.some((placement) => placement.code === placementCode)
-    );
-    if (unavailablePlacement) {
-      issues.push(
-        `Placement ${unavailablePlacement} is unavailable for ${product?.title ?? 'item'}.`
-      );
-    }
-    const missingTechnique = item.placementCodes.find(
-      (placementCode) => !item.placementTechniques[placementCode]
-    );
-    if (requireProviderMetadata && missingTechnique) {
-      issues.push(`Provider technique metadata is missing for ${item.title} ${missingTechnique}.`);
-    }
-  }
-  return issues;
-}
-
 export async function createCheckoutSession(input: CheckoutInput): Promise<CheckoutSession> {
   const settings = getRuntimeSettings();
   const quote = await getQuoteById(input.quoteId);
@@ -750,16 +693,8 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
   if (Date.now() > new Date(quote.expiresAt).getTime()) {
     quoteIssues.push('Quote expired. Create a fresh quote before checkout.');
   }
-  const requiredDesignIds = new Set(
-    quote.items
-      .flatMap((item) => [
-        item.designAssetId,
-        ...item.placements.map((placement) => placement.designAssetId),
-      ])
-      .filter(Boolean) as string[]
-  );
-  if (input.designAssetId) requiredDesignIds.add(input.designAssetId);
-  if (!requiredDesignIds.size) {
+  const requiredDesignIds = checkoutDesignAssetIds(quote, input.designAssetId);
+  if (!requiredDesignIds.length) {
     quoteIssues.push('Checkout requires generated or uploaded artwork.');
   }
 
@@ -768,7 +703,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     if (issue) quoteIssues.push(issue);
   }
   if (settings.liveStripeEnabled && !quoteIssues.length) {
-    const durableIssue = await verifyDurableCheckoutState(quote, Array.from(requiredDesignIds));
+    const durableIssue = await verifyDurableCheckoutState(quote, requiredDesignIds);
     if (durableIssue) quoteIssues.push(durableIssue);
   }
 
@@ -795,7 +730,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     policyAcceptedAt: runtimeNow(),
     currency: quote.currency,
     quote,
-    designAssetId: input.designAssetId ?? Array.from(requiredDesignIds)[0],
+    designAssetId: input.designAssetId ?? requiredDesignIds[0],
     fulfillment: {
       provider: settings.livePrintfulEnabled ? 'printful-ready' : 'fixture',
       status: 'validated',

@@ -13,11 +13,63 @@ import {
   checkoutPolicyAcceptanceIssue,
   CURRENT_CHECKOUT_POLICY_VERSION,
 } from '../config/policies.js';
+import {
+  checkoutDesignAssetIds,
+  checkoutDesignIssue,
+} from '../services/checkout-validation.service.js';
 
 const acceptedCheckoutPolicies = {
   policyAccepted: true,
   policyVersion: CURRENT_CHECKOUT_POLICY_VERSION,
 };
+
+test('checkout artwork validation fails closed before payment orchestration', () => {
+  assert.match(checkoutDesignIssue(undefined) ?? '', /could not be verified/i);
+  assert.match(
+    checkoutDesignIssue({
+      id: 'reference',
+      purpose: 'reference',
+      imageUrl: 'https://example.com/reference.png',
+      generationStatus: 'complete',
+      policyStatus: 'pass',
+      readinessStatus: 'pass',
+    }) ?? '',
+    /print artwork/i
+  );
+  assert.match(
+    checkoutDesignIssue({
+      id: 'missing-image',
+      generationStatus: 'complete',
+      policyStatus: 'pass',
+      readinessStatus: 'pass',
+    }) ?? '',
+    /missing/i
+  );
+});
+
+test('checkout artwork IDs retain distinct placement assignments without duplicates', async () => {
+  const { product, variant, placement } = await firstProductSelection();
+  const secondPlacement = product.placements.find((candidate) => candidate.code !== placement.code);
+  assert.ok(secondPlacement);
+  const quote = await createQuote([
+    {
+      productId: product.id,
+      variantId: variant.id,
+      quantity: 1,
+      placementCodes: [placement.code],
+      designAssetId: 'design-front',
+      placements: [
+        { code: placement.code, designAssetId: 'design-front' },
+        { code: secondPlacement.code, designAssetId: 'design-back' },
+      ],
+    },
+  ]);
+  assert.deepEqual(checkoutDesignAssetIds(quote, 'design-extra'), [
+    'design-front',
+    'design-back',
+    'design-extra',
+  ]);
+});
 
 async function firstProductSelection() {
   const products = await listProducts();
