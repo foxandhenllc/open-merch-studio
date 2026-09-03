@@ -21,6 +21,13 @@ export function stripeEventStatusIsTerminal(status?: string | null): boolean {
   return Boolean(status && !['processing', 'retrying'].includes(status));
 }
 
+export function printfulAttemptClaimDecision(
+  createdAt: Date,
+  now = Date.now()
+): 'busy' | 'supersede' {
+  return createdAt.getTime() > now - 2 * 60 * 1000 ? 'busy' : 'supersede';
+}
+
 export const persistedOrderStatus = (status: OrderSummary['status']) => {
   if (status === 'checkout_pending') return 'PENDING_PAYMENT';
   if (status === 'paid') return 'PAID';

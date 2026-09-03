@@ -2,6 +2,8 @@ import Stripe from 'stripe';
 import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import type { QuoteBreakdown } from '../types/catalog.js';
+import { stripeChargeRefundState } from './order-state.service.js';
+import type { StripeRefundState } from './order-state.service.js';
 
 export type StripeCheckoutKind = 'studio_pass' | 'merch_order';
 
@@ -163,6 +165,20 @@ export async function retrieveStripeCharge(chargeId: string): Promise<Stripe.Cha
   } catch {
     return null;
   }
+}
+
+export async function retrieveStripeSessionRefundState(
+  session: Stripe.Checkout.Session
+): Promise<StripeRefundState> {
+  const paymentIntentId =
+    typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id;
+  const paymentIntent = paymentIntentId ? await retrieveStripePaymentIntent(paymentIntentId) : null;
+  const latestCharge = paymentIntent?.latest_charge;
+  const charge =
+    typeof latestCharge === 'string' ? await retrieveStripeCharge(latestCharge) : latestCharge;
+  return charge ? stripeChargeRefundState(charge) : { state: 'unavailable', refundedCents: 0 };
 }
 
 export async function createMerchCheckoutSession(params: {

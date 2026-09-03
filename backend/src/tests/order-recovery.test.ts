@@ -8,6 +8,7 @@ import {
   filterAdminOrderItems,
   normalizeOperatorReviewStatus,
   persistedOrderStatus,
+  printfulAttemptClaimDecision,
   printfulRetryBlocker,
   restoreRuntimeOrderStatus,
   runtimeFulfillmentStatus,
@@ -146,6 +147,12 @@ test('Printful retry eligibility requires durable payment and rejects terminal o
     }),
     null
   );
+});
+
+test('Printful attempt leases block active work and supersede stale work', () => {
+  const now = Date.now();
+  assert.equal(printfulAttemptClaimDecision(new Date(now - 30_000), now), 'busy');
+  assert.equal(printfulAttemptClaimDecision(new Date(now - 180_000), now), 'supersede');
 });
 
 test('Stripe refund state distinguishes partial and full refunds', () => {

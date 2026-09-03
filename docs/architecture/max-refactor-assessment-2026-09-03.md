@@ -127,3 +127,28 @@ store capabilities remain product work outside the refactor.
 This checkpoint passed lint, 84 backend tests (81 passed and three database-only skips), the explicit
 fixture smoke, typecheck, production build/static-route checks, the local multi-placement contract,
 and the complete 11-viewport browser suite across five products.
+
+## Printful recovery checkpoint
+
+Completed September 3, 2026:
+
+- Added `printful-order-recovery.service.ts` as the cohesive boundary for artwork resolution,
+  fulfillment eligibility, two-minute attempt leases, stale-attempt supersession, provider draft
+  retry, retry result persistence, and recovery audit records.
+- Moved `OrderRecoveryError` to its own stable module and re-exported it from `order.service.ts`, so
+  controller error handling and existing imports retain the same runtime class identity.
+- Moved Stripe session refund lookup into the Stripe adapter and reused it from both paid-checkout
+  reconciliation and Printful recovery.
+- Added characterization coverage proving active fulfillment attempts remain blocked while stale
+  attempts are eligible for supersession.
+
+`order.service.ts` moved from 1,337 to 958 lines, below the maintained-source target. The new
+Printful recovery module is 406 lines, the recovery error module is 11 lines, and `stripe.service.ts`
+is 234 lines. The order-domain extraction is now at a stable stopping point: checkout and webhook
+orchestration remain together, while persistence and provider recovery have typed boundaries.
+
+This checkpoint passed lint, 85 backend tests (82 passed and three database-only skips), the explicit
+fixture smoke, typecheck, production build/static-route checks, the local multi-placement contract,
+and the complete 11-viewport browser suite across five products. The next staged target is
+`frontend/src/studio-view-model.ts` (1,696 lines), beginning with pure selectors and typed commands;
+the 1,273-line Printful provider service remains a later transport/transformation split.
