@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogPanel } from '@components/CatalogPanel';
 import { CheckoutPanel } from '@components/CheckoutPanel';
 import { ConfigurationPanel } from '@components/ConfigurationPanel';
+import { ArtworkSourcePanel } from '@components/ArtworkSourcePanel';
 import { ErrorNote } from '@components/ErrorNote';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
@@ -434,204 +435,39 @@ export function WorkbenchStudioApp() {
             )}
 
             {vm.workbenchMode === 'describe' && selected && (
-              <div className={`panel-stack${vm.errors.generation ? 'has-generation-error' : ''}`}>
-                <button className="selection-summary" type="button" onClick={vm.showConfigure}>
-                  <span>{vm.selectedProduct!.title}</span>
-                  <b>{vm.selectedVariant!.name}</b>
-                  <small>Edit</small>
-                </button>
-                {activePlacement && (
-                  <div className="placement-target" role="status">
-                    <b>Creating artwork for {activePlacement.displayName}</b>
-                    <p>
-                      Your other print area stays unchanged. Generate, upload, or use references
-                      for this side only.
-                    </p>
-                  </div>
-                )}
-                <div className="artwork-source" role="group" aria-label="Choose how to make artwork">
-                  <button
-                    type="button"
-                    aria-pressed={vm.creationPath === 'generate'}
-                    onClick={() => vm.setCreationPath('generate')}
-                  >
-                    <b>Create with AI</b>
-                    <small>Start with an idea</small>
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={vm.creationPath === 'upload'}
-                    onClick={() => vm.setCreationPath('upload')}
-                  >
-                    <b>Use my artwork</b>
-                    <small>No AI generation</small>
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={vm.creationPath === 'reference'}
-                    onClick={() => vm.setCreationPath('reference')}
-                  >
-                    <b>Use references</b>
-                    <small>Create something new</small>
-                  </button>
-                </div>
-
-                {vm.creationPath === 'upload' ? (
-                  <div className="upload-workspace">
-                    <label className={`upload-drop${uploadPreview ? ' has-preview' : ''}`}>
-                      {uploadPreview ? (
-                        <img src={uploadPreview} alt="Selected artwork preview" />
-                      ) : (
-                        <span>
-                          <b>Choose your artwork</b>
-                          <small>PNG, JPEG, or WebP · up to 20 MB</small>
-                        </span>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
-                      />
-                    </label>
-                    {uploadFile && (
-                      <p className="upload-file-name">
-                        <span>{uploadFile.name}</span>
-                        <small>{(uploadFile.size / 1024 / 1024).toFixed(1)} MB</small>
-                      </p>
-                    )}
-                    <label className="option-check">
-                      <input
-                        type="checkbox"
-                        checked={removeUploadBackground}
-                        onChange={(event) => setRemoveUploadBackground(event.target.checked)}
-                      />
-                      <span>
-                        <b>Remove the background</b>
-                        <small>Useful for logos and isolated subjects. Leave off for full photos.</small>
-                      </span>
-                    </label>
-                    <label className="option-check rights-check">
-                      <input
-                        type="checkbox"
-                        checked={uploadRightsConfirmed}
-                        onChange={(event) => setUploadRightsConfirmed(event.target.checked)}
-                      />
-                      <span>
-                        I created this artwork or have permission to reproduce it on merchandise.
-                      </span>
-                    </label>
-                  </div>
-                ) : (
-                  <>
-                    {vm.creationPath === 'reference' && (
-                      <div className="reference-workspace">
-                        <label className="option-check rights-check">
-                          <input
-                            type="checkbox"
-                            checked={referenceRightsConfirmed}
-                            onChange={(event) => setReferenceRightsConfirmed(event.target.checked)}
-                          />
-                          <span>
-                            I created these references or have permission to use them as creative input.
-                          </span>
-                        </label>
-                        <label className="reference-add">
-                          <span>Add reference images</span>
-                          <small>Up to five · style, mood, color, or composition</small>
-                          <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            multiple
-                            disabled={
-                              !referenceRightsConfirmed ||
-                              vm.referenceAssets.length >= 5 ||
-                              vm.busy.generating
-                            }
-                            onChange={(event) => {
-                              void vm.addReferenceImages(Array.from(event.target.files ?? []));
-                              event.currentTarget.value = '';
-                            }}
-                          />
-                        </label>
-                        {vm.referenceAssets.length > 0 && (
-                          <div className="reference-strip" aria-label="Uploaded references">
-                            {vm.referenceAssets.map((asset) => (
-                              <figure key={asset.id}>
-                                <img src={asset.imageUrl} alt={asset.asset?.originalFilename ?? 'Reference'} />
-                                <button
-                                  type="button"
-                                  aria-label="Remove reference"
-                                  onClick={() => vm.removeReferenceAsset(asset.id)}
-                                >
-                                  ×
-                                </button>
-                              </figure>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <label className="prompt-field streamlined-prompt">
-                      <span>
-                        {vm.creationPath === 'reference'
-                          ? 'What new design should these inspire?'
-                          : 'What should we make?'}
-                      </span>
-                      <textarea
-                        ref={promptField}
-                        value={vm.prompt}
-                        onChange={(event) => vm.setPrompt(event.target.value)}
-                        rows={6}
-                        maxLength={600}
-                        placeholder={
-                          vm.creationPath === 'reference'
-                            ? 'Use the warm colors and handmade texture, but create a new original raccoon mechanic graphic…'
-                            : 'A cheerful red panda tending a tiny garden, bold screen-print style, no words…'
-                        }
-                      />
-                      <small className="prompt-help">
-                        {vm.creationPath === 'reference'
-                          ? 'Describe what to borrow and what the new artwork should become.'
-                          : 'Describe the subject, style, colors, and any essential words.'}
-                      </small>
-                      {vm.prompt.length >= 450 && <b>{vm.prompt.length}/600</b>}
-                    </label>
-                  </>
-                )}
-                <ErrorNote
-                  error={vm.errors.generation}
-                  onRetry={() => {
-                    if (vm.creationPath === 'upload' && uploadFile) {
-                      void vm.uploadArtwork(uploadFile, removeUploadBackground);
-                    } else {
-                      void vm.generate();
-                    }
-                  }}
-                />
-                <button
-                  className="button button--primary button--wide"
-                  type="button"
-                  onClick={() => {
-                    if (vm.creationPath === 'upload' && uploadFile) {
-                      void vm.uploadArtwork(uploadFile, removeUploadBackground);
-                    } else {
-                      void vm.generate();
-                    }
-                  }}
-                  disabled={
-                    vm.busy.generating ||
-                    (vm.creationPath === 'upload'
-                      ? !uploadFile || !uploadRightsConfirmed
-                      : promptBlocked)
+              <ArtworkSourcePanel
+                productTitle={vm.selectedProduct!.title}
+                variantName={vm.selectedVariant!.name}
+                activePlacement={activePlacement}
+                creationPath={vm.creationPath}
+                uploadFile={uploadFile}
+                uploadPreview={uploadPreview}
+                uploadRightsConfirmed={uploadRightsConfirmed}
+                removeUploadBackground={removeUploadBackground}
+                referenceAssets={vm.referenceAssets}
+                referenceRightsConfirmed={referenceRightsConfirmed}
+                prompt={vm.prompt}
+                promptBlocked={promptBlocked}
+                generating={vm.busy.generating}
+                error={vm.errors.generation}
+                promptRef={promptField}
+                onShowConfigure={vm.showConfigure}
+                onCreationPathChange={vm.setCreationPath}
+                onUploadFileChange={setUploadFile}
+                onUploadRightsChange={setUploadRightsConfirmed}
+                onRemoveUploadBackgroundChange={setRemoveUploadBackground}
+                onReferenceRightsChange={setReferenceRightsConfirmed}
+                onAddReferenceImages={(files) => void vm.addReferenceImages(files)}
+                onRemoveReferenceAsset={vm.removeReferenceAsset}
+                onPromptChange={vm.setPrompt}
+                onSubmit={() => {
+                  if (vm.creationPath === 'upload' && uploadFile) {
+                    void vm.uploadArtwork(uploadFile, removeUploadBackground);
+                  } else {
+                    void vm.generate();
                   }
-                >
-                  {vm.creationPath === 'upload'
-                    ? 'Prepare my artwork'
-                    : vm.creationPath === 'reference'
-                      ? 'Create from references'
-                      : 'Generate my design'}
-                </button>
-              </div>
+                }}
+              />
             )}
 
             {vm.workbenchMode === 'generating' && (

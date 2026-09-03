@@ -345,3 +345,28 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Artwork-source mode component checkpoint
+
+Completed September 3, 2026:
+
+- Added `components/ArtworkSourcePanel.tsx` with an adjacent typed prop contract for generated,
+  uploaded, and reference-led artwork entry.
+- Kept the selected upload, object-URL preview lifecycle, reproduction-rights assent, background
+  option, and reference-rights assent in the mounted workbench so navigating between modes does
+  not shorten their existing lifetime.
+- Kept upload, reference, and generation provider commands in the studio view model; the component
+  receives intent callbacks and owns no network or persistence behavior.
+- Preserved prompt focus handoff, upload and reference input constraints, retry behavior, customer
+  copy, and accessible pressed and disabled states.
+- Repaired the generation-error modifier spacing while moving the panel, so the documented error
+  treatment is now applied as a separate CSS class instead of being concatenated to `panel-stack`.
+
+`WorkbenchStudioApp.tsx` moved from 878 to 714 lines. The artwork-source component is 210 lines and
+its prop contract is 35 lines. Continue with the review mode only as a presentation extraction;
+placement reuse, revision commands, mockup and quote sequencing, and design history remain view-model
+responsibilities until a later controller-hook checkpoint has a smaller, cohesive ownership surface.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, lint, typecheck, production build/static-route checks, and the complete 11-viewport
+browser suite across five products plus upload/reference and recoverable checkout flows.
