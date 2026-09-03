@@ -272,3 +272,28 @@ This checkpoint passed 85 backend tests (82 passed and three database-only skips
 contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
 the complete 11-viewport browser suite across five products plus upload/reference and recoverable
 checkout flows.
+
+## Studio checkout boundary checkpoint
+
+Completed September 3, 2026:
+
+- Added `studio-checkout.ts` for typed checkout request construction, unavailable/not-ready error
+  presentation, and deterministic provider-result classification.
+- Made the four checkout outcomes explicit: secure redirect, inline confirmation, durable order
+  lookup, and pending provider state. This keeps fixture and live responses on one documented
+  interpretation path without moving browser redirects or payment state into a generic helper.
+- Kept Stripe authorization, provider calls, analytics, redirect control, order lookup, and React
+  state sequencing in `studio-view-model.ts`.
+- Added contract coverage for policy/session/artwork request fields, Stripe redirect priority,
+  inline confirmation, order lookup, closed-checkout presentation, and safe retry messaging that
+  tells customers not to submit payment twice.
+
+`studio-view-model.ts` moved from 1,445 to 1,428 lines; `studio-checkout.ts` is 88 lines. The next
+decision is no longer another small pure-function extraction: reassess the accumulated boundaries
+as a group and identify a cohesive request lifecycle hook whose ownership reduces the parent
+without exporting a large callback surface.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, the explicit fixture smoke, lint, typecheck, production build/static-route checks, and
+the complete 11-viewport browser suite across five products plus upload/reference and recoverable
+checkout flows.

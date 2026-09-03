@@ -23,6 +23,13 @@ import {
 import { classifyMockupResult, prepareMockupRequest } from '../src/studio-mockup.ts';
 import { prepareQuoteRequest, quoteAnnouncement } from '../src/studio-quote.ts';
 import {
+  checkoutNotReadyError,
+  checkoutUnavailable,
+  classifyCheckoutResult,
+  orderDetailsPendingError,
+  prepareCheckoutRequest,
+} from '../src/studio-checkout.ts';
+import {
   artworkAssignmentsForDraft,
   buildPlacementSelections,
   deriveArtworkState,
@@ -30,7 +37,11 @@ import {
   mapStudioError,
   mockupKey,
 } from '../src/studio-view-model.selectors.ts';
-import type { QuoteBreakdown } from '../src/types/catalog.ts';
+import type {
+  CheckoutSession,
+  CustomerOrderConfirmation,
+  QuoteBreakdown,
+} from '../src/types/catalog.ts';
 import { ApiError } from '../src/services/api-error.ts';
 
 const front = createLocalDesignDraft('Front selector artwork', undefined, ['front']);
@@ -336,6 +347,51 @@ assert.equal(
   quoteAnnouncement({ currency: 'USD', totalCents: 2855 } as QuoteBreakdown, false),
   'Price updated: $28.55.'
 );
+
+const checkoutQuote = { id: 'quote-1', currency: 'USD', totalCents: 2855 } as QuoteBreakdown;
+const checkoutRequest = prepareCheckoutRequest({
+  quote: checkoutQuote,
+  sessionId: 'fixture-session',
+  studioPassId: 'fixture-pass',
+  email: 'buyer@example.com',
+  design: front,
+  policyAccepted: true,
+  policyVersion: '2026-09-03',
+});
+assert.equal(checkoutRequest.quoteId, checkoutQuote.id);
+assert.equal(checkoutRequest.designAssetId, front.id);
+assert.equal(checkoutRequest.email, 'buyer@example.com');
+assert.equal(checkoutRequest.policyAccepted, true);
+
+const checkoutBase: CheckoutSession = {
+  id: 'checkout-1',
+  mode: 'stripe',
+  status: 'open',
+  checkoutUrl: 'https://checkout.stripe.example/session',
+  message: 'Checkout created.',
+};
+assert.deepEqual(classifyCheckoutResult(checkoutBase), {
+  kind: 'redirect',
+  checkoutUrl: checkoutBase.checkoutUrl,
+});
+
+const inlineOrder = { orderNumber: 'OMS-1001' } as CustomerOrderConfirmation;
+assert.deepEqual(
+  classifyCheckoutResult({
+    ...checkoutBase,
+    status: 'paid',
+    checkoutUrl: null,
+    order: inlineOrder,
+  } as CheckoutSession),
+  { kind: 'inline-order', order: inlineOrder }
+);
+assert.deepEqual(
+  classifyCheckoutResult({ ...checkoutBase, status: 'paid', checkoutUrl: null, orderId: 'order-1' }),
+  { kind: 'lookup-order', orderId: 'order-1' }
+);
+assert.equal(checkoutUnavailable('quote-1').quoteId, 'quote-1');
+assert.equal(checkoutNotReadyError('Enter an email.').retryable, false);
+assert.match(orderDetailsPendingError(new Error('Still processing.')).message, /Still processing/);
 
 assert.deepEqual(
   mapStudioError(new ApiError('Request budget reached.', 429, 'rate_limit'), 'generation'),

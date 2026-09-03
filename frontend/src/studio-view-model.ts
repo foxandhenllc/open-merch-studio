@@ -62,6 +62,13 @@ import {
 } from './studio-artwork.transitions';
 import { classifyMockupResult, prepareMockupRequest } from './studio-mockup';
 import { prepareQuoteRequest, quoteAnnouncement } from './studio-quote';
+import {
+  checkoutNotReadyError,
+  checkoutUnavailable,
+  classifyCheckoutResult,
+  orderDetailsPendingError,
+  prepareCheckoutRequest,
+} from './studio-checkout';
 
 export type {
   ActionKey,
@@ -1190,13 +1197,7 @@ export function useStudioViewModel() {
   const buyStudioPass = async () => {
     if (!session) return;
     if (!canUseCustomerCheckout) {
-      setCheckout({
-        id: 'checkout-disabled',
-        mode: 'stripe-ready',
-        status: 'blocked',
-        checkoutUrl: null,
-        message: 'Checkout opens soon. Your design and quote stay in this session.',
-      });
+      setCheckout(checkoutUnavailable());
       return;
     }
     setAction('pass', true);
@@ -1241,25 +1242,12 @@ export function useStudioViewModel() {
     if (!quote || !checkoutReadiness.ready) {
       setErrors((current) => ({
         ...current,
-        checkout: {
-          cause: 'checkout_not_ready',
-          title: 'Checkout needs one more step',
-          message: checkoutReadiness.blocker,
-          recovery: 'Your artwork and estimate are saved.',
-          retryable: false,
-        },
+        checkout: checkoutNotReadyError(checkoutReadiness.blocker),
       }));
       return;
     }
     if (!canUseCustomerCheckout) {
-      setCheckout({
-        id: 'checkout-disabled',
-        mode: 'stripe-ready',
-        status: 'blocked',
-        checkoutUrl: null,
-        quoteId: quote.id,
-        message: 'Checkout opens soon. Your design and quote stay in this session.',
-      });
+      setCheckout(checkoutUnavailable(quote.id));
       return;
     }
     setAction('checkout', true);
@@ -1268,37 +1256,38 @@ export function useStudioViewModel() {
     clearError('order');
     try {
       const result = consumeSource(
-        await api.checkout({
-          quote,
-          quoteId: quote.id,
-          sessionId: session?.id,
-          studioPassId: studioPass?.id,
-          email: email || undefined,
-          designAssetId: design?.id ?? undefined,
-          policyAccepted,
-          policyVersion,
-        })
+        await api.checkout(
+          prepareCheckoutRequest({
+            quote,
+            sessionId: session?.id,
+            studioPassId: studioPass?.id,
+            email,
+            design,
+            policyAccepted,
+            policyVersion,
+          })
+        )
       );
       setCheckout(result);
-      if (result.status === 'open' && result.checkoutUrl) {
+      const outcome = classifyCheckoutResult(result);
+      if (outcome.kind === 'redirect') {
         trackEvent('checkout_started', {
           source: 'quote',
           studio_pass: Boolean(studioPass),
         });
         setFlow('redirecting');
         setAnnouncement('Checkout ready. Redirecting to secure payment.');
-        window.location.assign(result.checkoutUrl);
+        window.location.assign(outcome.checkoutUrl);
         return;
       }
-      const inlineOrder = (result as CheckoutSession & { order?: CustomerOrderConfirmation }).order;
-      if (inlineOrder) {
-        setOrder(inlineOrder);
+      if (outcome.kind === 'inline-order') {
+        setOrder(outcome.order);
         setFlow('confirmed');
-        setAnnouncement(`Order ${inlineOrder.orderNumber} confirmed.`);
+        setAnnouncement(`Order ${outcome.order.orderNumber} confirmed.`);
         setWorkbenchMode('order');
-      } else if (result.orderId) {
+      } else if (outcome.kind === 'lookup-order') {
         try {
-          const nextOrder = consumeSource(await api.order(result.orderId));
+          const nextOrder = consumeSource(await api.order(outcome.orderId));
           setOrder(nextOrder);
           setFlow('confirmed');
           setAnnouncement(`Order ${nextOrder.orderNumber} confirmed.`);
@@ -1307,13 +1296,7 @@ export function useStudioViewModel() {
           setFlow('confirmed');
           setErrors((current) => ({
             ...current,
-            order: {
-              cause: 'details_pending',
-              title: 'Order received; details are still loading',
-              message: error instanceof Error ? error.message : 'Order details are pending.',
-              recovery: 'Retry the order lookup. Do not submit payment again.',
-              retryable: true,
-            },
+            order: orderDetailsPendingError(error),
           }));
         }
       }
