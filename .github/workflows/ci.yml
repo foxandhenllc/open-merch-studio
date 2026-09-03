@@ -31,7 +31,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - name: Use the repository npm version
+        run: npm install --global npm@10.9.2
+      - run: npm ci --no-audit
       - name: Reject browser-bundled credential variables
         run: |
           if git grep -nE 'VITE_[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|PRIVATE|ACCESS_CODE)' -- frontend .env.example; then
