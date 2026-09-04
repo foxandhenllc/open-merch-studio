@@ -102,7 +102,14 @@ read-only organization context, role policy, and two-organization fixture denial
 owner route remains unavailable in production until an issuer-aware membership repository is wired
 in after the database boundary is verified. No real sign-in, memberships, or owner writes are enabled.
 
-Next: add and verify the database boundary before draft writes. Existing operator-only behavior that
+**Membership database checkpoint implemented September 4, 2026:** separate issuer-scoped identities,
+constrained inactive-by-default memberships, a NOLOGIN read-only database role, scoped RLS, and an
+explicit-credential reader. The [database contract](../architecture/owner-membership-database.md)
+documents local/CI denial tests and the still-closed activation boundary. Legacy memberships are not
+promoted. This does not yet establish product ownership or publication isolation.
+
+Next: add product/design/collection ownership constraints, private revisions, publication snapshots,
+and audit actors before draft writes. Existing operator-only behavior that
 allows in-place publication edits, insufficient cross-organization relationship constraints, or
 fallback resurrection after unpublish must not be reused for owner administration. Per-organization
 commerce remains separately gated.

@@ -510,21 +510,56 @@ model OrderItem {
 }
 
 model Organization {
-  id            String               @id @default(uuid())
-  name          String
-  slug          String               @unique
-  status        String               @default("active")
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  members       OrganizationMember[]
-  brandProfile  BrandProfile?
-  savedDesigns  SavedDesign[]
-  savedProducts SavedProduct[]
-  collections   MerchCollection[]
-  storefronts   Storefront[]
+  id               String               @id @default(uuid())
+  name             String
+  slug             String               @unique
+  status           String               @default("active")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  members          OrganizationMember[]
+  ownerMemberships OwnerMembership[]
+  brandProfile     BrandProfile?
+  savedDesigns     SavedDesign[]
+  savedProducts    SavedProduct[]
+  collections      MerchCollection[]
+  storefronts      Storefront[]
 
+  @@unique([id, slug])
   @@index([status, createdAt])
   @@map("organizations")
+}
+
+// Legacy OrganizationMember rows are never promoted into authenticated owner grants.
+model OwnerIdentity {
+  id          String            @id @default(uuid())
+  issuer      String
+  subject     String
+  status      String            @default("disabled")
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  memberships OwnerMembership[]
+
+  @@unique([issuer, subject])
+  @@map("owner_identities")
+}
+
+model OwnerMembership {
+  id               String        @id @default(uuid())
+  identityId       String
+  organizationId   String
+  // Composite FK lets RLS scope by the route slug without recursive organization policies.
+  organizationSlug String
+  role             String        @default("viewer")
+  status           String        @default("inactive")
+  revokedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  identity         OwnerIdentity @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  organization     Organization  @relation(fields: [organizationId, organizationSlug], references: [id, slug], onDelete: Cascade)
+
+  @@unique([organizationId, identityId])
+  @@index([identityId, organizationSlug])
+  @@map("owner_memberships")
 }
 
 model OrganizationMember {

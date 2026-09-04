@@ -30,10 +30,11 @@ user or client logout instantly invalidates every already-issued JWT.
 
 ## Membership and role checks
 
-Resolve `(issuer, subject)` to a durable identity and membership. The current `OrganizationMember`
-contains only a subject string, role string, and organization ID. Add an issuer-scoped identity key,
-explicit membership status, constrained role values, and revocation metadata before using it for
-owner access. Never link memberships merely because an email matches an order or an organization.
+Resolve `(issuer, subject)` to a durable identity and membership. Legacy `OrganizationMember`
+contains only a subject string, role string, and organization ID; it remains excluded from owner
+access. Checkpoint 2a introduces separate issuer-scoped identities and constrained, revocable owner
+memberships rather than guessing a safe legacy backfill. Never link memberships merely because an
+email matches an order or an organization.
 Initial membership provisioning belongs to the protected operator workflow and a verified identity;
 invitations and owner transfers are later work with explicit acceptance and audit records.
 
@@ -167,7 +168,16 @@ require PostgreSQL), 15 script tests, frontend contracts, and the browser suite 
 The isolated Community Gear Lab rehearsal also passed with live gates disabled. These checks retain
 the existing customer workflow and read-only storefront; they do not substitute for RLS tests.
 
-The safest next implementation is checkpoint 2: local database constraints and a nonprivileged
-owner repository with RLS denial tests before draft writes. Production Auth configuration, initial
-real owner membership, and a restricted database credential need verified project/account targets
-before activation; this checkpoint does not create or enable them.
+### Checkpoint 2a — read-only membership isolation
+
+The [membership database contract](./owner-membership-database.md) adds separate issuer-scoped
+identity/membership tables, constrained roles/status/revocation, a NOLOGIN reader role, column grants,
+and acyclic RLS. The explicit-credential Prisma reader checks its connection boundary on every call
+and uses parameterized transaction-local identity/organization settings. Local PostgreSQL tests
+exercise unfiltered reads, two-organization/issuer denial, all role write denials, status/revocation,
+pool cleanup, constraints, drift rejection, and denied browser access. CI includes this dedicated gate.
+
+The safest next implementation is checkpoint 2b: product/design/collection ownership constraints,
+private revisions, publication snapshots, and audit actors before draft writes. Production Auth
+configuration, real memberships, schema application, and a restricted login still require verified
+project/account targets and an audited provisioning path. The owner router remains unwired.

@@ -35,6 +35,7 @@
     "prebuild": "npm run config:check",
     "audit:production": "node scripts/audit-production-lock.mjs",
     "test:browser": "node frontend/scripts/responsive-smoke.mjs && node frontend/scripts/policy-profile-smoke.mjs",
+    "test:owner-db": "node scripts/test-owner-database.mjs",
     "smoke:fixture": "node --import tsx backend/src/tests/fixture-smoke.test.ts",
     "smoke:live-upload": "node scripts/verify-live-upload.mjs",
     "smoke:deployed-upload": "node scripts/verify-deployed-upload-ui.mjs",

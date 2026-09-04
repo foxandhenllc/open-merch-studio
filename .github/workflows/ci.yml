@@ -53,6 +53,8 @@ jobs:
         run: DATABASE_URL= npm run smoke:fixture
       - name: Run serialized PostgreSQL recovery integration test
         run: node --import tsx --test --test-concurrency=1 backend/src/tests/database-recovery.integration.test.ts
+      - name: Verify restricted owner membership and RLS boundaries
+        run: OMS_OWNER_TEST_DATABASE_URL="$DATABASE_URL" npm run test:owner-db
       - run: npm run build
       - name: Install the browser used by responsive smoke coverage
         run: npx playwright install --with-deps chromium

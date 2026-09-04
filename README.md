@@ -101,11 +101,16 @@ npm run smoke:live-upload -- http://127.0.0.1:5001
 npm run smoke:deployed-upload -- https://your-deployment.example
 npm run build
 npm run test:browser
+npm run test:owner-db # Requires an isolated OMS_OWNER_TEST_DATABASE_URL; see the database contract.
 npm run dev:backend
 npm run dev:frontend
 ```
 
 ## API Surface
+
+Owner membership isolation and its PostgreSQL test setup are documented in the
+[owner database contract](./docs/architecture/owner-membership-database.md). Owner access remains
+closed in runtime composition; the migration does not provision a login or real memberships.
 
 - `GET /api/catalog/categories`
 - `GET /api/catalog/products`
