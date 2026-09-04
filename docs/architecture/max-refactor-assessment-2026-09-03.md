@@ -610,10 +610,31 @@ Completed September 4, 2026:
 - Documented why the cache is deliberately short-lived: it prevents duplicate provider calls during
   one quote lifecycle without turning a current-price estimate into a durable catalog fact.
 
-The pricing module is 91 lines and `printful.service.ts` moved from 605 to 507 lines. The remaining
+The pricing module is 88 lines and `printful.service.ts` moved from 605 to 525 lines. The remaining
 facade implementation is catalog synchronization; extracting it will leave `printful.service.ts` as
 a compatibility index over the client, pricing, catalog, mockup, and order domains.
 
 This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
 skips), both frontend contracts, the explicit fixture smoke, production build/static-route
 verification, and the complete 11-viewport browser suite.
+
+## Printful catalog synchronization checkpoint
+
+Completed September 4, 2026:
+
+- Added `printful-catalog-sync.service.ts` for paginated provider catalog reads, deliberate launch
+  curation, product/variant/placement persistence, price snapshots, fixture seeding, and sync-run
+  success/failure bookkeeping.
+- Reduced `printful.service.ts` to a documented compatibility facade. Existing consumers keep the
+  historical import path, while new domain code can import a focused Printful service directly.
+- Preserved the important curation boundary: a provider sync cannot silently make the full Printful
+  catalog sellable, and fixture sync remains explicit rather than masquerading as a live provider.
+
+The catalog synchronization module is 500 lines and the stable facade is 31 lines. No maintained
+Printful source file exceeds 500 lines after this stage. The provider split is complete enough to
+stop; further fragmentation would separate tightly coupled database mutations without reducing a
+real responsibility. The next high-leverage target returns to the 1,570-line studio view model.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, the explicit fixture smoke, the production dependency audit,
+production build/static-route verification, and the complete 11-viewport browser suite.
