@@ -1391,6 +1391,32 @@ async function exerciseGuestCartJourney(browser) {
   }
 }
 
+async function exerciseMiniStore(browser) {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 1440, height: 900 },
+  ]) {
+    const context = await browser.newContext({ viewport });
+    await context.route('**/api/storefronts/**', (route) => route.abort('failed'));
+    const page = await context.newPage();
+    try {
+      await page.goto(`${origin}/stores/fox-and-hen/one-clear-system`, {
+        waitUntil: 'networkidle',
+      });
+      await page.getByRole('heading', { name: 'One Clear System', level: 1 }).waitFor();
+      await page.getByText('Web + Workflow Studio', { exact: true }).waitFor();
+      assert.equal(await page.locator('.mini-store__products article').count(), 5);
+      const brokenImages = await page.locator('.mini-store img').evaluateAll((images) =>
+        images.filter((image) => !image.complete || image.naturalWidth === 0).map((image) => image.src)
+      );
+      assert.deepEqual(brokenImages, [], 'published mini-store artwork must load without broken images');
+      await assertNoHorizontalOverflow(page, `${viewport.width}x${viewport.height} mini-store`);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 try {
   await waitForServer();
   const browser = await chromium.launch({ headless: true });
@@ -1421,6 +1447,7 @@ try {
     await exerciseLegacyRecoveryExpiry(browser);
     await exerciseUploadedArtworkAndReferences(browser);
     await exerciseGuestCartJourney(browser);
+    await exerciseMiniStore(browser);
     await exercisePolicyPages(browser);
     process.stdout.write(
       'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, and the recoverable fixture checkout flow.\n'

@@ -18,6 +18,8 @@ Open Merch Studio is the public project name. The code, docs, and environment te
 - Accepts PNG, JPEG, and WebP artwork for direct non-generative use, keeps originals private, prepares normalized print PNG derivatives, and records dimensions, provenance, rights confirmation, and retention metadata.
 - Accepts up to five private reference images for new bespoke artwork, and supports true image-based revisions while retaining the prior draft.
 - Lets customers assign different artwork to supported print areas, including separate front and back files on the launch tee and tote, with placement cost shown in the quote.
+- Supports bounded item quantities and a reload-safe guest cart with multiple configured products,
+  then itemizes those products in hosted Stripe Checkout.
 - Creates fixture design drafts by default, with a guarded OpenAI image-generation adapter, prompt moderation, and print-ready prompt shaping available only when live generation is explicitly enabled.
 - Runs basic print-readiness checks before quoting.
 - Produces transparent cost-plus quotes with product cost, design allocation, margin, shipping estimate, payment fee estimate, and total.
@@ -25,6 +27,8 @@ Open Merch Studio is the public project name. The code, docs, and environment te
 - Uses guarded, idempotent Stripe Checkout and webhooks for live payment. Paid orders enter a durable review queue and create draft-only Printful orders with duplicate-recovery safeguards; production confirmation remains a manual operator decision.
 - Stores a normalized catalog and launch data model for categories, products, variants, placements, mockups, sessions, Studio Passes, AI spend events, quotes, orders, payment events, fulfillment attempts, settings, and audit logs.
 - Supports fixture-backed local development when Printful, Stripe, and OpenAI credentials are not configured.
+- Provides an operator-protected saved-product and themed-collection foundation plus read-only hosted
+  mini-stores; owner sign-in and per-organization commerce remain future gates.
 
 ## Launch Catalog
 
@@ -32,7 +36,7 @@ The live curated catalog currently contains five focused products: a Bella + Can
 
 ## Example Collection
 
-The [Fox & Hen “One Clear System” collection](https://openmerchstudio.com/examples/fox-and-hen) demonstrates the current product surface with five coordinated pieces. It uses the approved horizontal, stacked, ampersand, and circular Fox & Hen marks from the live business site, plus production-sized print files, a mug wrap, and separate front/back artwork for the tee and tote. Suggested retail on that page is planning guidance until the companion storefront is published.
+The [Fox & Hen “One Clear System” collection](https://openmerchstudio.com/examples/fox-and-hen) demonstrates the current product surface with five coordinated pieces. Its companion [read-only mini-store](https://openmerchstudio.com/stores/fox-and-hen/one-clear-system) demonstrates the themed storefront presentation without inheriting commerce settings. Both use approved Fox & Hen marks, production-sized print files, and separate front/back artwork for the tee and tote.
 
 ## Stack
 
@@ -82,6 +86,7 @@ npm run dev:frontend
 - `GET /api/catalog/products`
 - `GET /api/catalog/products/:slug`
 - `POST /api/catalog/quotes`
+- `GET /api/storefronts/:organizationSlug/:storefrontSlug`
 - `POST /api/design/sessions`
 - `POST /api/design/ideas`
 - `POST /api/design/drafts`
@@ -107,12 +112,16 @@ npm run dev:frontend
 - `POST /api/admin/orders/:orderId/review`
 - `GET /api/admin/report`
 - `GET /api/admin/launch-readiness`
+- `POST /api/admin/storefronts/bootstrap`
+- `POST /api/admin/saved-products`
+- `POST /api/admin/storefronts/publish`
 
 ## Commerce Runbook
 
 - Public launch tickets: [docs/tickets/launch/README.md](./docs/tickets/launch/README.md)
 - Checkout and order flow: [docs/architecture/paid-beta-flow.md](./docs/architecture/paid-beta-flow.md)
 - Operations runbook: [docs/launch/paid-beta-runbook.md](./docs/launch/paid-beta-runbook.md)
+- Mini-store operator runbook: [docs/launch/mini-store-operator-runbook.md](./docs/launch/mini-store-operator-runbook.md)
 - Audit template: [docs/launch/launch-audit-template.md](./docs/launch/launch-audit-template.md)
 - Domain cutover: [docs/launch/domain-cutover-openmerchstudio-com.md](./docs/launch/domain-cutover-openmerchstudio-com.md)
 - Supervised live-commerce evidence: [docs/launch/audits/2026-07-17-supervised-live-commerce-smoke.md](./docs/launch/audits/2026-07-17-supervised-live-commerce-smoke.md)
@@ -125,6 +134,7 @@ npm run dev:frontend
 - Staged Max Refactor assessment: [docs/architecture/max-refactor-assessment-2026-09-03.md](./docs/architecture/max-refactor-assessment-2026-09-03.md)
 - Cart, reorder, reusable distribution, plugin, and service roadmap: [docs/roadmap/open-source-commerce-next.md](./docs/roadmap/open-source-commerce-next.md)
 - Themed saved products and embeddable mini-stores: [docs/roadmap/themed-mini-stores.md](./docs/roadmap/themed-mini-stores.md)
+- Themed storefront ownership and publication boundary: [docs/architecture/themed-storefront-boundary.md](./docs/architecture/themed-storefront-boundary.md)
 
 ## Printful References
 

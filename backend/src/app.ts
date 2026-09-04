@@ -8,6 +8,7 @@ import catalogRoutes from './routes/catalog.routes.js';
 import designRoutes from './routes/design.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import commerceRoutes from './routes/commerce.routes.js';
+import storefrontRoutes from './routes/storefront.routes.js';
 import { getCatalogHealth } from './controllers/catalog.controller.js';
 import { postStripeWebhook } from './controllers/commerce.controller.js';
 import { postPrintfulWebhook } from './controllers/printful-webhook.controller.js';
@@ -58,6 +59,7 @@ export function createApp() {
   app.get('/api/health', getCatalogHealth);
   app.use('/api/catalog', catalogRoutes);
   app.use('/api/design', designRoutes);
+  app.use('/api/storefronts', storefrontRoutes);
   app.use('/api', commerceRoutes);
   app.use('/api/admin', adminRoutes);
 

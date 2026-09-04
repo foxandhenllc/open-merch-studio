@@ -73,6 +73,14 @@
     {
       "source": "/examples/fox-and-hen",
       "destination": "/examples/fox-and-hen/index.html"
+    },
+    {
+      "source": "/stores/fox-and-hen/one-clear-system",
+      "destination": "/stores/fox-and-hen/one-clear-system/index.html"
+    },
+    {
+      "source": "/stores/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

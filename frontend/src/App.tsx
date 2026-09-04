@@ -3,6 +3,7 @@ import { OpenSourceAttribution } from './components/OpenSourceAttribution';
 import { FoxHenCollectionPage } from './components/FoxHenCollectionPage';
 import { publicConfig } from './config';
 import { WorkbenchStudioApp } from './WorkbenchStudioApp';
+import { MiniStorePage } from './components/MiniStorePage';
 
 const path = () => window.location.pathname.replace(/\/+$/, '') || '/';
 const section = (heading: string, body: string) => ({ heading, body });
@@ -269,6 +270,10 @@ function NotFoundPage() {
 
 export default function App() {
   const currentPath = path();
+  const storeMatch = currentPath.match(/^\/stores\/([^/]+)\/([^/]+)$/);
+  if (storeMatch) {
+    return <MiniStorePage organizationSlug={storeMatch[1]} storefrontSlug={storeMatch[2]} />;
+  }
   const route = policies[currentPath];
   if (route) return <PolicyPage route={route} />;
   if (currentPath === '/examples/fox-and-hen') return <FoxHenCollectionPage />;

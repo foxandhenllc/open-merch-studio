@@ -521,3 +521,31 @@ Completed September 3, 2026:
 
 This checkpoint passed lint, typecheck, 88 backend tests (85 passed and three database-only skips),
 both frontend contracts, production build/static-route verification, and the complete browser suite.
+
+## Themed mini-store foundation checkpoint
+
+Completed September 3, 2026:
+
+- Added organization and future verified-member ownership, brand profiles, reusable saved designs,
+  immutable design versions, saved product configurations, ordered collections, and storefront
+  publication state to Prisma with a committed migration.
+- Enabled RLS without public Data API policies for all nine new tables. Protected mutations remain
+  behind the existing admin boundary until verified owner authentication is implemented.
+- Added protected bootstrap, quote-to-product, and publication operations. Saving resolves the
+  durable quote and artwork again, creates an immutable provenance version, and requires policy-pass,
+  print-ready artwork. Publishing fails closed on catalog, variant, product, or artwork drift.
+- Added a customer-safe public DTO that omits private artwork IDs, quote IDs, storage paths, and
+  provider payloads, plus a read-only responsive hosted route.
+- Published the owned Fox & Hen fixture/reference route at
+  `/stores/fox-and-hen/one-clear-system`, using five existing verified mockup assets and the required
+  “Web + Workflow Studio” descriptor.
+- Added canonical/social metadata, sitemap coverage, dynamic-store routing, slug/path contracts, and
+  phone/desktop browser assertions for product count, image loading, and horizontal overflow.
+
+This is a read-only mini-store milestone, not per-organization commerce. Database migration,
+operator-created production records, authenticated owner administration, Printful drift
+reconciliation, and an organization-specific launch review remain explicit gates.
+
+This checkpoint passed lint, typecheck, 90 backend tests (87 passed and three database-only skips),
+both frontend contracts, production build/static-route verification for eight canonical routes, and
+the complete browser suite including phone and desktop mini-store QA.

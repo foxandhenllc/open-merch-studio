@@ -1,6 +1,7 @@
 # Themed Products and Mini-Stores
 
-**Status:** Next product phase; deliberately not included in the upload launch
+**Status:** Durable foundation and read-only preview completed September 3, 2026; owner UI and
+per-store commerce remain gated
 
 **Examples:** FanHarmon/Harmontown collections, RCR collections, and creator- or client-specific storefronts
 
@@ -14,12 +15,18 @@ The important shift is from a temporary guest session to durable, owner-controll
 
 ## First Useful Release
 
-1. Owner authentication and organization/workspace membership.
-2. **Save product** from the review screen, preserving artwork version, Printful product/variant, placement, mockup, pricing inputs, and rights/provenance.
-3. A product library with draft, active, archived, and needs-review states.
-4. Collections with title, slug, description, hero art, brand tokens, product ordering, and visibility.
-5. A hosted route such as `/stores/fanharmon/harmontown` plus a safe embed/link option for `fanharmon.com` or an RCR property.
-6. Printful synchronization that detects retired variants, price drift, mockup drift, and disconnected store products before publication.
+1. Organization/workspace membership schema is complete. Interactive owner authentication is not;
+   protected writes currently use the existing operator-admin boundary.
+2. **Save product** from a durable quote through the protected API, preserving Printful
+   product/variant, placements, mockup, pricing configuration, artwork provenance, and readiness.
+3. Product draft/active state and collection ordering are complete at the data/service layer. The
+   owner library UI remains.
+4. Collections, brand profiles, publication state, and storefront slugs are complete at the
+   data/service layer.
+5. Hosted read-only routes are complete, with `/stores/fox-and-hen/one-clear-system` as the owned
+   fixture/reference implementation. Dynamic stores require records in PostgreSQL.
+6. Printful synchronization and drift detection remain before a saved product can promise
+   unattended commerce.
 
 ## Data Boundaries
 
@@ -34,9 +41,10 @@ Artwork and products must belong to exactly one organization by default. Sharing
 
 ## Recommended Sequence
 
-1. Saved designs/products for one owner, with no public storefront.
-2. Themed collections and internal preview URLs.
-3. Hosted read-only mini-store previews, isolated from the existing public OMS checkout configuration.
+1. Saved products for one operator-managed owner, with no public storefront. **Service complete.**
+2. Themed collections and internal preview URLs. **Service complete.**
+3. Hosted read-only mini-store previews, isolated from the existing public OMS checkout
+   configuration. **Complete for the Fox & Hen reference store.**
 4. Domain/embed support and per-store analytics.
 5. Per-organization commerce, legal, tax, support, and Printful-store configuration only after each owner passes its own launch review. The existing Fox & Hen-operated checkout does not automatically authorize commerce for FanHarmon, RCR, or another client organization.
 

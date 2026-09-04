@@ -19,6 +19,15 @@ export const STATIC_ROUTES = [
     socialImageAlt: 'Fox & Hen collection printed five ways with Open Merch Studio',
   },
   {
+    path: '/stores/fox-and-hen/one-clear-system',
+    output: 'stores/fox-and-hen/one-clear-system/index.html',
+    title: 'One Clear System | Fox & Hen Mini-Store',
+    description:
+      'Explore the Fox & Hen One Clear System collection in an Open Merch Studio themed mini-store.',
+    socialImage: '/examples/fox-and-hen/collection-share.png',
+    socialImageAlt: 'Fox & Hen One Clear System merchandise collection',
+  },
+  {
     path: '/privacy',
     output: 'privacy/index.html',
     title: 'Privacy Policy | Open Merch Studio',

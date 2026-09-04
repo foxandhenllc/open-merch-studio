@@ -27,6 +27,8 @@ import {
 } from './local-fixtures';
 import { publicConfig } from '../config';
 import { ApiError } from './api-error';
+import type { PublicStorefront } from '../types/storefront';
+import { localStorefront } from './local-storefront';
 
 export { ApiError } from './api-error';
 
@@ -85,6 +87,17 @@ async function withFallback<T>(
 }
 
 export const api = {
+  storefront: (organizationSlug: string, storefrontSlug: string) =>
+    withFallback(
+      request<PublicStorefront>(
+        `/api/storefronts/${encodeURIComponent(organizationSlug)}/${encodeURIComponent(storefrontSlug)}`
+      ),
+      () => {
+        const storefront = localStorefront(organizationSlug, storefrontSlug);
+        if (!storefront) throw new Error('Storefront not found.');
+        return storefront;
+      }
+    ),
   capabilities: () =>
     withFallback(
       request<{ capabilities: StudioCapabilities }>('/api/health').then(
