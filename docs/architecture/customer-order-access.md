@@ -12,7 +12,8 @@ not authorization.
    credential. Fixture checkout may issue the same credential immediately because no real payment
    exists and its checkout result is already final.
 4. The browser stores the credential locally and sends it only as an `Authorization: Bearer` header
-   to `GET /api/orders/:orderId`. It is not placed in a query string or application log.
+   to the customer order and reorder-draft routes. It is not placed in a query string or
+   application log.
 5. OMS stores only the SHA-256 digest. Issuing a replacement revokes the prior grant, and an operator
    can revoke the current grant through the protected admin API.
 
@@ -29,9 +30,11 @@ order-identifier oracle.
 - The order response remains the reduced customer-safe DTO. Authorization does not expose internal
   order IDs, provider references, addresses, email addresses, or raw payloads.
 - Database RLS is enabled for `order_access_grants`, with no browser-role grants or policies.
-- “Buy again” may use this boundary to load immutable prior items, but it must create a new editable
-  cart, validate current catalog and artwork access, and request a new quote. It must not replay a
-  prior quote or initiate checkout automatically.
+- “Buy again” uses this boundary to load immutable prior choices through
+  `POST /api/orders/:orderId/reorder-draft`. The server validates the current catalog and retained
+  print-ready artwork before the browser creates a new editable cart and requests a new quote. It
+  never returns the prior price, recipient, payment, policy acceptance, or fulfillment state and
+  never initiates checkout automatically.
 
 ## Operator recovery
 

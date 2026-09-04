@@ -28,6 +28,7 @@ import {
   quoteAnnouncement,
 } from '../src/studio-quote.ts';
 import {
+  createReorderCartItems,
   createStudioCartItem,
   prepareCartQuoteRequest,
   studioCartUnitCount,
@@ -375,6 +376,30 @@ assert.deepEqual(
   [updatedCartItem.line],
   'cart quotes must reuse the immutable configured line rather than reconstructing artwork'
 );
+const reorderedCart = createReorderCartItems({
+  sourceOrderNumber: 'OMS-1001',
+  items: [
+    {
+      productId: tee.id,
+      variantId: tee.variants[0]!.id,
+      productTitle: tee.title,
+      variantName: tee.variants[0]!.name,
+      quantity: 2,
+      placementCodes: ['front', 'back'],
+      placements: [
+        { code: 'front', designAssetId: front.id ?? undefined },
+        { code: 'back', designAssetId: back.id ?? undefined },
+      ],
+      designAssetId: front.id!,
+    },
+  ],
+});
+assert.equal(reorderedCart.length, 1);
+assert.deepEqual(reorderedCart[0]?.line.placements, [
+  { code: 'front', designAssetId: front.id },
+  { code: 'back', designAssetId: back.id },
+]);
+assert.equal(reorderedCart[0]?.line.quantity, 2);
 assert.equal(
   quoteAnnouncement({ currency: 'USD', totalCents: 2855 } as QuoteBreakdown, true),
   'Price estimate ready: $28.55.'

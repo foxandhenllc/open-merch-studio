@@ -1386,6 +1386,23 @@ async function exerciseGuestCartJourney(browser) {
     assert.match(orderItemDetails[0] ?? '', /Qty 2$/);
     assert.match(orderItemDetails[1] ?? '', /Qty 3$/);
     await page.getByLabel('0 items').waitFor();
+
+    const reorderQuoteRequest = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === '/api/catalog/quotes' &&
+        request.postDataJSON()?.items?.length === 2
+    );
+    await page.getByRole('button', { name: 'Buy again', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your cart' }).waitFor();
+    const reorderQuote = (await reorderQuoteRequest).postDataJSON();
+    assert.deepEqual(
+      reorderQuote.items.map((item) => item.quantity),
+      [2, 3],
+      'Buy again should create a fresh quote from the prior product choices'
+    );
+    await page.getByLabel('5 items').waitFor();
+    assert.equal(await page.locator('.cart-line').count(), 2);
+    await assertNoHorizontalOverflow(page, '390x844 buy again cart');
   } finally {
     await context.close();
   }
@@ -1450,7 +1467,7 @@ try {
     await exerciseMiniStore(browser);
     await exercisePolicyPages(browser);
     process.stdout.write(
-      'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, and the recoverable fixture checkout flow.\n'
+      'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, recoverable fixture checkout, and Buy again cart reconstruction.\n'
     );
   } finally {
     await browser.close();

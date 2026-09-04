@@ -3,6 +3,7 @@ import type {
   CatalogProduct,
   CheckoutSession,
   CustomerOrderConfirmation,
+  CustomerReorderDraft,
   DesignDraft,
   DesignIdea,
   DesignMockup,
@@ -734,7 +735,33 @@ export function createLocalCheckout(quote: QuoteBreakdown, email?: string): Chec
     quoteId: quote.id,
     studioPassId: localPass?.id,
     orderId: localOrder.id,
+    orderAccess: { orderId: localOrder.id, token: `oma_${'f'.repeat(43)}` },
     message: 'Fixture checkout completed. No real charge was created.',
+  };
+}
+
+export function getLocalCustomerReorderDraft(): CustomerReorderDraft | null {
+  if (!localOrder?.quote?.items.length) return null;
+  return {
+    sourceOrderNumber: localOrder.orderNumber,
+    items: localOrder.quote.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      productTitle: item.title,
+      variantName: item.variantName,
+      quantity: item.quantity,
+      placementCodes: item.placementCodes,
+      placements: item.placements.map((placement) => ({
+        code: placement.code,
+        designAssetId: placement.designAssetId ?? item.designAssetId,
+        layout: placement.layout,
+      })),
+      orientation: item.orientation,
+      designAssetId:
+        item.designAssetId ??
+        item.placements.find((placement) => placement.designAssetId)?.designAssetId ??
+        '',
+    })),
   };
 }
 

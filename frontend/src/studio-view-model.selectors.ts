@@ -27,6 +27,7 @@ export const emptyBusy: Record<ActionKey, boolean> = {
   quoting: false,
   pass: false,
   checkout: false,
+  reorder: false,
 };
 
 export function mapStudioError(error: unknown, surface: Surface): SurfaceError {
@@ -34,6 +35,14 @@ export function mapStudioError(error: unknown, surface: Surface): SurfaceError {
   const status = error instanceof ApiError ? error.status : 0;
   const code = error instanceof ApiError ? error.code : undefined;
   const normalized = `${code || ''} ${message}`.toLowerCase();
+  if (code === 'reorder_unavailable')
+    return {
+      cause: 'reorder_unavailable',
+      title: 'This order cannot be repeated as-is',
+      message,
+      recovery: 'Choose a current product in the studio or contact support about the original.',
+      retryable: false,
+    };
   if (code === 'revision_allowance_required')
     return {
       cause: 'revision_allowance_required',

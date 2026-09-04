@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { parseCheckoutHandoff, removeCheckoutHandoffParams } from '../checkout-return';
 import { api } from '../services/api';
-import type { CheckoutConfirmation, CustomerOrderConfirmation } from '../types/catalog';
+import type {
+  CheckoutConfirmation,
+  CustomerOrderAccess,
+  CustomerOrderConfirmation,
+} from '../types/catalog';
 import { trackEvent } from '../utils/analytics';
 import { saveCustomerOrderAccess } from '../order-access';
 
@@ -27,7 +31,7 @@ const savePendingCheckoutSession = (sessionId: string | null) => {
 
 type UseCheckoutReturnOptions = {
   studioReady: boolean;
-  onConfirmedOrder: (order: CustomerOrderConfirmation) => void;
+  onConfirmedOrder: (order: CustomerOrderConfirmation, access?: CustomerOrderAccess) => void;
 };
 
 export function useCheckoutReturn({ studioReady, onConfirmedOrder }: UseCheckoutReturnOptions) {
@@ -85,7 +89,9 @@ export function useCheckoutReturn({ studioReady, onConfirmedOrder }: UseCheckout
             if (nextConfirmation.state !== 'processing') {
               savePendingCheckoutSession(null);
               saveCustomerOrderAccess(nextConfirmation.orderAccess);
-              if (nextConfirmation.order) onConfirmedOrder(nextConfirmation.order);
+              if (nextConfirmation.order) {
+                onConfirmedOrder(nextConfirmation.order, nextConfirmation.orderAccess);
+              }
               trackEvent('checkout_returned', {
                 result: nextConfirmation.state === 'failed' ? 'unknown' : 'success',
                 mode: 'live',

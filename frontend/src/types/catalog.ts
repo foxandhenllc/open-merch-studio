@@ -233,6 +233,21 @@ export type CustomerOrderAccess = {
   token: string;
 };
 
+export type CustomerReorderDraft = {
+  sourceOrderNumber: string;
+  items: Array<{
+    productId: string;
+    variantId: string;
+    productTitle: string;
+    variantName: string;
+    quantity: number;
+    placementCodes: string[];
+    placements: PlacementSelection[];
+    orientation?: 'portrait' | 'landscape' | 'square';
+    designAssetId: string;
+  }>;
+};
+
 export type OrderSummary = {
   id: string;
   orderNumber: string;

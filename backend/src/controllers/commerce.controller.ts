@@ -25,11 +25,21 @@ import {
   customerOrderAccessIsValid,
   issueCustomerOrderAccess,
 } from '../services/customer-order-access.service.js';
+import { createCustomerReorderDraft } from '../services/customer-reorder.service.js';
 
 const bearerToken = (req: Request): string | undefined => {
   const authorization = req.header('authorization') ?? '';
   const match = authorization.match(/^Bearer\s+(\S+)$/i);
   return match?.[1];
+};
+
+const authorizedCustomerOrderId = async (req: Request): Promise<string> => {
+  const orderId = String(req.params.orderId ?? '');
+  if (!(await customerOrderAccessIsValid(orderId, bearerToken(req)))) {
+    // Keep missing and unauthorized orders indistinguishable to avoid an identifier oracle.
+    throw new HttpError('Order not found.', 404);
+  }
+  return orderId;
 };
 
 export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Response) => {
@@ -80,10 +90,7 @@ export const postFixtureFulfillment = asyncHandler(async (req: Request, res: Res
 });
 
 export const getOrder = asyncHandler(async (req: Request, res: Response) => {
-  const orderId = String(req.params.orderId ?? '');
-  const authorized = await customerOrderAccessIsValid(orderId, bearerToken(req));
-  const order = authorized ? await getOrderSummary(orderId) : undefined;
-  // Use one response for missing and unauthorized orders so the route is not an identifier oracle.
+  const order = await getOrderSummary(await authorizedCustomerOrderId(req));
   if (!order) {
     throw new HttpError('Order not found.', 404);
   }
@@ -91,6 +98,18 @@ export const getOrder = asyncHandler(async (req: Request, res: Response) => {
     success: true,
     data: toCustomerOrderConfirmation(order, env.supportEmail),
   });
+});
+
+export const postOrderReorderDraft = asyncHandler(async (req: Request, res: Response) => {
+  const orderId = await authorizedCustomerOrderId(req);
+  const draft = await createCustomerReorderDraft(orderId);
+  if (!draft) throw new HttpError('Order not found.', 404);
+  logOperationalEvent('info', 'customer_reorder_draft_created', {
+    orderId,
+    requestId: String(res.locals.requestId ?? ''),
+    outcome: `${draft.items.length}_lines`,
+  });
+  res.json({ success: true, data: draft });
 });
 
 export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response) => {

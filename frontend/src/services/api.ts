@@ -5,6 +5,7 @@ import type {
   CheckoutSession,
   CheckoutConfirmation,
   CustomerOrderConfirmation,
+  CustomerReorderDraft,
   DesignDraft,
   DesignIdea,
   DesignMockup,
@@ -22,6 +23,7 @@ import {
   createLocalSession,
   createLocalStudioPass,
   getLocalCustomerOrder,
+  getLocalCustomerReorderDraft,
   localCategories,
   localProductsForCategory,
 } from './local-fixtures';
@@ -387,6 +389,18 @@ export const api = {
         const order = getLocalCustomerOrder(publicConfig.supportEmail);
         if (!order) throw new Error('Order details are still pending.');
         return order;
+      }
+    ),
+  reorderDraft: (orderId: string, accessToken: string) =>
+    withFallback(
+      request<CustomerReorderDraft>(`/api/orders/${encodeURIComponent(orderId)}/reorder-draft`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }),
+      () => {
+        const draft = getLocalCustomerReorderDraft();
+        if (!draft) throw new Error('This order cannot be added to a new cart.');
+        return draft;
       }
     ),
 };

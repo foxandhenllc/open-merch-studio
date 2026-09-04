@@ -259,6 +259,10 @@ test('public commerce endpoints return only customer-safe confirmations', async 
     const orderPath = `/api/orders/${order.id}`;
     const unauthorized = await fetch(`http://127.0.0.1:${port}${orderPath}`);
     assert.equal(unauthorized.status, 404);
+    const unauthorizedReorder = await fetch(`http://127.0.0.1:${port}${orderPath}/reorder-draft`, {
+      method: 'POST',
+    });
+    assert.equal(unauthorizedReorder.status, 404);
 
     const initialAccess = await issueCustomerOrderAccess(order.id);
     const authorized = await fetch(`http://127.0.0.1:${port}${orderPath}`, {

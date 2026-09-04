@@ -84,8 +84,8 @@ is:
 1. Observe one supervised real order and shipment lifecycle, including each customer email.
 2. Add scheduled reconciliation for missed events and shipment-item allocation.
 3. **Completed September 4, 2026:** replace the public order lookup boundary with a rotating,
-   revocable opaque credential. A customer-facing revisit link and “Buy again” UI remain separate
-   follow-up work.
+   revocable opaque credential and use it for a safe **Buy again** cart reconstruction. A durable
+   customer-facing revisit link remains separate follow-up work.
 
 Official references:
 

@@ -1610,6 +1610,31 @@ input:focus {
   font-size: 11px;
   font-weight: 750;
 }
+.order-repeat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.order-repeat > div {
+  display: grid;
+  gap: 4px;
+}
+.order-repeat strong {
+  font-size: 12px;
+}
+.order-repeat p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
 .order-support-copy {
   margin: 18px 0 0;
   font-size: 11px;
@@ -1618,6 +1643,16 @@ input:focus {
 .order-support-copy a {
   color: var(--accent);
   font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .order-repeat {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .order-repeat .button {
+    width: 100%;
+  }
 }
 
 .site-footer {

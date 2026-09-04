@@ -95,6 +95,10 @@ export function useGuestCart({ sessionId, studioPassId, onSource }: GuestCartOpt
     );
   }, []);
 
+  const replace = useCallback((nextItems: StudioCartItem[]) => {
+    setItems(nextItems.slice(0, MAX_STUDIO_CART_LINES));
+  }, []);
+
   const remove = useCallback((id: string) => {
     setItems((current) => current.filter((item) => item.id !== id));
   }, []);
@@ -125,6 +129,7 @@ export function useGuestCart({ sessionId, studioPassId, onSource }: GuestCartOpt
     quoting,
     error,
     add,
+    replace,
     remove,
     updateQuantity,
     refreshQuote,

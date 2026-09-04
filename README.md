@@ -104,6 +104,7 @@ npm run dev:frontend
 - `POST /api/stripe/webhook`
 - `POST /api/printful/webhook`
 - `GET /api/orders/:orderId` (customer order-access bearer required)
+- `POST /api/orders/:orderId/reorder-draft` (customer order-access bearer required)
 - `POST /api/admin/catalog/sync`
 - `GET /api/admin/settings`
 - `GET /api/admin/orders`

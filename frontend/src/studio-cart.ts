@@ -1,6 +1,7 @@
 import type {
   CatalogProduct,
   CatalogVariant,
+  CustomerReorderDraft,
   DesignDraft,
   PlacementLayout,
   QuoteBreakdown,
@@ -21,6 +22,26 @@ export type StudioCartItem = {
   variantName: string;
   line: StudioQuoteItemInput;
 };
+
+/** Assigns browser-local identity while preserving only the server-approved reusable choices. */
+export function createReorderCartItems(draft: CustomerReorderDraft): StudioCartItem[] {
+  const addedAt = new Date().toISOString();
+  return draft.items.map((item) => ({
+    id: crypto.randomUUID(),
+    addedAt,
+    productTitle: item.productTitle,
+    variantName: item.variantName,
+    line: {
+      productId: item.productId,
+      variantId: item.variantId,
+      quantity: item.quantity,
+      placementCodes: item.placementCodes,
+      placements: item.placements,
+      orientation: item.orientation,
+      designAssetId: item.designAssetId,
+    },
+  }));
+}
 
 /** Captures an immutable, provider-ready line without retaining a stale quote total. */
 export function createStudioCartItem(params: {

@@ -12,6 +12,7 @@ import { mapStudioError } from '../studio-view-model.selectors';
 import { api, type Sourced } from '../services/api';
 import type {
   CheckoutSession,
+  CustomerOrderAccess,
   CustomerOrderConfirmation,
   DesignDraft,
   QuoteBreakdown,
@@ -20,6 +21,7 @@ import type {
 } from '../types/catalog';
 import { trackEvent } from '../utils/analytics';
 import { saveCustomerOrderAccess } from '../order-access';
+import { createReorderCartItems, type StudioCartItem } from '../studio-cart';
 
 const PENDING_CART_CHECKOUT_KEY = 'open-merch-studio:pending-cart-checkout:v1';
 
@@ -41,6 +43,7 @@ type UseStudioCheckoutOptions = {
   cartReadiness: CheckoutReadiness;
   onStudioPassChange: (studioPass: StudioPass) => void;
   onCartClear: () => void;
+  onCartReplace: (items: StudioCartItem[]) => void;
   onSource: <T>(result: Sourced<T>) => T;
   onFlowChange: (flow: FlowState) => void;
   onModeChange: (mode: WorkbenchMode) => void;
@@ -64,6 +67,7 @@ export function useStudioCheckout({
   cartReadiness,
   onStudioPassChange,
   onCartClear,
+  onCartReplace,
   onSource,
   onFlowChange,
   onModeChange,
@@ -72,8 +76,10 @@ export function useStudioCheckout({
   const [source, setSource] = useState<CheckoutSource>('design');
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [order, setOrder] = useState<CustomerOrderConfirmation | null>(null);
+  const [orderAccess, setOrderAccess] = useState<CustomerOrderAccess | null>(null);
   const [passBusy, setPassBusy] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [reorderBusy, setReorderBusy] = useState(false);
   const [errors, setErrors] = useState<{
     checkout?: SurfaceError;
     order?: SurfaceError;
@@ -87,6 +93,7 @@ export function useStudioCheckout({
   const clearResults = useCallback(() => {
     setCheckout(null);
     setOrder(null);
+    setOrderAccess(null);
   }, []);
 
   const buyStudioPass = async () => {
@@ -176,6 +183,7 @@ export function useStudioCheckout({
       );
       setCheckout(result);
       saveCustomerOrderAccess(result.orderAccess);
+      setOrderAccess(result.orderAccess ?? null);
       const outcome = classifyCheckoutResult(result);
       if (outcome.kind === 'redirect') {
         trackEvent('checkout_started', {
@@ -220,13 +228,39 @@ export function useStudioCheckout({
     }
   };
 
+  const buyAgain = async () => {
+    if (!orderAccess) {
+      setErrors((current) => ({
+        ...current,
+        order: orderDetailsPendingError(
+          new Error('Secure order access is unavailable in this browser.')
+        ),
+      }));
+      return;
+    }
+    setReorderBusy(true);
+    clearError('order');
+    try {
+      const draft = onSource(await api.reorderDraft(orderAccess.orderId, orderAccess.token));
+      onCartReplace(createReorderCartItems(draft));
+      onFlowChange('configuring');
+      onModeChange('cart');
+      onAnnouncement(`A fresh cart was created from ${draft.sourceOrderNumber}.`);
+    } catch (error) {
+      setErrors((current) => ({ ...current, order: mapStudioError(error, 'order') }));
+    } finally {
+      setReorderBusy(false);
+    }
+  };
+
   const acceptConfirmedOrder = useCallback(
-    (confirmedOrder: CustomerOrderConfirmation) => {
+    (confirmedOrder: CustomerOrderConfirmation, access?: CustomerOrderAccess) => {
       if (window.sessionStorage.getItem(PENDING_CART_CHECKOUT_KEY)) {
         onCartClear();
         window.sessionStorage.removeItem(PENDING_CART_CHECKOUT_KEY);
       }
       setOrder(confirmedOrder);
+      setOrderAccess(access ?? null);
       onFlowChange('confirmed');
       onAnnouncement(`Order ${confirmedOrder.orderNumber} is ready to review.`);
       onModeChange('order');
@@ -239,13 +273,14 @@ export function useStudioCheckout({
     setSource,
     checkout,
     order,
-    busy: { pass: passBusy, checkout: checkoutBusy },
+    busy: { pass: passBusy, checkout: checkoutBusy, reorder: reorderBusy },
     errors,
     clearError,
     clearCheckout,
     clearResults,
     buyStudioPass,
     createCheckout,
+    buyAgain,
     acceptConfirmedOrder,
     clearPendingCartCheckout: () => window.sessionStorage.removeItem(PENDING_CART_CHECKOUT_KEY),
   };

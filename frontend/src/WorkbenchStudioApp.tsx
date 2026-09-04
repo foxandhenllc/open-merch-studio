@@ -448,7 +448,14 @@ export function WorkbenchStudioApp() {
               />
             )}
 
-            {vm.workbenchMode === 'order' && vm.order && <OrderTimeline order={vm.order} />}
+            {vm.workbenchMode === 'order' && vm.order && (
+              <OrderTimeline
+                order={vm.order}
+                onBuyAgain={vm.buyAgain}
+                reorderBusy={vm.busy.reorder}
+                reorderError={vm.errors.order}
+              />
+            )}
             <Footer onStartFresh={vm.startFresh} />
           </div>
         </aside>

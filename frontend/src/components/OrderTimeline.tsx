@@ -1,4 +1,6 @@
 import type { CustomerOrderConfirmation } from '@app-types/catalog';
+import type { SurfaceError } from '../studio-view-model.types';
+import { ErrorNote } from './ErrorNote';
 
 const money = (cents: number, currency: string) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
@@ -43,7 +45,17 @@ const timelineTone = (status: CustomerOrderConfirmation['status']) => {
   return 'status-pill--ok';
 };
 
-export function OrderTimeline({ order }: { order: CustomerOrderConfirmation }) {
+export function OrderTimeline({
+  order,
+  onBuyAgain,
+  reorderBusy,
+  reorderError,
+}: {
+  order: CustomerOrderConfirmation;
+  onBuyAgain: () => void;
+  reorderBusy: boolean;
+  reorderError?: SurfaceError;
+}) {
   const chrome = orderChrome(order.status);
   const shipments = order.shipments ?? [];
   return (
@@ -129,6 +141,21 @@ export function OrderTimeline({ order }: { order: CustomerOrderConfirmation }) {
           ))}
         </div>
       ) : null}
+      <div className="order-repeat">
+        <div>
+          <strong>Want another?</strong>
+          <p>Start a fresh cart with these products and artwork, then review current pricing.</p>
+        </div>
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={onBuyAgain}
+          disabled={reorderBusy}
+        >
+          {reorderBusy ? 'Preparing cart…' : 'Buy again'}
+        </button>
+      </div>
+      <ErrorNote error={reorderError} onRetry={onBuyAgain} />
       <p className="order-support-copy">
         Need help? Email <a href={`mailto:${order.support.email}`}>{order.support.email}</a> with
         your order number. Review the <a href="/returns">returns and cancellations policy</a> for

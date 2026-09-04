@@ -31,7 +31,8 @@ export type ActionKey =
   | 'mockup'
   | 'quoting'
   | 'pass'
-  | 'checkout';
+  | 'checkout'
+  | 'reorder';
 
 export type Surface =
   | 'boot'
