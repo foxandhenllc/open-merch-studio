@@ -93,7 +93,9 @@ fail closed. Runtime code must not guess a nearest version.
    Every live provider/payment/fulfillment gate is disabled; no provider credentials are inherited.
    CI repeats this command. Real merchant policy approval remains mandatory before live activation.
 6. Only then build owner authentication and editable mini-store administration on top of the
-   organization boundary.
+   organization boundary. The [owner administration architecture](./mini-store-owner-administration.md)
+   now specifies the identity adapter, membership roles, scoped repository/RLS boundary, immutable
+   publication revisions, audit records, and prerequisite corrections. Owner mutations remain disabled.
 
 ## Examples
 

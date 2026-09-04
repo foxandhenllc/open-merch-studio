@@ -4,6 +4,12 @@ This is an operator-only workflow until authenticated owner administration is im
 admin access code only in the `x-admin-access` header and never place it in a URL, repository file,
 browser screenshot, or support message.
 
+The [owner administration architecture](../architecture/mini-store-owner-administration.md) defines
+the next implementation checkpoints. Do not expose these operator endpoints to signed-in owners:
+organization-scoped authorization, database constraints, private revisions, explicit unpublish,
+and actor-bound audit records must exist first. The current built-in Fox & Hen fallback must also
+yield to durable unpublication before an owner unpublish control is offered.
+
 ## 1. Apply and verify the schema
 
 Apply `20260904003000_themed_mini_stores` through the deployment's normal Prisma migration process.
