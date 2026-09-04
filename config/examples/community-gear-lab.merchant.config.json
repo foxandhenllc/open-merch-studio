@@ -1,0 +1,51 @@
+{
+  "$schema": "../merchant.schema.json",
+  "schemaVersion": 1,
+  "brand": {
+    "displayName": "Community Gear Lab",
+    "shortName": "Gear Lab",
+    "shortDescription": "Custom gear for communities and teams",
+    "logoPath": "/icon.svg",
+    "socialImagePath": "/open-merch-studio-share.png",
+    "colors": {
+      "background": "#fff8ec",
+      "foreground": "#17221b",
+      "accent": "#b5471f"
+    }
+  },
+  "web": {
+    "canonicalUrl": "https://merch.example.org",
+    "title": "Community Gear Lab",
+    "description": "Create coordinated merchandise for your community."
+  },
+  "operator": {
+    "legalName": "Example Community Company LLC",
+    "disclosure": "Community Gear Lab is operated by Example Community Company LLC.",
+    "supportEmail": "support@example.org",
+    "countryCode": "US"
+  },
+  "orders": { "prefix": "CGL" },
+  "email": { "senderName": "Community Gear Lab", "fromLocalPart": "orders" },
+  "catalog": {
+    "currency": "USD",
+    "shippingCountryCodes": ["US"],
+    "curatedCategorySlugs": ["apparel", "bags", "drinkware"]
+  },
+  "pricing": { "marginLabel": "Store operations" },
+  "policies": {
+    "privacyPath": "/privacy",
+    "termsPath": "/terms",
+    "returnsPath": "/returns",
+    "contentPolicyPath": "/content-policy",
+    "approvedVersion": "2026-09-04",
+    "lastApprovedDate": "2026-09-04"
+  },
+  "attribution": {
+    "projectName": "Open Merch Studio",
+    "projectUrl": "https://openmerchstudio.com",
+    "sourceUrl": "https://github.com/foxandhenllc/open-merch-studio",
+    "licenseName": "MIT",
+    "creatorName": "Fox & Hen",
+    "creatorUrl": "https://foxandhenllc.com"
+  }
+}

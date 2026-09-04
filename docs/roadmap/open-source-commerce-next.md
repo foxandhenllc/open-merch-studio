@@ -62,7 +62,7 @@ contributors. Add focused architecture decision records as the cart and notifica
 This is realistic, with one important distinction: **secrets belong in `.env`; merchant identity
 does not.** A reusable store should require:
 
-- a typed, committed `merchant.config.ts` (name, domains, support contacts, currency, regions,
+- a typed, committed `config/merchant.config.json` (name, domains, support contacts, currency, regions,
   catalog allowlist, policy URLs, brand colors, and asset paths);
 - deployment-managed environment values for database and provider credentials;
 - `npm run setup` to validate prerequisites, generate Prisma, apply or print migrations, and seed the

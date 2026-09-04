@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openmerchstudio.com/schemas/merchant-config-v1.json",
+  "title": "Open Merch Studio merchant configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "brand",
+    "web",
+    "operator",
+    "orders",
+    "email",
+    "catalog",
+    "pricing",
+    "policies",
+    "attribution"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "brand": { "$ref": "#/$defs/brand" },
+    "web": { "$ref": "#/$defs/web" },
+    "operator": { "$ref": "#/$defs/operator" },
+    "orders": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefix"],
+      "properties": {
+        "prefix": { "type": "string", "pattern": "^[A-Z][A-Z0-9]{1,7}$" }
+      }
+    },
+    "email": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["senderName", "fromLocalPart"],
+      "properties": {
+        "senderName": { "$ref": "#/$defs/text" },
+        "fromLocalPart": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        }
+      }
+    },
+    "catalog": { "$ref": "#/$defs/catalog" },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["marginLabel"],
+      "properties": { "marginLabel": { "$ref": "#/$defs/text" } }
+    },
+    "policies": { "$ref": "#/$defs/policies" },
+    "attribution": { "$ref": "#/$defs/attribution" }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "path": { "type": "string", "pattern": "^/[A-Za-z0-9/_\\.-]+$" },
+    "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "emailAddress": { "type": "string", "format": "email" },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName",
+        "shortName",
+        "shortDescription",
+        "logoPath",
+        "socialImagePath",
+        "colors"
+      ],
+      "properties": {
+        "displayName": { "$ref": "#/$defs/text" },
+        "shortName": { "$ref": "#/$defs/text" },
+        "shortDescription": { "$ref": "#/$defs/text" },
+        "logoPath": { "$ref": "#/$defs/path" },
+        "socialImagePath": { "$ref": "#/$defs/path" },
+        "colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["background", "foreground", "accent"],
+          "properties": {
+            "background": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+            "foreground": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+            "accent": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+          }
+        }
+      }
+    },
+    "web": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalUrl", "title", "description"],
+      "properties": {
+        "canonicalUrl": { "$ref": "#/$defs/url" },
+        "title": { "$ref": "#/$defs/text" },
+        "description": { "$ref": "#/$defs/text" }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legalName", "disclosure", "supportEmail", "countryCode"],
+      "properties": {
+        "legalName": { "$ref": "#/$defs/text" },
+        "disclosure": { "$ref": "#/$defs/text" },
+        "supportEmail": { "$ref": "#/$defs/emailAddress" },
+        "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$" }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "shippingCountryCodes", "curatedCategorySlugs"],
+      "properties": {
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "shippingCountryCodes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
+        },
+        "curatedCategorySlugs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "privacyPath",
+        "termsPath",
+        "returnsPath",
+        "contentPolicyPath",
+        "approvedVersion",
+        "lastApprovedDate"
+      ],
+      "properties": {
+        "privacyPath": { "$ref": "#/$defs/path" },
+        "termsPath": { "$ref": "#/$defs/path" },
+        "returnsPath": { "$ref": "#/$defs/path" },
+        "contentPolicyPath": { "$ref": "#/$defs/path" },
+        "approvedVersion": { "$ref": "#/$defs/text" },
+        "lastApprovedDate": { "type": "string", "format": "date" }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectName",
+        "projectUrl",
+        "sourceUrl",
+        "licenseName",
+        "creatorName",
+        "creatorUrl"
+      ],
+      "properties": {
+        "projectName": { "$ref": "#/$defs/text" },
+        "projectUrl": { "$ref": "#/$defs/url" },
+        "sourceUrl": { "$ref": "#/$defs/url" },
+        "licenseName": { "$ref": "#/$defs/text" },
+        "creatorName": { "$ref": "#/$defs/text" },
+        "creatorUrl": { "$ref": "#/$defs/url" }
+      }
+    }
+  }
+}

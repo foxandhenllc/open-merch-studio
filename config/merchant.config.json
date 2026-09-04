@@ -1,0 +1,57 @@
+{
+  "$schema": "./merchant.schema.json",
+  "schemaVersion": 1,
+  "brand": {
+    "displayName": "Open Merch Studio",
+    "shortName": "OMS",
+    "shortDescription": "Open-source custom merch workbench",
+    "logoPath": "/icon.svg",
+    "socialImagePath": "/open-merch-studio-share.png",
+    "colors": {
+      "background": "#f5f5f2",
+      "foreground": "#171814",
+      "accent": "#3154d9"
+    }
+  },
+  "web": {
+    "canonicalUrl": "https://openmerchstudio.com",
+    "title": "Open Merch Studio | Create Custom Merch",
+    "description": "Upload, create, prepare, preview, and order custom merchandise."
+  },
+  "operator": {
+    "legalName": "Fox&Hen, LLC",
+    "disclosure": "Open Merch Studio is operated by Fox&Hen, LLC.",
+    "supportEmail": "support@openmerchstudio.com",
+    "countryCode": "US"
+  },
+  "orders": { "prefix": "OMS" },
+  "email": { "senderName": "Open Merch Studio", "fromLocalPart": "orders" },
+  "catalog": {
+    "currency": "USD",
+    "shippingCountryCodes": ["US"],
+    "curatedCategorySlugs": [
+      "apparel",
+      "drinkware",
+      "wall-art",
+      "bags",
+      "stickers"
+    ]
+  },
+  "pricing": { "marginLabel": "Open Merch Studio margin" },
+  "policies": {
+    "privacyPath": "/privacy",
+    "termsPath": "/terms",
+    "returnsPath": "/returns",
+    "contentPolicyPath": "/content-policy",
+    "approvedVersion": "2026-07-17",
+    "lastApprovedDate": "2026-07-17"
+  },
+  "attribution": {
+    "projectName": "Open Merch Studio",
+    "projectUrl": "https://openmerchstudio.com",
+    "sourceUrl": "https://github.com/foxandhenllc/open-merch-studio",
+    "licenseName": "MIT",
+    "creatorName": "Fox & Hen",
+    "creatorUrl": "https://foxandhenllc.com"
+  }
+}

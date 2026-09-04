@@ -1,0 +1,88 @@
+# Merchant configuration RFC
+
+**Status:** Draft schema implemented for review
+
+**Schema:** `config/merchant.config.json`, version 1
+
+**Scope:** One merchant per deployment; this is not a multi-tenant design.
+
+## Decision
+
+Open Merch Studio will use one committed, versioned JSON manifest for non-secret merchant identity
+and presentation. Provider credentials, database locations, webhook secrets, and live authorization
+remain deployment-managed environment values. Policy prose remains operator-approved application
+content; the manifest identifies its routes and approval version but does not generate legal terms.
+
+Project attribution is deliberately separate from merchant branding. A fork can call its store
+“Community Gear Lab” while continuing to identify Open Merch Studio, its source, creator, and MIT
+license accurately.
+
+## Precedence and failure behavior
+
+1. `config/merchant.config.json` is the committed public source of truth.
+2. Deployment-derived host values may describe the current deployment but never replace canonical
+   merchant identity.
+3. Environment values supply secrets and explicit live gates only. They may not silently override
+   brand, operator, policy, or attribution fields.
+4. Built-in fixture data remains available only when fixture fallbacks are enabled.
+
+`npm run config:validate` validates the reference and synthetic profiles. `npm run doctor` includes
+the active profile check. Invalid JSON, an unsupported schema version, missing public assets, unsafe
+URLs, malformed order prefixes, or missing launch-critical fields returns a nonzero exit code.
+Validation reports field paths and fixed remediation text, never configured secret values.
+
+## Field ownership
+
+| Domain        | Manifest fields                                   | Classification                       | Current consumers to migrate                               |
+| ------------- | ------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Brand         | name, description, logo, social image, colors     | Public config                        | workbench header, loading shell, PWA and social metadata   |
+| Web/SEO       | canonical URL, title, description                 | Public config                        | `index.html`, static routes, sitemap and canonical tags    |
+| Operator      | legal name, disclosure, support email, country    | Public config plus operator approval | policies, support, customer order view                     |
+| Policies      | route paths, approved version/date                | Operator-approved content metadata   | policy routing and checkout acceptance                     |
+| Catalog       | currency, shipping countries, category allowlist  | Public config                        | catalog presentation and checkout validation               |
+| Pricing       | customer-visible margin label                     | Public config                        | quote line labels                                          |
+| Orders        | order-number prefix                               | Public config                        | durable order creation and support references              |
+| Email         | sender display name and mailbox local part        | Public config                        | customer templates; verified domain stays deployment setup |
+| Attribution   | project/source/license/creator identity           | Public config, license-preserving    | footer and repository links                                |
+| Providers     | API keys, account/store IDs, webhook secrets      | Secret env                           | backend adapters only                                      |
+| Storage/data  | database URL, Supabase URL and service key        | Secret env                           | Prisma and private artwork storage                         |
+| Authorization | payment, fulfillment, checkout mode, auto-confirm | Explicit env gates                   | server enforcement only                                    |
+| Deployment    | runtime host/preview URL                          | Deployment-derived                   | CORS and callback construction                             |
+
+## Security and policy boundaries
+
+- The manifest is public and must contain no credentials, banking data, tax IDs, private addresses,
+  customer data, provider identifiers, or webhook values.
+- A support email is public contact metadata; email-provider authentication remains secret.
+- `CHECKOUT_ACCESS_MODE` remains the server payment gate. Manifest validation cannot enable payment.
+- `PRINTFUL_AUTO_CONFIRM_ORDERS=false` remains the default review-first fulfillment contract.
+- Policy dates prove only which operator-reviewed copy was selected. The validator does not assess
+  legal sufficiency and must not fabricate policy text.
+- Merchant configuration does not confer organization membership or mini-store write access.
+
+## Versioning and migration
+
+Schema version 1 is a draft until runtime consumers, a clean-clone rehearsal, and a second merchant
+build are verified. Additive optional fields may remain within a version; removing, renaming, or
+changing field meaning requires a new version and an explicit migration guide. Unsupported versions
+fail closed. Runtime code must not guess a nearest version.
+
+## Implementation sequence
+
+1. **Completed:** reference and synthetic profiles, JSON Schema, deterministic validator, doctor
+   integration, missing-asset checks, and redaction tests.
+2. Generate typed frontend/backend constants from the validated manifest at build time; do not read
+   mutable files from request handlers.
+3. Migrate low-risk consumers first: presentation, attribution, email sender copy, pricing label,
+   and order prefix. Preserve current Open Merch Studio output with snapshots.
+4. Migrate SEO/static generation and operator-approved policy metadata.
+5. Rehearse the synthetic profile from a clean clone in fixture mode before calling version 1 stable.
+6. Only then build owner authentication and editable mini-store administration on top of the
+   organization boundary.
+
+## Examples
+
+- `config/merchant.config.json` is the Open Merch Studio reference profile.
+- `config/examples/community-gear-lab.merchant.config.json` proves the shape can represent a second
+  merchant without changing source code. Its `.example.org` identity is synthetic and not a claim
+  of a deployed business.
