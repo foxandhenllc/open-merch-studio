@@ -4,8 +4,6 @@ import { canUseCustomerCheckout } from './config';
 import type {
   CatalogCategory,
   CatalogProduct,
-  CheckoutSession,
-  CustomerOrderConfirmation,
   DesignDraft,
   PlacementLayout,
   StudioCapabilities,
@@ -40,18 +38,12 @@ import {
 } from './studio-configuration.transitions';
 import { referenceAssetIds } from './studio-artwork.transitions';
 import { normalizeStudioItemQuantity } from './studio-quote';
-import {
-  checkoutNotReadyError,
-  checkoutUnavailable,
-  classifyCheckoutResult,
-  orderDetailsPendingError,
-  prepareCheckoutRequest,
-} from './studio-checkout';
 import { createStudioCartItem, MAX_STUDIO_CART_LINES, studioCartUnitCount } from './studio-cart';
 import { useGuestCart } from './hooks/useGuestCart';
 import { useStudioMockup, type StudioMockupRequest } from './hooks/useStudioMockup';
 import { useStudioQuote } from './hooks/useStudioQuote';
 import { useStudioArtwork, type ArtworkCommit } from './hooks/useStudioArtwork';
+import { useStudioCheckout } from './hooks/useStudioCheckout';
 import { restoreStudioSession } from './studio-session-restoration';
 
 export type {
@@ -86,9 +78,6 @@ export function useStudioViewModel() {
     PreviewOrientation | undefined
   >();
   const [email, setEmail] = useState('');
-  const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
-  const [checkoutSource, setCheckoutSource] = useState<'design' | 'cart'>('design');
-  const [order, setOrder] = useState<CustomerOrderConfirmation | null>(null);
   const [busy, setBusy] = useState(emptyBusy);
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
   const [fallback, setFallback] = useState<{ visible: boolean; reason: string } | null>(null);
@@ -99,6 +88,8 @@ export function useStudioViewModel() {
   const [online, setOnline] = useState(navigator.onLine);
   const startingFresh = useRef(false);
   const productSelections = useRef(new Map<string, RememberedProductSelection>());
+  // Artwork is constructed before checkout; this narrow bridge avoids either hook owning the other.
+  const clearCheckoutResults = useRef<() => void>(() => undefined);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -161,8 +152,7 @@ export function useStudioViewModel() {
         studioQuote.invalidate();
       }
       if (commit.kind === 'undo') {
-        setCheckout(null);
-        setOrder(null);
+        clearCheckoutResults.current();
       }
       await requestStudioMockup({
         product: commit.product,
@@ -246,6 +236,24 @@ export function useStudioViewModel() {
       }),
     [cart.items.length, cart.quote, cart.quoteExpired, cart.quoteStale, email]
   );
+  const studioCheckout = useStudioCheckout({
+    session,
+    studioPass,
+    email,
+    design,
+    quote,
+    cartQuote: cart.quote,
+    designReadiness: checkoutReadiness,
+    cartReadiness: cartCheckoutReadiness,
+    onStudioPassChange: setStudioPass,
+    onCartClear: cart.clear,
+    onSource: consumeSource,
+    onFlowChange: setFlow,
+    onModeChange: setWorkbenchMode,
+    onAnnouncement: setAnnouncement,
+  });
+  clearCheckoutResults.current = studioCheckout.clearResults;
+  const { source: checkoutSource, checkout, order } = studioCheckout;
   const setAction = (key: ActionKey, value: boolean) =>
     setBusy((current) => ({ ...current, [key]: value }));
   const clearError = (surface: Surface) => {
@@ -259,6 +267,10 @@ export function useStudioViewModel() {
     }
     if (surface === 'generation') {
       artwork.clearError();
+      return;
+    }
+    if (surface === 'checkout' || surface === 'order') {
+      studioCheckout.clearError(surface);
       return;
     }
     setErrors((current) => ({ ...current, [surface]: undefined }));
@@ -414,8 +426,7 @@ export function useStudioViewModel() {
     if (mockup) setMockupStale(true);
     if (quote) setFlow('quote_stale');
     else setFlow(design ? 'drafted' : 'configuring');
-    setCheckout(null);
-    setOrder(null);
+    studioCheckout.clearResults();
   };
   const setQuantity = (value: number) => {
     const nextQuantity = normalizeStudioItemQuantity(value);
@@ -425,8 +436,7 @@ export function useStudioViewModel() {
     if (quote) {
       setFlow('quote_stale');
     }
-    setCheckout(null);
-    setOrder(null);
+    studioCheckout.clearResults();
     setAnnouncement(`Quantity updated to ${nextQuantity}. Refreshing your price estimate.`);
   };
   const selectProduct = (product: CatalogProduct) => {
@@ -689,7 +699,7 @@ export function useStudioViewModel() {
   useEffect(() => {
     if (!artworkQuoteEligible || !design?.id || !selectedProduct || !selectedVariant) {
       studioQuote.clear();
-      setCheckout(null);
+      studioCheckout.clearCheckout();
       return undefined;
     }
     if (quote && !quoteStale && !quoteExpired) return undefined;
@@ -712,129 +722,6 @@ export function useStudioViewModel() {
     selectedVariant?.id,
     studioPass?.id,
   ]);
-  const buyStudioPass = async () => {
-    if (!session) return;
-    if (!canUseCustomerCheckout) {
-      setCheckout(checkoutUnavailable());
-      return;
-    }
-    setAction('pass', true);
-    clearError('checkout');
-    try {
-      const result = consumeSource(await api.studioPassCheckout(session.id));
-      setCheckout(result);
-      if (result.status === 'open' && result.checkoutUrl) {
-        trackEvent('studio_pass_checkout_started', {
-          source: 'gate',
-          result: result.mode === 'stripe' ? 'live' : 'fallback',
-        });
-        setAnnouncement('Opening secure checkout.');
-        window.location.assign(result.checkoutUrl);
-        return;
-      }
-      if (result.studioPassId)
-        setStudioPass({
-          id: result.studioPassId,
-          sessionId: session.id,
-          status: 'simulated',
-          priceCents: 500,
-          creditCents: 500,
-          includedRoughDrafts: 8,
-          includedEdits: 2,
-          includedFinals: 1,
-          roughDraftsUsed: 0,
-          editsUsed: 0,
-          finalsUsed: 0,
-          createdAt: new Date().toISOString(),
-        });
-      setAnnouncement(
-        'Studio Pass activated. The eligible order credit will be applied automatically.'
-      );
-    } catch (error) {
-      fail('checkout', error);
-    } finally {
-      setAction('pass', false);
-    }
-  };
-  const createCheckout = async (policyAccepted: true, policyVersion: string) => {
-    const activeQuote = checkoutSource === 'cart' ? cart.quote : quote;
-    const activeReadiness = checkoutSource === 'cart' ? cartCheckoutReadiness : checkoutReadiness;
-    if (!activeQuote || !activeReadiness.ready) {
-      setErrors((current) => ({
-        ...current,
-        checkout: checkoutNotReadyError(activeReadiness.blocker),
-      }));
-      return;
-    }
-    if (!canUseCustomerCheckout) {
-      setCheckout(checkoutUnavailable(activeQuote.id));
-      return;
-    }
-    setAction('checkout', true);
-    if (checkoutSource === 'cart') {
-      window.sessionStorage.setItem('open-merch-studio:pending-cart-checkout:v1', 'true');
-    } else {
-      window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
-    }
-    setFlow('ordering');
-    clearError('checkout');
-    clearError('order');
-    try {
-      const result = consumeSource(
-        await api.checkout(
-          prepareCheckoutRequest({
-            quote: activeQuote,
-            sessionId: session?.id,
-            studioPassId: studioPass?.id,
-            email,
-            design: checkoutSource === 'cart' ? null : design,
-            policyAccepted,
-            policyVersion,
-          })
-        )
-      );
-      setCheckout(result);
-      const outcome = classifyCheckoutResult(result);
-      if (outcome.kind === 'redirect') {
-        trackEvent('checkout_started', {
-          source: 'quote',
-          studio_pass: Boolean(studioPass),
-        });
-        setFlow('redirecting');
-        setAnnouncement('Checkout ready. Redirecting to secure payment.');
-        window.location.assign(outcome.checkoutUrl);
-        return;
-      }
-      if (outcome.kind === 'inline-order') {
-        if (checkoutSource === 'cart') cart.clear();
-        setOrder(outcome.order);
-        setFlow('confirmed');
-        setAnnouncement(`Order ${outcome.order.orderNumber} confirmed.`);
-        setWorkbenchMode('order');
-      } else if (outcome.kind === 'lookup-order') {
-        try {
-          const nextOrder = consumeSource(await api.order(outcome.orderId));
-          if (checkoutSource === 'cart') cart.clear();
-          setOrder(nextOrder);
-          setFlow('confirmed');
-          setAnnouncement(`Order ${nextOrder.orderNumber} confirmed.`);
-          setWorkbenchMode('order');
-        } catch (error) {
-          setFlow('confirmed');
-          setErrors((current) => ({
-            ...current,
-            order: orderDetailsPendingError(error),
-          }));
-        }
-      }
-    } catch (error) {
-      fail('checkout', error);
-      setFlow('quoted');
-    } finally {
-      setAction('checkout', false);
-    }
-  };
-
   const resetCurrentDesign = () => {
     studioQuote.clear();
     setSelectedProductId('');
@@ -849,7 +736,7 @@ export function useStudioViewModel() {
     setIdea(null);
     setDesign(null);
     setMockup(null);
-    setCheckout(null);
+    studioCheckout.clearCheckout();
     setFlow('configuring');
     setWorkbenchMode('product');
   };
@@ -898,23 +785,10 @@ export function useStudioViewModel() {
     if (step === 'make' && selectedProduct) setWorkbenchMode(design ? 'review' : 'configure');
     if (step === 'order' && cart.items.length) setWorkbenchMode('cart');
     else if (step === 'order' && artworkReady) {
-      setCheckoutSource('design');
+      studioCheckout.setSource('design');
       setWorkbenchMode('checkout');
     }
   };
-  const acceptConfirmedOrder = useCallback(
-    (confirmedOrder: CustomerOrderConfirmation) => {
-      if (window.sessionStorage.getItem('open-merch-studio:pending-cart-checkout:v1')) {
-        cart.clear();
-        window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
-      }
-      setOrder(confirmedOrder);
-      setFlow('confirmed');
-      setAnnouncement(`Order ${confirmedOrder.orderNumber} is ready to review.`);
-      setWorkbenchMode('order');
-    },
-    [cart.clear]
-  );
   const startFresh = () => {
     const confirmed = window.confirm(
       'Start fresh? This clears the product, prompt, artwork, cart, and prices saved in this browser.'
@@ -925,7 +799,7 @@ export function useStudioViewModel() {
     studioQuote.cancel();
     clearStudioResumeState();
     cart.clear();
-    window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
+    studioCheckout.clearPendingCartCheckout();
     if (session?.id) void api.cleanupSessionUploads(session.id);
     window.location.replace(window.location.pathname);
   };
@@ -968,12 +842,14 @@ export function useStudioViewModel() {
       ...artwork.busy,
       mockup: mockupBusy,
       quoting: quoteBusy,
+      ...studioCheckout.busy,
     },
     errors: {
       ...errors,
       generation: artwork.error,
       mockup: mockupError,
       quote: quoteError,
+      ...studioCheckout.errors,
     },
     fallback,
     dataSource,
@@ -1018,12 +894,12 @@ export function useStudioViewModel() {
     setActiveMockupViewIndex,
     createMockup,
     createQuote,
-    buyStudioPass,
-    createCheckout,
+    buyStudioPass: studioCheckout.buyStudioPass,
+    createCheckout: studioCheckout.createCheckout,
     addCurrentDesignToCart,
     boot,
     navigate,
-    acceptConfirmedOrder,
+    acceptConfirmedOrder: studioCheckout.acceptConfirmedOrder,
     startFresh,
     continueFromConfigure: () => setWorkbenchMode(design ? 'review' : 'describe'),
     showProduct: () => setWorkbenchMode('product'),
@@ -1032,11 +908,11 @@ export function useStudioViewModel() {
     showReview: () => setWorkbenchMode('review'),
     showCart: () => setWorkbenchMode('cart'),
     showCheckout: () => {
-      setCheckoutSource('design');
+      studioCheckout.setSource('design');
       setWorkbenchMode('checkout');
     },
     showCartCheckout: () => {
-      setCheckoutSource('cart');
+      studioCheckout.setSource('cart');
       setWorkbenchMode('checkout');
     },
     showCheckoutBack: () => setWorkbenchMode(checkoutSource === 'cart' ? 'cart' : 'review'),

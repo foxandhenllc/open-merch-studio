@@ -773,6 +773,34 @@ This checkpoint passed lint, typecheck, all 93 backend tests, both frontend cont
 build/static-route verification, and the complete 11-viewport browser suite including persisted
 generation failure and recoverable checkout state.
 
+## Studio checkout lifecycle checkpoint
+
+Completed September 4, 2026:
+
+- Added `useStudioCheckout.ts` as the owner of Studio Pass checkout, design-versus-cart checkout
+  source, Stripe handoff state, inline fixture confirmation, post-checkout order lookup, and the
+  checkout/order error surfaces.
+- Kept the server authorization boundary intact: the browser configuration can hide or reveal the
+  customer action, but the existing backend gate remains authoritative.
+- Preserved the signed-webhook confirmation rule. A Stripe redirect is only a handoff; the customer
+  view reaches confirmed order state only from an inline fixture order or a server order lookup.
+- Documented the pending-cart handoff marker and the narrow artwork-to-checkout invalidation bridge,
+  where module construction order would otherwise make one domain hook own the other.
+- Kept the returned view-model API stable so the workbench and checkout-return hook did not need a
+  presentation-layer migration.
+
+`studio-view-model.ts` moved from 1,047 to 922 lines; the checkout hook is 250 lines. The central
+workflow model is now below the refactor assessment's 1,000-line trigger. Remaining large files are
+`styles.css` (4,096 lines), `order.service.ts` (958), and `design.service.ts` (927). The two services
+are cohesive and below the trigger after their earlier extractions; stylesheet decomposition is the
+next size-driven cleanup, but should be organized by rendered surface and cascade ownership rather
+than split at arbitrary line boundaries.
+
+This checkpoint passed lint, typecheck, all 93 backend tests (90 passed and three database-only
+skips), both frontend contracts, production build/static-route verification, and the complete
+11-viewport browser suite across five products, upload/reference artwork paths, persisted failure
+recovery, and recoverable fixture checkout.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:
