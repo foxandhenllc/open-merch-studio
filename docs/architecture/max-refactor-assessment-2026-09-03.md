@@ -638,3 +638,28 @@ real responsibility. The next high-leverage target returns to the 1,570-line stu
 This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
 skips), both frontend contracts, the explicit fixture smoke, the production dependency audit,
 production build/static-route verification, and the complete 11-viewport browser suite.
+
+## Studio mockup lifecycle checkpoint
+
+Completed September 4, 2026:
+
+- Added `useStudioMockup.ts` as the owner of provider preview state, request sequencing, cache
+  identity, stale-preview presentation, surface errors, progress state, and active provider view.
+- Kept product configuration and quote/checkout transitions in the parent studio model. The hook
+  receives those decisions as explicit callbacks instead of acquiring unrelated workflow state.
+- Preserved the multi-print invariant by continuing to derive both the provider payload and the
+  cache key from normalized per-placement artwork assignments.
+- Preserved stale-response protection: a slow preview can no longer become current after a newer
+  placement request, while the last successful preview remains visible and marked stale.
+- Exposed a narrow cache insertion seam so guest-session restoration can reuse a validated saved
+  mockup without reaching into hook internals.
+
+`studio-view-model.ts` moved from 1,570 to 1,510 lines. The new 149-line hook is a cohesive lifecycle
+boundary rather than a generic state abstraction. Quote request cancellation and quote freshness
+are the next comparable frontend lifecycle seam; artwork generation should remain separate because
+its polling, allowance, and revision rules have a different failure model.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, production build/static-route verification, and the complete
+11-viewport browser suite across five products, uploads, reference artwork, persisted failures, and
+the recoverable fixture checkout flow.

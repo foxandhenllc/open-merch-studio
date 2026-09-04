@@ -4,12 +4,10 @@ import { canUseCustomerCheckout } from './config';
 import type {
   CatalogCategory,
   CatalogProduct,
-  CatalogVariant,
   CheckoutSession,
   CustomerOrderConfirmation,
   DesignDraft,
   DesignIdea,
-  DesignMockup,
   PlacementLayout,
   QuoteBreakdown,
   StudioCapabilities,
@@ -60,7 +58,6 @@ import {
   selectReferenceFiles,
   undoArtworkRevision,
 } from './studio-artwork.transitions';
-import { classifyMockupResult, prepareMockupRequest } from './studio-mockup';
 import {
   normalizeStudioItemQuantity,
   prepareQuoteRequest,
@@ -73,12 +70,9 @@ import {
   orderDetailsPendingError,
   prepareCheckoutRequest,
 } from './studio-checkout';
-import {
-  createStudioCartItem,
-  MAX_STUDIO_CART_LINES,
-  studioCartUnitCount,
-} from './studio-cart';
+import { createStudioCartItem, MAX_STUDIO_CART_LINES, studioCartUnitCount } from './studio-cart';
 import { useGuestCart } from './hooks/useGuestCart';
+import { useStudioMockup, type StudioMockupRequest } from './hooks/useStudioMockup';
 
 export type {
   ActionKey,
@@ -133,7 +127,6 @@ export function useStudioViewModel() {
   const [email, setEmail] = useState('');
   const [idea, setIdea] = useState<DesignIdea | null>(null);
   const [design, setDesign] = useState<DesignDraft | null>(null);
-  const [mockup, setMockup] = useState<DesignMockup | null>(null);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [checkoutSource, setCheckoutSource] = useState<'design' | 'cart'>('design');
@@ -142,21 +135,17 @@ export function useStudioViewModel() {
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
   const [fallback, setFallback] = useState<{ visible: boolean; reason: string } | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>('live');
-  const [mockupStale, setMockupStale] = useState(false);
   const [quoteStale, setQuoteStale] = useState(false);
   const [generationPhase, setGenerationPhase] = useState('Queued');
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [recoveryMessage, setRecoveryMessage] = useState('');
-  const [activeMockupViewIndex, setActiveMockupViewIndex] = useState(0);
   const [designHistory, setDesignHistory] = useState<DesignDraft[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const generationController = useRef<AbortController | null>(null);
   const quoteController = useRef<AbortController | null>(null);
   const quoteRequestId = useRef(0);
-  const mockupRequestId = useRef(0);
   const startingFresh = useRef(false);
-  const mockupCache = useRef(new Map<string, DesignMockup>());
   const productSelections = useRef(new Map<string, RememberedProductSelection>());
 
   const selectedProduct = useMemo(
@@ -192,6 +181,27 @@ export function useStudioViewModel() {
     if (result.fallbackReason) setFallback({ visible: true, reason: result.fallbackReason });
     return result.data;
   }, []);
+  const studioMockup = useStudioMockup({
+    sessionId: session?.id,
+    quotePresent: Boolean(quote),
+    dataSource,
+    onSource: consumeSource,
+    onFlowChange: setFlow,
+    onModeChange: setWorkbenchMode,
+    onAnnouncement: setAnnouncement,
+    onOperationStartedAt: setOperationStartedAt,
+  });
+  const {
+    mockup,
+    setMockup,
+    stale: mockupStale,
+    setStale: setMockupStale,
+    busy: mockupBusy,
+    error: mockupError,
+    activeViewIndex: activeMockupViewIndex,
+    setActiveViewIndex: setActiveMockupViewIndex,
+    cacheMockup,
+  } = studioMockup;
   const cart = useGuestCart({
     sessionId: session?.id,
     studioPassId: studioPass?.id,
@@ -211,8 +221,13 @@ export function useStudioViewModel() {
   );
   const setAction = (key: ActionKey, value: boolean) =>
     setBusy((current) => ({ ...current, [key]: value }));
-  const clearError = (surface: Surface) =>
+  const clearError = (surface: Surface) => {
+    if (surface === 'mockup') {
+      studioMockup.clearError();
+      return;
+    }
     setErrors((current) => ({ ...current, [surface]: undefined }));
+  };
   const fail = (surface: Surface, error: unknown) =>
     setErrors((current) => ({ ...current, [surface]: mapStudioError(error, surface) }));
 
@@ -246,8 +261,8 @@ export function useStudioViewModel() {
             }
           })
         );
-        const availableReferences = restoredReferences.filter(
-          (asset): asset is DesignDraft => Boolean(asset?.id)
+        const availableReferences = restoredReferences.filter((asset): asset is DesignDraft =>
+          Boolean(asset?.id)
         );
         setReferenceAssets(availableReferences);
         if (availableReferences.length) setCreationPath('reference');
@@ -319,8 +334,8 @@ export function useStudioViewModel() {
         })
       );
       const restoredPlacementArtwork = Object.fromEntries(
-        restoredPlacementArtworkEntries.filter(
-          (entry): entry is readonly [string, DesignDraft] => Boolean(entry)
+        restoredPlacementArtworkEntries.filter((entry): entry is readonly [string, DesignDraft] =>
+          Boolean(entry)
         )
       );
       setPlacementArtwork(restoredPlacementArtwork);
@@ -361,7 +376,7 @@ export function useStudioViewModel() {
         );
         if (savedMockup && savedMockupMatches) {
           setMockup(savedMockup);
-          mockupCache.current.set(
+          cacheMockup(
             mockupKey({
               productId: product.id,
               variantId: variant.id,
@@ -383,7 +398,8 @@ export function useStudioViewModel() {
                 placementCodes: placements,
                 placements: placements.map((code) => ({
                   code,
-                  designAssetId: restoredPlacementArtwork[code]?.id ?? restoredDraft.id ?? undefined,
+                  designAssetId:
+                    restoredPlacementArtwork[code]?.id ?? restoredDraft.id ?? undefined,
                   layout: code === 'default' ? saved.mugLayout : undefined,
                 })),
                 designAssetId: restoredDraft.id,
@@ -393,7 +409,7 @@ export function useStudioViewModel() {
             );
             setMockup(restoredMockup);
             if (restoredMockup.status === 'complete') {
-              mockupCache.current.set(
+              cacheMockup(
                 mockupKey({
                   productId: product.id,
                   variantId: variant.id,
@@ -420,7 +436,7 @@ export function useStudioViewModel() {
       fail('boot', error);
       setFlow('boot_failed');
     }
-  }, [consumeSource]);
+  }, [cacheMockup, consumeSource]);
 
   useEffect(() => {
     void boot();
@@ -502,95 +518,17 @@ export function useStudioViewModel() {
       setAction('catalog', false);
     }
   };
-  const requestMockup = async (params: {
-    product: CatalogProduct;
-    variant: CatalogVariant;
-    placements: string[];
-    draft: DesignDraft;
-    artworkByCode?: Record<string, DesignDraft>;
-    mugLayout?: PlacementLayout;
-    orientation?: PreviewOrientation;
-    revealReview?: boolean;
-  }) => {
-    const prepared = prepareMockupRequest(
-      {
-        product: params.product,
-        variant: params.variant,
-        placements: params.placements,
-        draft: params.draft,
-        artworkByCode: params.artworkByCode ?? placementArtwork,
-        mugLayout: params.mugLayout ?? mugLayout,
-        orientation: params.orientation,
-      },
-      session?.id
-    );
-    if (!prepared) return;
-    const requestId = ++mockupRequestId.current;
-    const cached = mockupCache.current.get(prepared.cacheKey);
-    if (cached) {
-      setAction('mockup', false);
-      setOperationStartedAt(null);
-      setMockup(cached);
-      setActiveMockupViewIndex(0);
-      setMockupStale(false);
-      clearError('mockup');
-      setFlow(quote ? 'quote_stale' : 'drafted');
-      setAnnouncement('Saved product mockup restored.');
-      trackEvent('mockup_completed', { result: 'success', source: 'fallback' });
-      if (params.revealReview !== false) setWorkbenchMode('review');
-      return;
+  const requestMockup = (
+    params: Omit<StudioMockupRequest, 'artworkByCode' | 'mugLayout'> & {
+      artworkByCode?: Record<string, DesignDraft>;
+      mugLayout?: PlacementLayout;
     }
-    if (mockup) setMockupStale(true);
-    setAction('mockup', true);
-    setFlow('previewing');
-    setOperationStartedAt(Date.now());
-    clearError('mockup');
-    try {
-      const sourced = await api.mockup(prepared.body);
-      const result = consumeSource(sourced);
-      if (requestId !== mockupRequestId.current) return;
-      setMockup(result);
-      setActiveMockupViewIndex(0);
-      setMockupStale(false);
-      const outcome = classifyMockupResult(result, sourced.source);
-      if (outcome.failed) {
-        trackEvent('mockup_completed', {
-          result: 'failed',
-          source: outcome.analyticsSource,
-        });
-        fail('mockup', outcome.error);
-        setFlow(quote ? 'quote_stale' : 'drafted');
-        setAnnouncement(outcome.announcement);
-        if (params.revealReview !== false) setWorkbenchMode('review');
-      } else {
-        trackEvent('mockup_completed', {
-          result: 'success',
-          source: outcome.analyticsSource,
-        });
-        mockupCache.current.set(prepared.cacheKey, result);
-        setFlow(quote ? 'quote_stale' : 'drafted');
-        setAnnouncement(outcome.announcement);
-        if (params.revealReview !== false) setWorkbenchMode('review');
-      }
-    } catch (error) {
-      if (requestId !== mockupRequestId.current) return;
-      trackEvent('mockup_completed', {
-        result: 'failed',
-        source: dataSource === 'live' ? 'printful' : 'fallback',
-      });
-      fail('mockup', error);
-      setFlow(quote ? 'quote_stale' : 'drafted');
-      setAnnouncement(
-        'The product preview failed. Your artwork is safe; retry the preview or continue without it.'
-      );
-      if (params.revealReview !== false) setWorkbenchMode('review');
-    } finally {
-      if (requestId === mockupRequestId.current) {
-        setAction('mockup', false);
-        setOperationStartedAt(null);
-      }
-    }
-  };
+  ) =>
+    studioMockup.request({
+      ...params,
+      artworkByCode: params.artworkByCode ?? placementArtwork,
+      mugLayout: params.mugLayout ?? mugLayout,
+    });
   const markStale = () => {
     quoteRequestId.current += 1;
     quoteController.current?.abort();
@@ -628,12 +566,16 @@ export function useStudioViewModel() {
         orientation: selectedOrientation,
       });
     }
-    const { variant, placements, orientation, placementArtwork: nextPlacementArtwork } =
-      selectProductConfiguration({
-        product,
-        remembered: productSelections.current.get(product.id),
-        design,
-      });
+    const {
+      variant,
+      placements,
+      orientation,
+      placementArtwork: nextPlacementArtwork,
+    } = selectProductConfiguration({
+      product,
+      remembered: productSelections.current.get(product.id),
+      design,
+    });
     setSelectedProductId(product.id);
     setSelectedVariantIdState(variant?.id ?? '');
     setSelectedPlacements(placements);
@@ -784,7 +726,9 @@ export function useStudioViewModel() {
     setIdea(null);
     setCreationPath('generate');
     setWorkbenchMode('describe');
-    const label = selectedProduct?.placements.find((placement) => placement.code === code)?.displayName;
+    const label = selectedProduct?.placements.find(
+      (placement) => placement.code === code
+    )?.displayName;
     setAnnouncement(`Create different artwork for ${label ?? code}.`);
   };
   const reusePlacementArtwork = (sourceCode: string, targetCode: string) => {
@@ -1077,11 +1021,7 @@ export function useStudioViewModel() {
         sessionId: session?.id,
       });
       const revised = consumeSource(result);
-      const nextPlacementArtwork = replaceDraftAssignments(
-        placementArtwork,
-        design.id,
-        revised
-      );
+      const nextPlacementArtwork = replaceDraftAssignments(placementArtwork, design.id, revised);
       setDesignHistory((current) => appendDesignHistory(current, design));
       setDesign(revised);
       setPlacementArtwork(nextPlacementArtwork);
@@ -1186,10 +1126,7 @@ export function useStudioViewModel() {
         orientation: selectedOrientation,
       });
       if (!request) return;
-      const sourced = await api.quote(
-        request,
-        controller.signal
-      );
+      const sourced = await api.quote(request, controller.signal);
       const result = consumeSource(sourced);
       if (requestId !== quoteRequestId.current) return;
       setQuote(result);
@@ -1438,16 +1375,19 @@ export function useStudioViewModel() {
       setWorkbenchMode('checkout');
     }
   };
-  const acceptConfirmedOrder = useCallback((confirmedOrder: CustomerOrderConfirmation) => {
-    if (window.sessionStorage.getItem('open-merch-studio:pending-cart-checkout:v1')) {
-      cart.clear();
-      window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
-    }
-    setOrder(confirmedOrder);
-    setFlow('confirmed');
-    setAnnouncement(`Order ${confirmedOrder.orderNumber} is ready to review.`);
-    setWorkbenchMode('order');
-  }, [cart.clear]);
+  const acceptConfirmedOrder = useCallback(
+    (confirmedOrder: CustomerOrderConfirmation) => {
+      if (window.sessionStorage.getItem('open-merch-studio:pending-cart-checkout:v1')) {
+        cart.clear();
+        window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
+      }
+      setOrder(confirmedOrder);
+      setFlow('confirmed');
+      setAnnouncement(`Order ${confirmedOrder.orderNumber} is ready to review.`);
+      setWorkbenchMode('order');
+    },
+    [cart.clear]
+  );
   const startFresh = () => {
     const confirmed = window.confirm(
       'Start fresh? This clears the product, prompt, artwork, cart, and prices saved in this browser.'
@@ -1496,8 +1436,8 @@ export function useStudioViewModel() {
     checkoutSource,
     checkout,
     order,
-    busy,
-    errors,
+    busy: { ...busy, mockup: mockupBusy },
+    errors: { ...errors, mockup: mockupError },
     fallback,
     dataSource,
     mockupStale,
