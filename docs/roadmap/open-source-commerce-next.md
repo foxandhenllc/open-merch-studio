@@ -67,7 +67,9 @@ does not.** A reusable store should require:
 - deployment-managed environment values for database and provider credentials;
 - `npm run setup` to validate prerequisites, generate Prisma, apply or print migrations, and seed the
   curated catalog;
-- `npm run doctor` to report missing configuration without printing secrets;
+- **Foundation completed September 4, 2026:** `npm run doctor` reports Node, URL, provider,
+  database, and commerce-gate conflicts without printing values. Database reachability and merchant
+  profile validation remain part of the post-RFC setup slice;
 - one documented Vercel template path and equivalent platform-neutral deployment contract;
 - fixture mode that works from a clean clone before any provider is enabled.
 

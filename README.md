@@ -53,11 +53,16 @@ nvm use
 npm install
 cp .env.example backend/.env
 cp .env.example frontend/.env
+npm run doctor
 npm run db:generate
 npm run dev
 ```
 
 The app works in fixture mode without provider credentials. Add local credentials only to ignored `.env` files or deployment-managed values.
+
+`npm run doctor` reports fixture, provider, and commerce readiness without printing configured
+values. A clean clone should report `fixture-ready`; provider presence is not the same as live
+payment or fulfillment authorization.
 
 The example environment keeps live payment and fulfillment gates disabled and permits simulated
 local checkout. Production activation requires deployment-managed credentials and the supervised
