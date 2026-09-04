@@ -5,7 +5,7 @@ import type {
   QuoteBreakdown,
   QuoteLineInput,
 } from '../types/catalog.js';
-import type { PrintfulVariantPricing } from './printful.service.js';
+import type { PrintfulVariantPricing } from './printful-pricing.service.js';
 
 export type PricingSettings = {
   currency: string;

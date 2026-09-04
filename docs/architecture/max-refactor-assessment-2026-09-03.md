@@ -598,3 +598,22 @@ customer-facing target is still `studio-view-model.ts` at 1,570 lines.
 This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
 skips), both frontend contracts, the explicit fixture smoke, production build/static-route
 verification, and the complete 11-viewport browser suite.
+
+## Printful pricing checkpoint
+
+Completed September 4, 2026:
+
+- Added `printful-pricing.service.ts` for live variant/technique pricing, placement-cost mapping,
+  cents normalization, and the bounded in-process provider cache.
+- Changed the catalog and quote services to import the pricing boundary directly, eliminating their
+  dependency on the mixed Printful facade while retaining the facade re-export for compatibility.
+- Documented why the cache is deliberately short-lived: it prevents duplicate provider calls during
+  one quote lifecycle without turning a current-price estimate into a durable catalog fact.
+
+The pricing module is 91 lines and `printful.service.ts` moved from 605 to 507 lines. The remaining
+facade implementation is catalog synchronization; extracting it will leave `printful.service.ts` as
+a compatibility index over the client, pricing, catalog, mockup, and order domains.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, the explicit fixture smoke, production build/static-route
+verification, and the complete 11-viewport browser suite.

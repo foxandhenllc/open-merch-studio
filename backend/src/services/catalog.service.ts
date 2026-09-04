@@ -11,7 +11,10 @@ import type {
   QuoteLineInput,
 } from '../types/catalog.js';
 import { buildQuoteBreakdown, estimateRetailTotalCents } from './pricing.service.js';
-import { fetchPrintfulVariantPricing, type PrintfulVariantPricing } from './printful.service.js';
+import {
+  fetchPrintfulVariantPricing,
+  type PrintfulVariantPricing,
+} from './printful-pricing.service.js';
 import {
   getDraft,
   getStudioPassById,
