@@ -23,15 +23,15 @@ candidate for behavior-preserving extraction rather than a rewrite.
 
 ## Highest-leverage seams
 
-| Current concentration | Size at audit | Extraction target |
-| --- | ---: | --- |
-| `backend/src/services/order.service.ts` | 2,274 lines | quote validation, Checkout orchestration, Stripe reconciliation, refund handling, fulfillment review, recovery |
-| `frontend/src/studio-view-model.ts` | 1,696 lines | state/selectors, design commands, product commands, quote/checkout commands, restoration |
-| `backend/src/services/printful.service.ts` | 1,273 lines | client transport, catalog sync, mockups, draft orders, status mapping |
-| `frontend/src/WorkbenchStudioApp.tsx` | 1,075 lines | one component per product/configure/create/review/checkout/order mode |
-| `backend/src/services/runtime-store.ts` | 963 lines | fixture store and durable repository adapters |
-| `frontend/src/styles.css` | 3,776 lines | tokens/base, workbench, components, policy pages, example collection, responsive rules |
-| `frontend/scripts/responsive-smoke.mjs` | 1,274 lines | shared harness plus independent customer journeys |
+| Current concentration                      | Size at audit | Extraction target                                                                                              |
+| ------------------------------------------ | ------------: | -------------------------------------------------------------------------------------------------------------- |
+| `backend/src/services/order.service.ts`    |   2,274 lines | quote validation, Checkout orchestration, Stripe reconciliation, refund handling, fulfillment review, recovery |
+| `frontend/src/studio-view-model.ts`        |   1,696 lines | state/selectors, design commands, product commands, quote/checkout commands, restoration                       |
+| `backend/src/services/printful.service.ts` |   1,273 lines | client transport, catalog sync, mockups, draft orders, status mapping                                          |
+| `frontend/src/WorkbenchStudioApp.tsx`      |   1,075 lines | one component per product/configure/create/review/checkout/order mode                                          |
+| `backend/src/services/runtime-store.ts`    |     963 lines | fixture store and durable repository adapters                                                                  |
+| `frontend/src/styles.css`                  |   3,776 lines | tokens/base, workbench, components, policy pages, example collection, responsive rules                         |
+| `frontend/scripts/responsive-smoke.mjs`    |   1,274 lines | shared harness plus independent customer journeys                                                              |
 
 ## Staged sequence
 
@@ -549,3 +549,29 @@ reconciliation, and an organization-specific launch review remain explicit gates
 This checkpoint passed lint, typecheck, 90 backend tests (87 passed and three database-only skips),
 both frontend contracts, production build/static-route verification for eight canonical routes, and
 the complete browser suite including phone and desktop mini-store QA.
+
+## Printful transport and mockup checkpoint
+
+Completed September 4, 2026:
+
+- Added `printful-client.service.ts` as the shared authenticated transport boundary for provider
+  credentials, store scoping, response-envelope normalization, public artwork URL validation, and
+  operator-safe error descriptions.
+- Added `printful-mockup.service.ts` for printfile lookup, placement-aware file positioning, mockup
+  task creation and bounded polling, provider view normalization, and mug front-view preference.
+- Kept `printful.service.ts` as the stable public facade so existing controllers, services, and
+  tests retain their import paths while catalog sync, pricing, and draft-order responsibilities
+  remain unchanged.
+- Documented only the non-obvious invariants: one transport configuration across provider domains,
+  no loopback artwork URLs, uncropped square placement fitting, bounded polling, and customer-safe
+  view ranking.
+
+`printful.service.ts` moved from 1,273 to 943 lines. The new transport module is 59 lines and the
+mockup module is 315 lines. The next behavior-preserving Printful seam is the order payload and
+draft-submission domain; after that, catalog pricing and sync can leave the facade. The studio view
+model remains a separate high-priority target at 1,570 lines and should receive a cohesive lifecycle
+hook rather than another series of tiny pure helpers.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, the explicit fixture smoke, the production dependency audit,
+production build/static-route verification, and the complete 11-viewport browser suite.
