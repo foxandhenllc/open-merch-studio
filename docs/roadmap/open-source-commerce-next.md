@@ -26,11 +26,12 @@ Build in this order:
 1. **Completed September 3, 2026:** add quantity to the current product review and re-quote every
    change server-side. Guest recovery retains the quantity, restored quotes must match it, and both
    browser and server enforce the current 1–25 item boundary.
-2. Add a guest cart that can hold multiple configured products. The backend quote and order models
-   already support multiple items and quantities; the frontend currently submits one item, and
-   Stripe currently receives one aggregate line item.
+2. **Completed September 3, 2026:** add a session-scoped guest cart that holds up to ten configured
+   products, preserves distinct artwork/placements, supports per-line quantities, restores after a
+   reload, re-quotes the complete cart, and clears only after confirmed fixture or returned payment.
 3. Send itemized Stripe line items while preserving the server-authoritative quote total and current
-   webhook idempotency.
+   webhook idempotency. The implementation is complete locally and requires the same CI/deployment
+   promotion as the guest cart before live use.
 4. Add **Buy again** to the protected order page. It should create a new editable cart from immutable
    prior order items, verify retained artwork access, revalidate current catalog availability, and
    generate a new quote. It must never replay an expired quote or charge automatically.

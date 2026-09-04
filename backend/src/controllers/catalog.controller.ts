@@ -10,7 +10,11 @@ import {
 import type { QuoteLineInput } from '../types/catalog.js';
 import { getQuoteById } from '../services/order.service.js';
 import { env } from '../config/env.js';
-import { MAX_QUOTE_ITEM_QUANTITY, validateQuoteItemQuantity } from '../services/pricing.service.js';
+import {
+  MAX_QUOTE_ITEM_QUANTITY,
+  MAX_QUOTE_LINE_ITEMS,
+  validateQuoteItemQuantity,
+} from '../services/pricing.service.js';
 
 export const getCatalogHealth = asyncHandler(async (_req: Request, res: Response) => {
   res.json({
@@ -75,6 +79,9 @@ export const postQuote = asyncHandler(async (req: Request, res: Response) => {
   const items = req.body?.items as QuoteLineInput[] | undefined;
   if (!Array.isArray(items) || items.length === 0) {
     throw new HttpError('Quote requires at least one item.', 400);
+  }
+  if (items.length > MAX_QUOTE_LINE_ITEMS) {
+    throw new HttpError(`A quote can contain at most ${MAX_QUOTE_LINE_ITEMS} items.`, 400);
   }
   try {
     items.forEach((item) => validateQuoteItemQuantity(item.quantity));

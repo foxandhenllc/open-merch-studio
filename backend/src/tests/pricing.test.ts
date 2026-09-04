@@ -4,6 +4,7 @@ import {
   buildQuoteBreakdown,
   estimateRetailTotalCents,
   MAX_QUOTE_ITEM_QUANTITY,
+  MAX_QUOTE_LINE_ITEMS,
   validateQuoteItemQuantity,
 } from '../services/pricing.service.js';
 import { sampleCatalog } from '../services/catalog-fixtures.js';
@@ -211,4 +212,23 @@ test('quote quantities are bounded before a customer can create an oversized cha
   assert.throws(() => validateQuoteItemQuantity(0), /whole number/);
   assert.throws(() => validateQuoteItemQuantity(1.5), /whole number/);
   assert.throws(() => validateQuoteItemQuantity(MAX_QUOTE_ITEM_QUANTITY + 1), /whole number/);
+});
+
+test('quotes reject an oversized number of configured products', () => {
+  const product = sampleCatalog.products[0];
+  const variant = product.variants[0];
+  const line = {
+    productId: product.id,
+    variantId: variant.id,
+    quantity: 1,
+    placementCodes: ['front'],
+  };
+  assert.throws(
+    () =>
+      buildQuoteBreakdown(
+        [product],
+        Array.from({ length: MAX_QUOTE_LINE_ITEMS + 1 }, () => line)
+      ),
+    /at most 10 configured products/
+  );
 });

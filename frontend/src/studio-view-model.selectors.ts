@@ -284,7 +284,6 @@ export function deriveStepStates(params: {
       : params.design
         ? 'done'
         : 'todo',
-    order:
-      params.workbenchMode === 'checkout' || params.workbenchMode === 'order' ? 'active' : 'todo',
+    order: ['cart', 'checkout', 'order'].includes(params.workbenchMode) ? 'active' : 'todo',
   };
 }

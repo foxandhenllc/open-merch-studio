@@ -110,6 +110,14 @@ export function ReviewPanel({
           <button
             className="button button--secondary button--wide"
             type="button"
+            onClick={actions.onAddToCart}
+            disabled={checkoutBlocked}
+          >
+            Add to cart &amp; make another
+          </button>
+          <button
+            className="button button--secondary button--wide"
+            type="button"
             onClick={actions.onMakeChanges}
           >
             Make changes

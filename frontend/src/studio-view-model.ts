@@ -73,6 +73,12 @@ import {
   orderDetailsPendingError,
   prepareCheckoutRequest,
 } from './studio-checkout';
+import {
+  createStudioCartItem,
+  MAX_STUDIO_CART_LINES,
+  studioCartUnitCount,
+} from './studio-cart';
+import { useGuestCart } from './hooks/useGuestCart';
 
 export type {
   ActionKey,
@@ -130,6 +136,7 @@ export function useStudioViewModel() {
   const [mockup, setMockup] = useState<DesignMockup | null>(null);
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
+  const [checkoutSource, setCheckoutSource] = useState<'design' | 'cart'>('design');
   const [order, setOrder] = useState<CustomerOrderConfirmation | null>(null);
   const [busy, setBusy] = useState(emptyBusy);
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
@@ -185,6 +192,23 @@ export function useStudioViewModel() {
     if (result.fallbackReason) setFallback({ visible: true, reason: result.fallbackReason });
     return result.data;
   }, []);
+  const cart = useGuestCart({
+    sessionId: session?.id,
+    studioPassId: studioPass?.id,
+    onSource: consumeSource,
+  });
+  const cartCheckoutReadiness = useMemo(
+    () =>
+      deriveCheckoutReadiness({
+        artworkReady: cart.items.length > 0,
+        quote: cart.quote,
+        quoteStale: cart.quoteStale,
+        quoteExpired: cart.quoteExpired,
+        email,
+        paymentAvailable: canUseCustomerCheckout,
+      }),
+    [cart.items.length, cart.quote, cart.quoteExpired, cart.quoteStale, email]
+  );
   const setAction = (key: ActionKey, value: boolean) =>
     setBusy((current) => ({ ...current, [key]: value }));
   const clearError = (surface: Surface) =>
@@ -1266,18 +1290,25 @@ export function useStudioViewModel() {
     }
   };
   const createCheckout = async (policyAccepted: true, policyVersion: string) => {
-    if (!quote || !checkoutReadiness.ready) {
+    const activeQuote = checkoutSource === 'cart' ? cart.quote : quote;
+    const activeReadiness = checkoutSource === 'cart' ? cartCheckoutReadiness : checkoutReadiness;
+    if (!activeQuote || !activeReadiness.ready) {
       setErrors((current) => ({
         ...current,
-        checkout: checkoutNotReadyError(checkoutReadiness.blocker),
+        checkout: checkoutNotReadyError(activeReadiness.blocker),
       }));
       return;
     }
     if (!canUseCustomerCheckout) {
-      setCheckout(checkoutUnavailable(quote.id));
+      setCheckout(checkoutUnavailable(activeQuote.id));
       return;
     }
     setAction('checkout', true);
+    if (checkoutSource === 'cart') {
+      window.sessionStorage.setItem('open-merch-studio:pending-cart-checkout:v1', 'true');
+    } else {
+      window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
+    }
     setFlow('ordering');
     clearError('checkout');
     clearError('order');
@@ -1285,11 +1316,11 @@ export function useStudioViewModel() {
       const result = consumeSource(
         await api.checkout(
           prepareCheckoutRequest({
-            quote,
+            quote: activeQuote,
             sessionId: session?.id,
             studioPassId: studioPass?.id,
             email,
-            design,
+            design: checkoutSource === 'cart' ? null : design,
             policyAccepted,
             policyVersion,
           })
@@ -1308,6 +1339,7 @@ export function useStudioViewModel() {
         return;
       }
       if (outcome.kind === 'inline-order') {
+        if (checkoutSource === 'cart') cart.clear();
         setOrder(outcome.order);
         setFlow('confirmed');
         setAnnouncement(`Order ${outcome.order.orderNumber} confirmed.`);
@@ -1315,6 +1347,7 @@ export function useStudioViewModel() {
       } else if (outcome.kind === 'lookup-order') {
         try {
           const nextOrder = consumeSource(await api.order(outcome.orderId));
+          if (checkoutSource === 'cart') cart.clear();
           setOrder(nextOrder);
           setFlow('confirmed');
           setAnnouncement(`Order ${nextOrder.orderNumber} confirmed.`);
@@ -1335,6 +1368,62 @@ export function useStudioViewModel() {
     }
   };
 
+  const resetCurrentDesign = () => {
+    quoteRequestId.current += 1;
+    quoteController.current?.abort();
+    setSelectedProductId('');
+    setSelectedVariantIdState('');
+    setQuantityState(1);
+    setSelectedPlacements([]);
+    setPlacementArtwork({});
+    setActivePlacementCode('');
+    setPrompt('');
+    setCreationPath('generate');
+    setReferenceAssets([]);
+    setIdea(null);
+    setDesign(null);
+    setMockup(null);
+    setQuote(null);
+    setQuoteStale(false);
+    setCheckout(null);
+    setFlow('configuring');
+    setWorkbenchMode('product');
+  };
+
+  const addCurrentDesignToCart = () => {
+    if (cart.items.length >= MAX_STUDIO_CART_LINES) {
+      setAnnouncement(`Your cart can hold up to ${MAX_STUDIO_CART_LINES} configured products.`);
+      setWorkbenchMode('cart');
+      return;
+    }
+    if (
+      !selectedProduct ||
+      !selectedVariant ||
+      !design ||
+      !artworkReady ||
+      !quote ||
+      quoteStale ||
+      quoteExpired
+    ) {
+      setAnnouncement('Wait for a print-ready design and current estimate before adding it.');
+      return;
+    }
+    const item = createStudioCartItem({
+      product: selectedProduct,
+      variant: selectedVariant,
+      quantity,
+      selectedPlacements,
+      design,
+      placementArtwork,
+      mugLayout,
+      orientation: selectedOrientation,
+    });
+    if (!item) return;
+    cart.add(item);
+    setAnnouncement(`${selectedProduct.title} added to your cart.`);
+    resetCurrentDesign();
+  };
+
   const stepStates = useMemo(
     () => deriveStepStates({ workbenchMode, selectedProduct, design }),
     [selectedProduct, design, workbenchMode]
@@ -1343,23 +1432,33 @@ export function useStudioViewModel() {
     if (workbenchMode === 'generating' || busy.generating || busy.revising) return;
     if (step === 'product') setWorkbenchMode('product');
     if (step === 'make' && selectedProduct) setWorkbenchMode(design ? 'review' : 'configure');
-    if (step === 'order' && artworkReady) setWorkbenchMode('checkout');
+    if (step === 'order' && cart.items.length) setWorkbenchMode('cart');
+    else if (step === 'order' && artworkReady) {
+      setCheckoutSource('design');
+      setWorkbenchMode('checkout');
+    }
   };
   const acceptConfirmedOrder = useCallback((confirmedOrder: CustomerOrderConfirmation) => {
+    if (window.sessionStorage.getItem('open-merch-studio:pending-cart-checkout:v1')) {
+      cart.clear();
+      window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
+    }
     setOrder(confirmedOrder);
     setFlow('confirmed');
     setAnnouncement(`Order ${confirmedOrder.orderNumber} is ready to review.`);
     setWorkbenchMode('order');
-  }, []);
+  }, [cart.clear]);
   const startFresh = () => {
     const confirmed = window.confirm(
-      'Start fresh? This clears the product, prompt, artwork, and price saved in this browser.'
+      'Start fresh? This clears the product, prompt, artwork, cart, and prices saved in this browser.'
     );
     if (!confirmed) return;
     startingFresh.current = true;
     generationController.current?.abort();
     quoteController.current?.abort();
     clearStudioResumeState();
+    cart.clear();
+    window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
     if (session?.id) void api.cleanupSessionUploads(session.id);
     window.location.replace(window.location.pathname);
   };
@@ -1392,6 +1491,9 @@ export function useStudioViewModel() {
     design,
     mockup,
     quote,
+    cart,
+    cartUnitCount: studioCartUnitCount(cart.items),
+    checkoutSource,
     checkout,
     order,
     busy,
@@ -1411,6 +1513,7 @@ export function useStudioViewModel() {
     artworkReady,
     artworkQuoteEligible,
     checkoutReadiness,
+    cartCheckoutReadiness,
     canGenerateAnother,
     canRevise,
     stepStates,
@@ -1440,6 +1543,7 @@ export function useStudioViewModel() {
     createQuote,
     buyStudioPass,
     createCheckout,
+    addCurrentDesignToCart,
     boot,
     navigate,
     acceptConfirmedOrder,
@@ -1449,7 +1553,16 @@ export function useStudioViewModel() {
     showConfigure: () => setWorkbenchMode('configure'),
     showDescribe: () => setWorkbenchMode('describe'),
     showReview: () => setWorkbenchMode('review'),
-    showCheckout: () => setWorkbenchMode('checkout'),
+    showCart: () => setWorkbenchMode('cart'),
+    showCheckout: () => {
+      setCheckoutSource('design');
+      setWorkbenchMode('checkout');
+    },
+    showCartCheckout: () => {
+      setCheckoutSource('cart');
+      setWorkbenchMode('checkout');
+    },
+    showCheckoutBack: () => setWorkbenchMode(checkoutSource === 'cart' ? 'cart' : 'review'),
     dismissRecovery: () => setRecoveryMessage(''),
     dismissFallback: () => setFallback(null),
     clearError,

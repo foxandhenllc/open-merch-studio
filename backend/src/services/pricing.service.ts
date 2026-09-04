@@ -30,6 +30,7 @@ export const pricingSettingsFromEnv = (): PricingSettings => ({
 const roundCents = (value: number) => Math.max(0, Math.round(value));
 
 export const MAX_QUOTE_ITEM_QUANTITY = 25;
+export const MAX_QUOTE_LINE_ITEMS = 10;
 
 /**
  * Enforces the commerce-wide per-line quantity limit at the pricing boundary.
@@ -102,6 +103,9 @@ export function buildQuoteBreakdown(
     providerPricingByVariantId?: Record<string, PrintfulVariantPricing>;
   } = {}
 ): QuoteBreakdown {
+  if (inputItems.length > MAX_QUOTE_LINE_ITEMS) {
+    throw new Error(`A quote can contain at most ${MAX_QUOTE_LINE_ITEMS} configured products.`);
+  }
   const productMap = new Map(products.map((product) => [product.id, product]));
   const items = inputItems.map((input) => {
     const product = productMap.get(input.productId);

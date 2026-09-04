@@ -2201,6 +2201,31 @@ input:focus {
   min-height: 36px;
   padding: 0;
 }
+.header-cart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.header-cart span {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  padding-inline: 5px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 10px;
+}
 .streamlined-app > .step-rail {
   height: 58px;
   margin: 0 auto;
@@ -2712,6 +2737,57 @@ input:focus {
 .review-total strong {
   font-size: 25px;
   letter-spacing: -0.05em;
+}
+.cart-lines {
+  display: grid;
+  gap: 10px;
+}
+.cart-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.cart-line > div,
+.cart-line label {
+  display: grid;
+  gap: 4px;
+}
+.cart-line span,
+.cart-line small,
+.cart-line label {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+.cart-line select {
+  min-width: 68px;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.cart-line > .text-action {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.cart-total {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-block: 16px;
+  border-block: 1px solid var(--line);
+}
+.cart-total span {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+.cart-total strong {
+  font-size: 23px;
 }
 .print-area-review {
   display: grid;

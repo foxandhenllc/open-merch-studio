@@ -29,6 +29,7 @@ export type ReviewDesignOptions = {
 
 export type ReviewPanelActions = {
   onQuantityChange: (quantity: number) => void;
+  onAddToCart: () => void;
   onEditAreas: () => void;
   onCustomizePlacement: (code: string) => void;
   onReusePlacementArtwork: (sourceCode: string, targetCode: string) => void;

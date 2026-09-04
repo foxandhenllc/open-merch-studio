@@ -10,6 +10,16 @@ import { buildPlacementSelections } from './studio-view-model.selectors';
 
 export const MAX_STUDIO_ITEM_QUANTITY = 25;
 
+export type StudioQuoteItemInput = {
+  productId: string;
+  variantId: string;
+  quantity: number;
+  placementCodes: string[];
+  placements: ReturnType<typeof buildPlacementSelections>;
+  orientation?: PreviewOrientation;
+  designAssetId: string;
+};
+
 /** Normalizes browser input for presentation; the quote API independently validates the result. */
 export function normalizeStudioItemQuantity(value: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -27,7 +37,11 @@ export function prepareQuoteRequest(params: {
   quantity: number;
   mugLayout: PlacementLayout;
   orientation?: PreviewOrientation;
-}) {
+}): {
+  sessionId?: string;
+  studioPassId?: string;
+  items: StudioQuoteItemInput[];
+} | null {
   if (!params.design.id) return null;
   return {
     sessionId: params.sessionId,

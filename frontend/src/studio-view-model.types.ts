@@ -19,6 +19,7 @@ export type WorkbenchMode =
   | 'describe'
   | 'generating'
   | 'review'
+  | 'cart'
   | 'checkout'
   | 'order';
 

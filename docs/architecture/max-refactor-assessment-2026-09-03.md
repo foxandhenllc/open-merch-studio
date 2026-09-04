@@ -479,3 +479,29 @@ should follow that cart boundary rather than be folded into it.
 This checkpoint passed lint, typecheck, 86 backend tests (83 passed and three database-only skips),
 both frontend contracts, the explicit fixture smoke, production build/static-route verification,
 the production dependency audit, and the complete 11-viewport browser suite.
+
+## Guest cart product checkpoint
+
+Completed September 3, 2026:
+
+- Added an isolated guest-cart hook and pure cart module instead of expanding the active-design
+  state machine with a second set of quote lifecycle rules.
+- Captured each configured product as an immutable quote input, including exact per-placement
+  artwork IDs, variant, orientation, layout, and quantity.
+- Added session-bound browser persistence, per-line quantity updates/removal, a combined fresh quote,
+  a responsive cart panel, and a compact always-visible cart count.
+- Added matching browser and server limits of ten configured lines and retained the existing 1–25
+  quantity boundary for every line.
+- Kept fixture checkout available for no-charge testing while preserving the existing server-side
+  production checkout authorization boundary.
+- Proved two different products and quantities through combined request payload, reload recovery,
+  customer checkout, fixture fulfillment, order-summary quantities, and post-confirmation clearing.
+
+The guest cart is intentionally not an account or durable product library. Its saved inputs belong
+to one design session and remain in that browser. Durable owner products and mini-store collections
+require organization ownership, access control, and immutable design versions rather than reusing
+this local-storage boundary.
+
+This checkpoint passed lint, typecheck, 87 backend tests (84 passed and three database-only skips),
+both frontend contracts, production build/static-route verification, and the complete 11-viewport
+browser suite plus the two-product cart and no-charge checkout journey.

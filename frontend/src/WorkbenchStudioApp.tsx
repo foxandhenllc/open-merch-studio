@@ -3,6 +3,7 @@ import { CatalogPanel } from '@components/CatalogPanel';
 import { CheckoutPanel } from '@components/CheckoutPanel';
 import { ConfigurationPanel } from '@components/ConfigurationPanel';
 import { ArtworkSourcePanel } from '@components/ArtworkSourcePanel';
+import { CartPanel } from '@components/CartPanel';
 import { ErrorNote } from '@components/ErrorNote';
 import { GenerationStage } from '@components/GenerationStage';
 import { OrderTimeline } from '@components/OrderTimeline';
@@ -138,6 +139,7 @@ export function WorkbenchStudioApp() {
     describe: activePlacement ? `Create the ${activePlacement.displayName}` : 'Describe your design',
     generating: 'Making your artwork',
     review: reviewSettling ? 'Finishing your preview' : 'Your design is ready',
+    cart: 'Your cart',
     checkout: 'Review and checkout',
     order: 'Your order',
   }[vm.workbenchMode];
@@ -158,6 +160,9 @@ export function WorkbenchStudioApp() {
           </span>
         </a>
         <div className="compact-header__actions">
+          <button className="header-cart" type="button" onClick={vm.showCart}>
+            Cart <span aria-label={`${vm.cartUnitCount} items`}>{vm.cartUnitCount}</span>
+          </button>
           <a href="/support">Support</a>
           <button className="text-action" type="button" onClick={vm.startFresh}>
             Start fresh
@@ -381,6 +386,7 @@ export function WorkbenchStudioApp() {
                 }}
                 actions={{
                   onQuantityChange: vm.setQuantity,
+                  onAddToCart: vm.addCurrentDesignToCart,
                   onEditAreas: vm.showConfigure,
                   onCustomizePlacement: vm.customizePlacement,
                   onReusePlacementArtwork: vm.reusePlacementArtwork,
@@ -400,21 +406,45 @@ export function WorkbenchStudioApp() {
               />
             )}
 
+            {vm.workbenchMode === 'cart' && (
+              <CartPanel
+                items={vm.cart.items}
+                quote={vm.cart.quote}
+                quoteStale={vm.cart.quoteStale}
+                quoteExpired={vm.cart.quoteExpired}
+                quoting={vm.cart.quoting}
+                error={vm.cart.error}
+                onQuantityChange={vm.cart.updateQuantity}
+                onRemove={vm.cart.remove}
+                onRefreshQuote={vm.cart.refreshQuote}
+                onKeepShopping={vm.showProduct}
+                onCheckout={vm.showCartCheckout}
+              />
+            )}
+
             {vm.workbenchMode === 'checkout' && (
               <CheckoutPanel
-                quote={vm.quote}
-                quoting={vm.busy.quoting}
-                quoteStale={vm.quoteStale}
-                quoteExpired={vm.quoteExpired}
-                onRefreshQuote={vm.createQuote}
+                quote={vm.checkoutSource === 'cart' ? vm.cart.quote : vm.quote}
+                quoting={vm.checkoutSource === 'cart' ? vm.cart.quoting : vm.busy.quoting}
+                quoteStale={vm.checkoutSource === 'cart' ? vm.cart.quoteStale : vm.quoteStale}
+                quoteExpired={
+                  vm.checkoutSource === 'cart' ? vm.cart.quoteExpired : vm.quoteExpired
+                }
+                onRefreshQuote={
+                  vm.checkoutSource === 'cart' ? vm.cart.refreshQuote : vm.createQuote
+                }
                 email={vm.email}
                 onEmailChange={vm.setEmail}
-                readiness={vm.checkoutReadiness}
+                readiness={
+                  vm.checkoutSource === 'cart'
+                    ? vm.cartCheckoutReadiness
+                    : vm.checkoutReadiness
+                }
                 checkoutEnabled={publicConfig.enablePublicCheckout}
                 checkoutBusy={vm.busy.checkout}
                 checkoutError={vm.errors.checkout}
                 onCheckout={vm.createCheckout}
-                onBack={vm.showReview}
+                onBack={vm.showCheckoutBack}
               />
             )}
 

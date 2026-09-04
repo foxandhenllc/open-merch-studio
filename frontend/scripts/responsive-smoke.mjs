@@ -1309,6 +1309,88 @@ async function exerciseUploadedArtworkAndReferences(browser) {
   }
 }
 
+async function exerciseGuestCartJourney(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const quoteBodies = [];
+  await context.route('**/api/design/drafts', (route) => route.abort('failed'));
+  await context.route('**/api/catalog/quotes', async (route) => {
+    quoteBodies.push(route.request().postDataJSON());
+    await route.abort('failed');
+  });
+  const page = await context.newPage();
+  const makeProduct = async (productName, prompt) => {
+    await page.getByRole('button', { name: productName }).first().click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('textbox', { name: /What should we make/ }).fill(prompt);
+    await page.getByRole('button', { name: 'Generate my design', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your design is ready' }).waitFor({ timeout: 30_000 });
+  };
+
+  try {
+    await openProduct(page);
+    await makeProduct(
+      /Heavyweight Cotton Tee/,
+      'An original orange workshop badge with a bold ampersand and no other words'
+    );
+    await page.getByLabel('Quantity').selectOption('2');
+    await page.getByRole('button', { name: /Add to cart/ }).click();
+    await page.getByRole('heading', { name: 'Choose a product' }).waitFor();
+    await page.getByLabel('2 items').waitFor();
+
+    await page.getByRole('button', { name: 'Bags', exact: true }).click();
+    await makeProduct(/Everyday Canvas Tote/, 'A simple original black linework fox and hen emblem');
+    await page.getByRole('button', { name: /Add to cart/ }).click();
+    await page.getByLabel('3 items').waitFor();
+    await page.getByRole('button', { name: /Cart/ }).click();
+    await page.getByRole('heading', { name: 'Your cart' }).waitFor();
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('.cart-line').length === 2 &&
+        document.querySelector('.cart-total strong')?.textContent !== 'Updating…'
+    );
+    const combinedQuote = quoteBodies.findLast((body) => body.items.length === 2);
+    assert.deepEqual(
+      combinedQuote.items.map((item) => item.quantity),
+      [2, 1],
+      'the cart quote must submit both configured products and their quantities'
+    );
+
+    const updatedQuoteRequest = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === '/api/catalog/quotes' &&
+        request.postDataJSON()?.items?.length === 2
+    );
+    await page.getByLabel('Quantity for Everyday Canvas Tote').selectOption('3');
+    const updatedQuote = (await updatedQuoteRequest).postDataJSON();
+    assert.deepEqual(updatedQuote.items.map((item) => item.quantity), [2, 3]);
+    await page.getByLabel('5 items').waitFor();
+    await assertNoHorizontalOverflow(page, '390x844 guest cart');
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByLabel('5 items').waitFor();
+    await page.getByRole('button', { name: /Cart/ }).click();
+    assert.equal(await page.locator('.cart-line').count(), 2, 'guest cart should survive a reload');
+    await page.waitForFunction(
+      () => document.querySelector('.cart-total strong')?.textContent !== 'Updating…'
+    );
+    await page.getByRole('button', { name: 'Review cart and checkout' }).click();
+    await page.getByRole('heading', { name: 'Review and checkout' }).waitFor();
+    await page.getByRole('textbox', { name: 'Email for receipt' }).fill('cart.test@example.com');
+    await page.getByRole('checkbox', { name: /I confirm that I am at least 18/ }).check();
+    await page.getByRole('button', { name: 'Continue to secure checkout' }).click();
+    await page.getByRole('heading', { name: 'Your order' }).waitFor();
+    const orderItems = page.locator('.customer-order-items');
+    await orderItems.getByText('Heavyweight Cotton Tee', { exact: true }).waitFor();
+    await orderItems.getByText('Everyday Canvas Tote', { exact: true }).waitFor();
+    const orderItemDetails = await orderItems.locator('span').allTextContents();
+    assert.match(orderItemDetails[0] ?? '', /Qty 2$/);
+    assert.match(orderItemDetails[1] ?? '', /Qty 3$/);
+    await page.getByLabel('0 items').waitFor();
+  } finally {
+    await context.close();
+  }
+}
+
 try {
   await waitForServer();
   const browser = await chromium.launch({ headless: true });
@@ -1338,6 +1420,7 @@ try {
     await exerciseCheckoutReloadRecovery(browser);
     await exerciseLegacyRecoveryExpiry(browser);
     await exerciseUploadedArtworkAndReferences(browser);
+    await exerciseGuestCartJourney(browser);
     await exercisePolicyPages(browser);
     process.stdout.write(
       'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, and the recoverable fixture checkout flow.\n'

@@ -28,6 +28,12 @@ import {
   quoteAnnouncement,
 } from '../src/studio-quote.ts';
 import {
+  createStudioCartItem,
+  prepareCartQuoteRequest,
+  studioCartUnitCount,
+  updateStudioCartItemQuantity,
+} from '../src/studio-cart.ts';
+import {
   checkoutNotReadyError,
   checkoutUnavailable,
   classifyCheckoutResult,
@@ -351,6 +357,23 @@ assert.deepEqual(
   preparedQuote.items[0]?.placements.map((placement) => placement.designAssetId),
   [front.id, back.id],
   'quote requests must price the same distinct artwork assignments used by mockups'
+);
+const firstCartItem = createStudioCartItem({
+  product: tee,
+  variant: tee.variants[0]!,
+  quantity: 2,
+  selectedPlacements: ['front', 'back'],
+  design: front,
+  placementArtwork: { front, back },
+  mugLayout: 'center',
+});
+assert.ok(firstCartItem);
+const updatedCartItem = updateStudioCartItemQuantity(firstCartItem, 3);
+assert.equal(studioCartUnitCount([updatedCartItem]), 3);
+assert.deepEqual(
+  prepareCartQuoteRequest({ items: [updatedCartItem], sessionId: 'fixture-session' })?.items,
+  [updatedCartItem.line],
+  'cart quotes must reuse the immutable configured line rather than reconstructing artwork'
 );
 assert.equal(
   quoteAnnouncement({ currency: 'USD', totalCents: 2855 } as QuoteBreakdown, true),
