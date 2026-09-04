@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Community Gear Lab synthetic example">
+  <rect width="512" height="512" rx="80" fill="#fff8ec"/>
+  <circle cx="256" cy="230" r="170" fill="#17221b"/>
+  <text x="256" y="255" text-anchor="middle" font-family="sans-serif" font-size="90" font-weight="700" fill="#fff8ec">CGL</text>
+  <text x="256" y="454" text-anchor="middle" font-family="sans-serif" font-size="26" fill="#17221b">SYNTHETIC EXAMPLE</text>
+</svg>

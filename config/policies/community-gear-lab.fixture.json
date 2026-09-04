@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "purpose": "fixture-only",
+  "merchant": {
+    "displayName": "Community Gear Lab",
+    "canonicalUrl": "https://merch.example.org",
+    "legalName": "Example Community Company LLC",
+    "disclosure": "Community Gear Lab is operated by Example Community Company LLC.",
+    "supportEmail": "support@example.org",
+    "countryCode": "US"
+  },
+  "approvedVersion": "2026-09-04",
+  "lastApprovedDate": "2026-09-04",
+  "pages": {
+    "/privacy": {
+      "eyebrow": "Privacy",
+      "title": "Privacy Policy",
+      "summary": "Synthetic fixture demonstration only. These are not approved legal terms and cannot be used for commerce.",
+      "sections": [
+        {
+          "heading": "Demonstration identity",
+          "body": "Community Gear Lab is a synthetic example operated for this rehearsal as Example Community Company LLC. Support identity: support@example.org."
+        },
+        {
+          "heading": "Fixture boundary",
+          "body": "This page demonstrates selecting explicit policy content for another operator. No legal sufficiency or operator approval is claimed. Live payment and fulfillment remain disabled."
+        }
+      ]
+    },
+    "/terms": {
+      "eyebrow": "Terms",
+      "title": "Terms of Use",
+      "summary": "Synthetic fixture demonstration only. These are not approved legal terms and cannot be used for commerce.",
+      "sections": [
+        {
+          "heading": "Demonstration identity",
+          "body": "Community Gear Lab is a synthetic example operated for this rehearsal as Example Community Company LLC. Support identity: support@example.org."
+        },
+        {
+          "heading": "Fixture boundary",
+          "body": "This page demonstrates selecting explicit policy content for another operator. No legal sufficiency or operator approval is claimed. Live payment and fulfillment remain disabled."
+        }
+      ]
+    },
+    "/returns": {
+      "eyebrow": "Support",
+      "title": "Returns and Refunds Policy",
+      "summary": "Synthetic fixture demonstration only. These are not approved legal terms and cannot be used for commerce.",
+      "sections": [
+        {
+          "heading": "Demonstration identity",
+          "body": "Community Gear Lab is a synthetic example operated for this rehearsal as Example Community Company LLC. Support identity: support@example.org."
+        },
+        {
+          "heading": "Fixture boundary",
+          "body": "This page demonstrates selecting explicit policy content for another operator. No legal sufficiency or operator approval is claimed. Live payment and fulfillment remain disabled."
+        }
+      ]
+    },
+    "/content-policy": {
+      "eyebrow": "Safety",
+      "title": "Content Policy",
+      "summary": "Synthetic fixture demonstration only. These are not approved legal terms and cannot be used for commerce.",
+      "sections": [
+        {
+          "heading": "Demonstration identity",
+          "body": "Community Gear Lab is a synthetic example operated for this rehearsal as Example Community Company LLC. Support identity: support@example.org."
+        },
+        {
+          "heading": "Fixture boundary",
+          "body": "This page demonstrates selecting explicit policy content for another operator. No legal sufficiency or operator approval is claimed. Live payment and fulfillment remain disabled."
+        }
+      ]
+    },
+    "/support": {
+      "eyebrow": "Help",
+      "title": "Support",
+      "summary": "Synthetic fixture demonstration only. These are not approved legal terms and cannot be used for commerce.",
+      "sections": [
+        {
+          "heading": "Demonstration identity",
+          "body": "Community Gear Lab is a synthetic example operated for this rehearsal as Example Community Company LLC. Support identity: support@example.org."
+        },
+        {
+          "heading": "Fixture boundary",
+          "body": "This page demonstrates selecting explicit policy content for another operator. No legal sufficiency or operator approval is claimed. Live payment and fulfillment remain disabled."
+        }
+      ]
+    }
+  }
+}

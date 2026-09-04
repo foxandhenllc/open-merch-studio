@@ -40,7 +40,7 @@ export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => 
   provider: emailProviderFromEnv(source.EMAIL_PROVIDER),
   from: source.EMAIL_FROM?.trim() || undefined,
   replyTo: source.EMAIL_REPLY_TO?.trim() || undefined,
-  supportEmail: source.SUPPORT_EMAIL?.trim() || merchantConfig.operator.supportEmail,
+  supportEmail: merchantConfig.operator.supportEmail,
   resendApiKey: source.RESEND_API_KEY?.trim() || undefined,
   resendWebhookSecret: source.RESEND_WEBHOOK_SECRET?.trim() || undefined,
 });

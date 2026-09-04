@@ -58,3 +58,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run responsive and first-visitor browser smoke coverage
         run: npm run test:browser
+      - name: Rehearse an isolated merchant without provider credentials
+        run: npm run config:rehearse

@@ -6,6 +6,7 @@ import {
   readMerchantConfig,
   validateMerchantConfig,
 } from "./merchant-config.mjs";
+import { readPolicyContent, validatePolicyContent } from "./policy-content.mjs";
 
 const source = { ...process.env };
 for (const file of [".env", "backend/.env", "frontend/.env"]) {
@@ -15,10 +16,17 @@ for (const file of [".env", "backend/.env", "frontend/.env"]) {
 }
 
 const result = diagnoseConfiguration(source);
-const merchantErrors = validateMerchantConfig(
-  readMerchantConfig("config/merchant.config.json"),
-  { checkAssets: true },
-);
+let merchantErrors;
+try {
+  const merchant = readMerchantConfig("config/merchant.config.json");
+  merchantErrors = validateMerchantConfig(merchant, { checkAssets: true });
+  if (!merchantErrors.length)
+    merchantErrors.push(
+      ...validatePolicyContent(readPolicyContent(merchant), merchant),
+    );
+} catch {
+  merchantErrors = ["Merchant or policy document is unreadable."];
+}
 console.log(`Open Merch Studio doctor: ${result.mode}`);
 for (const item of result.checks) {
   console.log(

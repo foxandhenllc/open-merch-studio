@@ -76,7 +76,13 @@ does not.** A reusable store should require:
   longer require source edits for a fork;
 - **Build identity completed September 4, 2026:** canonical URLs, titles, descriptions, social
   metadata, icons, robots directives, and sitemaps now derive from the same manifest. The remaining
-  clean-clone blocker is deliberately separate, operator-approved policy prose—not code or secrets;
+  clean-clone blocker was deliberately separate, operator-approved policy prose;
+- **Policy boundary and isolated rehearsal completed September 4, 2026:** committed policy documents
+  are bound to exact merchant ownership, version/date, and reviewed-content digests. Current OMS
+  paragraphs are unchanged. Community Gear Lab passes a clean install, generated build, server fixture
+  lifecycle, and phone/desktop browser rehearsal with distinct support, pricing, prefix, policy, SEO,
+  and installed-app identity. Its notices remain explicitly synthetic and cannot enable commerce.
+  `npm run config:rehearse` repeats this evidence locally and in CI;
 - one documented Vercel template path and equivalent platform-neutral deployment contract;
 - fixture mode that works from a clean clone before any provider is enabled.
 

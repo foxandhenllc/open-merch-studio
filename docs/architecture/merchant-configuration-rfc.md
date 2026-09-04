@@ -1,6 +1,6 @@
 # Merchant configuration RFC
 
-**Status:** Runtime and build identity implemented; policy-content rehearsal pending
+**Status:** Version 1 configuration contract verified with isolated fixture-profile rehearsal
 
 **Schema:** `config/merchant.config.json`, version 1
 
@@ -10,8 +10,8 @@
 
 Open Merch Studio will use one committed, versioned JSON manifest for non-secret merchant identity
 and presentation. Provider credentials, database locations, webhook secrets, and live authorization
-remain deployment-managed environment values. Policy prose remains operator-approved application
-content; the manifest identifies its routes and approval version but does not generate legal terms.
+remain deployment-managed environment values. Policy prose is a separate committed operator-owned
+JSON document; the manifest pins its path, digest, approval version, and date. It never generates terms.
 
 Project attribution is deliberately separate from merchant branding. A fork can call its store
 “Community Gear Lab” while continuing to identify Open Merch Studio, its source, creator, and MIT
@@ -65,8 +65,9 @@ remediation text, never configured secret values.
 
 ## Versioning and migration
 
-Schema version 1 is a draft until runtime consumers, a clean-clone rehearsal, and a second merchant
-build are verified. Additive optional fields may remain within a version; removing, renaming, or
+Schema version 1 passed runtime, static-build, and isolated second-profile rehearsal on September 4,
+2026. This verifies configuration portability, not legal sufficiency or one-click live activation.
+Its policy paths remain fixed to the current deployment routes. Additive optional fields may remain within a version; removing, renaming, or
 changing field meaning requires a new version and an explicit migration guide. Unsupported versions
 fail closed. Runtime code must not guess a nearest version.
 
@@ -80,10 +81,17 @@ fail closed. Runtime code must not guess a nearest version.
    attribution, customer-email branding, support contact, currency default, Stripe item names,
    pricing label, and order prefix. The active profile preserves current Open Merch Studio output.
 4. **SEO completed September 4, 2026:** derive canonical origins, route titles/descriptions, social
-   identity, icon references, robots output, and sitemap output from the manifest. Runtime policy
-   prose remains operator-approved application content and must be decoupled before a second
-   merchant can pass the clean-clone rehearsal.
-5. Rehearse the synthetic profile from a clean clone in fixture mode before calling version 1 stable.
+   identity, icon references, robots output, and sitemap output from the manifest. The subsequent
+   policy boundary moved approved prose out of `App.tsx`; installed-app metadata and social-image
+   description now derive from the same profile. See [operator policy content](./operator-policy-content.md).
+5. **Completed September 4, 2026:** `npm run config:rehearse` installs indexed source in an isolated
+   temporary directory using `npm ci`, rejects cross-operator policy reuse, generates Community Gear
+   Lab configuration, and runs validation, doctor, lint, type-check, build, fixture checkout, compiled
+   server checks, and mobile/desktop browser verification. Runtime support, order prefix, pricing,
+   policy content/version, canonical metadata, installed-app identity, source, and MIT attribution
+   agree. The synthetic SVG is explicitly a fixture asset, not a tested social-platform preview.
+   Every live provider/payment/fulfillment gate is disabled; no provider credentials are inherited.
+   CI repeats this command. Real merchant policy approval remains mandatory before live activation.
 6. Only then build owner authentication and editable mini-store administration on top of the
    organization boundary.
 

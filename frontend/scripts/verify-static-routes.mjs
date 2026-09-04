@@ -9,6 +9,7 @@ import {
   NOT_FOUND_ROUTE,
   SITE_NAME,
   STATIC_ROUTES,
+  WEB_MANIFEST,
 } from './static-route-config.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -93,6 +94,7 @@ assert.deepEqual(
 const manifest = JSON.parse(
   await readFile(path.join(distDirectory, 'manifest.webmanifest'), 'utf8')
 );
+assert.deepEqual(manifest, WEB_MANIFEST, 'installed app identity must match the selected merchant');
 assert.ok(
   manifest.icons?.some((icon) => icon.src === ICON_PATH && icon.type === 'image/svg+xml'),
   'the web app manifest must expose the OMS icon'

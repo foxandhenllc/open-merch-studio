@@ -2,5 +2,5 @@ export type PolicyRoute = {
   title: string;
   eyebrow: string;
   summary: string;
-  sections: Array<{ heading: string; body: string }>;
+  sections: ReadonlyArray<{ readonly heading: string; readonly body: string }>;
 };

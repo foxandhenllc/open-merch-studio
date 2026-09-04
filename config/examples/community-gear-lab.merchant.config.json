@@ -5,8 +5,8 @@
     "displayName": "Community Gear Lab",
     "shortName": "Gear Lab",
     "shortDescription": "Custom gear for communities and teams",
-    "logoPath": "/icon.svg",
-    "socialImagePath": "/open-merch-studio-share.png",
+    "logoPath": "/community-gear-lab.svg",
+    "socialImagePath": "/community-gear-lab.svg",
     "colors": {
       "background": "#fff8ec",
       "foreground": "#17221b",
@@ -38,7 +38,9 @@
     "returnsPath": "/returns",
     "contentPolicyPath": "/content-policy",
     "approvedVersion": "2026-09-04",
-    "lastApprovedDate": "2026-09-04"
+    "lastApprovedDate": "2026-09-04",
+    "contentFile": "policies/community-gear-lab.fixture.json",
+    "contentSha256": "9748928bf290634f90b9c39de2fe92db179748cafffd62b3fd6893ab0aa41305"
   },
   "attribution": {
     "projectName": "Open Merch Studio",

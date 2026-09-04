@@ -91,8 +91,35 @@ export function validateMerchantConfig(config, options = {}) {
     if (!pathPattern.test(config.policies[key] ?? ""))
       errors.push(`policies.${key} must be a root path.`);
   requireText("policies.approvedVersion", config.policies.approvedVersion);
+  if (
+    !/^policies\/[a-z0-9][a-z0-9.-]*\.json$/.test(
+      config.policies.contentFile ?? "",
+    )
+  )
+    errors.push(
+      "policies.contentFile must identify committed JSON in config/policies.",
+    );
+  if (!/^[a-f0-9]{64}$/.test(config.policies.contentSha256 ?? ""))
+    errors.push(
+      "policies.contentSha256 must pin the operator-reviewed document.",
+    );
+  // Version 1 keeps the deployment route contract fixed. Custom routes need a coordinated migration.
+  for (const [key, route] of Object.entries({
+    privacyPath: "/privacy",
+    termsPath: "/terms",
+    returnsPath: "/returns",
+    contentPolicyPath: "/content-policy",
+  }))
+    if (config.policies[key] !== route)
+      errors.push(`policies.${key} must match the version 1 deployment route.`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(config.policies.lastApprovedDate ?? ""))
     errors.push("policies.lastApprovedDate must use YYYY-MM-DD.");
+  else if (
+    !Number.isFinite(Date.parse(config.policies.lastApprovedDate)) ||
+    new Date(config.policies.lastApprovedDate).toISOString().slice(0, 10) !==
+      config.policies.lastApprovedDate
+  )
+    errors.push("policies.lastApprovedDate must be a real calendar date.");
   for (const key of ["projectName", "licenseName", "creatorName"])
     requireText(`attribution.${key}`, config.attribution[key]);
   for (const key of ["projectUrl", "sourceUrl", "creatorUrl"])
@@ -102,7 +129,13 @@ export function validateMerchantConfig(config, options = {}) {
 }
 
 export function readMerchantConfig(path) {
-  return JSON.parse(readFileSync(path, "utf8"));
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new Error(
+      "Merchant configuration is missing, unreadable, or invalid JSON.",
+    );
+  }
 }
 
 /** Produces the same immutable typed module for browser and server consumers. */

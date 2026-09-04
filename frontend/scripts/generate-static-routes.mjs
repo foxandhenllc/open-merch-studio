@@ -8,12 +8,19 @@ import {
   NOT_FOUND_ROUTE,
   SITE_NAME,
   STATIC_ROUTES,
+  WEB_MANIFEST,
 } from './static-route-config.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const frontendDirectory = path.resolve(scriptDirectory, '..');
 const distDirectory = path.join(frontendDirectory, 'dist');
 const baseDocument = await readFile(path.join(distDirectory, 'index.html'), 'utf8');
+
+await writeFile(
+  path.join(distDirectory, 'manifest.webmanifest'),
+  JSON.stringify(WEB_MANIFEST, null, 2) + '\n',
+  'utf8'
+);
 
 const escapeHtml = (value) =>
   value
@@ -34,7 +41,7 @@ const renderDocument = ({
   description,
   canonicalUrl,
   socialImage = DEFAULT_SOCIAL_IMAGE,
-  socialImageAlt = 'Open Merch Studio with real custom product proofs',
+  socialImageAlt = `${SITE_NAME} with real custom product proofs`,
 }) => {
   const safeTitle = escapeHtml(title);
   const safeDescription = escapeHtml(description);

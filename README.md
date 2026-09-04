@@ -71,9 +71,16 @@ with `npm run config:validate`. Type-checking and builds reject stale generated 
 live commerce authorization remain environment-managed and are never part of that manifest. See
 the [merchant configuration RFC](./docs/architecture/merchant-configuration-rfc.md).
 
-Production builds also derive canonical URLs, search/social metadata, `robots.txt`, and the sitemap
-from the manifest. Policy prose remains an explicitly reviewed operator artifact; changing merchant
-identity does not silently rewrite legal terms.
+Production builds derive canonical URLs, search/social metadata, installed-app identity, `robots.txt`,
+and the sitemap from the manifest. Explicitly reviewed prose lives in `config/policies/`; the manifest
+pins its identity, version, date, and content digest. Changing identity or text cannot silently reuse
+another operator's approval. See [the policy contract](./docs/architecture/operator-policy-content.md).
+
+Run `npm run config:rehearse` to install Git-indexed source in a temporary directory and verify the
+synthetic Community Gear Lab profile in fixture mode. It copies no local secrets or untracked files,
+disables all live provider gates, and checks server behavior and phone/desktop browser journeys.
+Community Gear Lab's notices are demonstration content, not approved legal terms; ordinary and
+Vercel builds reject them. A real merchant must supply its own reviewed policy document.
 
 The example environment keeps live payment and fulfillment gates disabled and permits simulated
 local checkout. Production activation requires deployment-managed credentials and the supervised

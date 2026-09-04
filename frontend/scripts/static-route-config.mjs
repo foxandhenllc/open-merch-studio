@@ -74,6 +74,23 @@ export function buildStaticRouteConfig(merchantConfig) {
     defaultSocialImage: merchantConfig.brand.socialImagePath,
     siteName: brandName,
     iconPath: merchantConfig.brand.logoPath,
+    webManifest: {
+      name: brandName,
+      short_name: merchantConfig.brand.shortName,
+      description: merchantConfig.web.description,
+      start_url: '/',
+      display: 'standalone',
+      background_color: merchantConfig.brand.colors.background,
+      theme_color: merchantConfig.brand.colors.foreground,
+      icons: [
+        {
+          src: merchantConfig.brand.logoPath,
+          sizes: 'any',
+          type: 'image/svg+xml',
+          purpose: 'any maskable',
+        },
+      ],
+    },
     staticRoutes,
     notFoundRoute: {
       output: '404.html',
@@ -89,5 +106,6 @@ export const CANONICAL_ORIGIN = active.canonicalOrigin;
 export const DEFAULT_SOCIAL_IMAGE = active.defaultSocialImage;
 export const SITE_NAME = active.siteName;
 export const ICON_PATH = active.iconPath;
+export const WEB_MANIFEST = active.webManifest;
 export const STATIC_ROUTES = active.staticRoutes;
 export const NOT_FOUND_ROUTE = active.notFoundRoute;

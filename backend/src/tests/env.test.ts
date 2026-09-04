@@ -63,7 +63,7 @@ test('transactional email configuration parses future provider values without se
       provider: 'resend',
       from: 'Open Merch Studio <orders@example.com>',
       replyTo: 'support@example.com',
-      supportEmail: 'help@example.com',
+      supportEmail: 'support@openmerchstudio.com',
       resendApiKey: 're_fixture_key',
       resendWebhookSecret: 'whsec_fixture_value',
     }

@@ -3,6 +3,7 @@ import {
   readMerchantConfig,
   validateMerchantConfig,
 } from "./merchant-config.mjs";
+import { readPolicyContent, validatePolicyContent } from "./policy-content.mjs";
 
 const targets =
   process.argv.length > 2
@@ -14,9 +15,12 @@ const targets =
 let failed = false;
 for (const target of targets) {
   try {
-    const errors = validateMerchantConfig(readMerchantConfig(resolve(target)), {
+    const config = readMerchantConfig(resolve(target));
+    const errors = validateMerchantConfig(config, {
       checkAssets: true,
     });
+    if (!errors.length)
+      errors.push(...validatePolicyContent(readPolicyContent(config), config));
     console.log(`${errors.length ? "FAIL" : "PASS"} ${target}`);
     for (const error of errors) console.error(`  ${error}`);
     failed ||= errors.length > 0;

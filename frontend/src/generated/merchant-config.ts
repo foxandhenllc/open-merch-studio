@@ -47,8 +47,10 @@ export const merchantConfig = {
     termsPath: '/terms',
     returnsPath: '/returns',
     contentPolicyPath: '/content-policy',
-    approvedVersion: '2026-07-17',
-    lastApprovedDate: '2026-07-17',
+    approvedVersion: '2026-09-03',
+    lastApprovedDate: '2026-09-03',
+    contentFile: 'policies/open-merch-studio.json',
+    contentSha256: '39e9a66c6bc474cfeb2735829dffff1de7fd738728054f4e9eb52c16191d90fa',
   },
   attribution: {
     projectName: 'Open Merch Studio',

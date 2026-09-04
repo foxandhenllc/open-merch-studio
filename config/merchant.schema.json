@@ -136,15 +136,19 @@
         "returnsPath",
         "contentPolicyPath",
         "approvedVersion",
-        "lastApprovedDate"
+        "lastApprovedDate",
+        "contentFile",
+        "contentSha256"
       ],
       "properties": {
-        "privacyPath": { "$ref": "#/$defs/path" },
-        "termsPath": { "$ref": "#/$defs/path" },
-        "returnsPath": { "$ref": "#/$defs/path" },
-        "contentPolicyPath": { "$ref": "#/$defs/path" },
+        "privacyPath": { "const": "/privacy" },
+        "termsPath": { "const": "/terms" },
+        "returnsPath": { "const": "/returns" },
+        "contentPolicyPath": { "const": "/content-policy" },
         "approvedVersion": { "$ref": "#/$defs/text" },
-        "lastApprovedDate": { "type": "string", "format": "date" }
+        "lastApprovedDate": { "type": "string", "format": "date" },
+        "contentFile": { "type": "string", "pattern": "^policies/[a-z0-9][a-z0-9.-]*\\.json$" },
+        "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
       }
     },
     "attribution": {

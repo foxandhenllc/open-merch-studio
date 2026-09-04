@@ -1,5 +1,33 @@
 # Max Refactor assessment — September 3, 2026
 
+## Operator policy boundary checkpoint — September 4, 2026
+
+Completed the merchant-configuration policy extraction after reading the current architecture,
+runtime seams, tests, Git state, and source-size audit. `App.tsx` fell from 281 to 58 lines; the new
+render-only policy page is 53 lines. Approved paragraphs moved without wording changes into committed
+public JSON, protected by a regression digest and an operator-owned approval pin. Version/date,
+support identity, checkout acceptance, and generated content now share the reviewed manifest.
+
+Focused validators and the profile browser harness remain below 250 lines each. The repeatable
+isolated Community Gear Lab installation passed clean dependency installation, configuration checks,
+doctor, lint/type-check/build, server fixture lifecycle, and phone/desktop browser verification.
+Synthetic notices remain fixture-only and cannot pass ordinary/Vercel generation or authorize live
+commerce. The rehearsal also closed fixed installed-app identity and social-description seams.
+
+Repository gates passed config validation/check, lint, type-check, 98 backend tests (94 passes and
+four database-dependent skips locally), 15 setup/configuration/policy tests, both frontend contracts,
+build/static-route verification, fixture smoke, and the 150-package production audit with zero
+applicable advisories. Browser verification covered the existing 11 viewports and customer journeys
+plus exact policy paragraphs, support/attribution, persistence, pricing, prefix, and assent payload
+on phone and desktop. PostgreSQL coverage remains a required hosted CI gate.
+
+No touched maintained source exceeds 1,000 lines. Unchanged files above that threshold remain the
+2,205-line core stylesheet, 1,274-line focused stylesheet, and 1,570-line responsive smoke harness.
+Their next extractions are component-owned responsive rules and independent browser journey modules;
+they were deliberately excluded from this policy checkpoint. Generated TypeScript projections are
+excluded from the maintained-source audit. The 925-line studio view model and 959-line order service
+were not expanded.
+
 ## Decision
 
 A staged refactor is warranted, but it should begin after the current mobile, multi-placement,

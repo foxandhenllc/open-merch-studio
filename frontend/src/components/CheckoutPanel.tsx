@@ -3,8 +3,10 @@ import { ErrorNote } from './ErrorNote';
 import { QuoteLedger } from './QuoteLedger';
 import type { CheckoutPanelProps } from './CheckoutPanel.types';
 
-// Change this whenever the customer-facing assent below changes materially.
-const CHECKOUT_POLICY_VERSION = '2026-09-03';
+import { merchantConfig } from '../generated/merchant-config';
+
+// The build verifies that this approval record pins the exact displayed operator policy document.
+const CHECKOUT_POLICY_VERSION = merchantConfig.policies.approvedVersion;
 
 export function CheckoutPanel({
   quote,
