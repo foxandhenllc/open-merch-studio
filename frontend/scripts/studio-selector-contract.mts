@@ -41,10 +41,8 @@ import {
   orderDetailsPendingError,
   prepareCheckoutRequest,
 } from '../src/studio-checkout.ts';
-import {
-  parseCheckoutHandoff,
-  removeCheckoutHandoffParams,
-} from '../src/checkout-return.ts';
+import { parseCheckoutHandoff, removeCheckoutHandoffParams } from '../src/checkout-return.ts';
+import { parseCustomerOrderAccessHash } from '../src/order-access.ts';
 import {
   artworkAssignmentsForDraft,
   buildPlacementSelections,
@@ -60,16 +58,23 @@ import type {
 } from '../src/types/catalog.ts';
 import { ApiError } from '../src/services/api-error.ts';
 
+const emailAccessToken = `oma_${'a'.repeat(43)}`;
+assert.deepEqual(
+  parseCustomerOrderAccessHash(`#order=order_email_test&access=${emailAccessToken}`),
+  { orderId: 'order_email_test', token: emailAccessToken },
+  'email handoffs must accept the exact bounded order capability format'
+);
+assert.equal(
+  parseCustomerOrderAccessHash('#order=../../operator&access=oma_short'),
+  null,
+  'malformed email handoffs must not reach customer order APIs'
+);
+
 const front = createLocalDesignDraft('Front selector artwork', undefined, ['front']);
 const back = createLocalDesignDraft('Back selector artwork', undefined, ['back']);
 assert.ok(front.id && back.id);
 
-const reused = buildPlacementSelections(
-  ['front', 'back'],
-  front,
-  { front, back: front },
-  'center'
-);
+const reused = buildPlacementSelections(['front', 'back'], front, { front, back: front }, 'center');
 assert.deepEqual(
   reused.map((placement) => placement.designAssetId),
   [front.id, front.id],
@@ -235,7 +240,11 @@ assert.deepEqual(
 assert.deepEqual(referenceAssetIds([front, { ...back, id: null }]), [front.id]);
 
 const history = appendDesignHistory([], front);
-assert.deepEqual(appendDesignHistory(history, front), history, 'history must not duplicate a draft');
+assert.deepEqual(
+  appendDesignHistory(history, front),
+  history,
+  'history must not duplicate a draft'
+);
 
 const targetedArtwork = acceptArtworkDraft({
   draft: back,
@@ -247,11 +256,7 @@ assert.equal(targetedArtwork.front?.id, front.id);
 assert.equal(targetedArtwork.back?.id, back.id);
 
 const revisedFront = { ...front, id: 'revised-front' };
-const replacedArtwork = replaceDraftAssignments(
-  { front, back },
-  front.id,
-  revisedFront
-);
+const replacedArtwork = replaceDraftAssignments({ front, back }, front.id, revisedFront);
 assert.equal(replacedArtwork.front?.id, revisedFront.id);
 assert.equal(
   replacedArtwork.back?.id,
@@ -286,9 +291,7 @@ assert.throws(
       policy: { status: 'needs_review', reasons: ['Provider did not finish.'] },
     }),
   (error: unknown) =>
-    error instanceof ApiError &&
-    error.status === 503 &&
-    error.code === 'design_generation_failed'
+    error instanceof ApiError && error.status === 503 && error.code === 'design_generation_failed'
 );
 
 const preparedMockup = prepareMockupRequest(
@@ -447,7 +450,12 @@ assert.deepEqual(
   { kind: 'inline-order', order: inlineOrder }
 );
 assert.deepEqual(
-  classifyCheckoutResult({ ...checkoutBase, status: 'paid', checkoutUrl: null, orderId: 'order-1' }),
+  classifyCheckoutResult({
+    ...checkoutBase,
+    status: 'paid',
+    checkoutUrl: null,
+    orderId: 'order-1',
+  }),
   { kind: 'lookup-order', orderId: 'order-1' }
 );
 assert.deepEqual(

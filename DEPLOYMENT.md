@@ -52,10 +52,10 @@ Printful mockup generation uses `PRINTFUL_MOCKUP_TIMEOUT_MS` to cap provider pol
 
 The Open Merch Studio production deployment was rechecked on September 3, 2026 with
 `CHECKOUT_ACCESS_MODE=public`, live Stripe and Printful adapters enabled, payment and fulfillment
-authorization enabled, and `PRINTFUL_AUTO_CONFIRM_ORDERS=false`. Transactional email delivery and
-scheduled shipment reconciliation are not part of that launch contract. Signed Printful shipment
-and delivery webhooks are active and production-fixture verified; OMS transactional email remains
-disabled until its sender is verified and an inbox receipt passes. See
+authorization enabled, and `PRINTFUL_AUTO_CONFIRM_ORDERS=false`. Signed Printful shipment and
+delivery webhooks are active and production-fixture verified. Branded OMS transactional email was
+enabled after sender verification, exactly-once fixture coverage, and an external inbox delivery
+test. Scheduled shipment reconciliation is not yet part of the launch contract. See
 [the current post-payment experience](./docs/architecture/current-post-payment-experience.md).
 
 `gpt-image-2` is the default design model. Because that model does not emit transparent backgrounds, set `REMOVE_BG_API_KEY` to enable the automatic post-generation background-removal stage. Without it, generation and mockups still work, but print readiness shows a warning until a transparent file is prepared.

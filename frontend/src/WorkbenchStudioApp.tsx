@@ -13,6 +13,7 @@ import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
 import { publicConfig } from './config';
 import { useCheckoutReturn } from './hooks/useCheckoutReturn';
+import { useOrderRevisit } from './hooks/useOrderRevisit';
 import { useStudioViewModel } from './studio-view-model';
 import { formatMoney } from './utils/currency';
 
@@ -62,11 +63,14 @@ export function WorkbenchStudioApp() {
     studioReady,
     onConfirmedOrder: vm.acceptConfirmedOrder,
   });
+  const orderRevisit = useOrderRevisit({
+    studioReady,
+    onConfirmedOrder: vm.acceptConfirmedOrder,
+  });
 
   useLayoutEffect(() => {
     if (taskPanelScroll.current) taskPanelScroll.current.scrollTop = 0;
   }, [vm.workbenchMode]);
-
 
   useEffect(() => {
     if (!studioReady || vm.workbenchMode === 'generating') return undefined;
@@ -136,7 +140,9 @@ export function WorkbenchStudioApp() {
   const panelTitle = {
     product: 'Choose a product',
     configure: 'Choose color and size',
-    describe: activePlacement ? `Create the ${activePlacement.displayName}` : 'Describe your design',
+    describe: activePlacement
+      ? `Create the ${activePlacement.displayName}`
+      : 'Describe your design',
     generating: 'Making your artwork',
     review: reviewSettling ? 'Finishing your preview' : 'Your design is ready',
     cart: 'Your cart',
@@ -170,7 +176,27 @@ export function WorkbenchStudioApp() {
         </div>
       </header>
 
-      {checkoutReturn ? (
+      {orderRevisit.loading ? (
+        <div className="checkout-return compact-return">
+          <StatusNote tone="info" title="Opening your order">
+            <p>Loading the private order details from your email link…</p>
+          </StatusNote>
+        </div>
+      ) : orderRevisit.error ? (
+        <div className="checkout-return compact-return">
+          <StatusNote
+            tone="warning"
+            title="We couldn’t open that order"
+            primaryAction={
+              orderRevisit.retryable
+                ? { label: 'Try again', onClick: orderRevisit.retry }
+                : { label: 'Dismiss', onClick: orderRevisit.dismiss }
+            }
+          >
+            <p>{orderRevisit.error}</p>
+          </StatusNote>
+        </div>
+      ) : checkoutReturn ? (
         <div className="checkout-return compact-return">
           <StatusNote
             tone={
@@ -197,8 +223,8 @@ export function WorkbenchStudioApp() {
               <p>
                 {checkoutReturn.order.orderNumber} ·{' '}
                 {formatMoney(checkoutReturn.order.totalCents, checkoutReturn.order.currency)}{' '}
-                including {formatMoney(checkoutReturn.order.taxCents, checkoutReturn.order.currency)}{' '}
-                tax
+                including{' '}
+                {formatMoney(checkoutReturn.order.taxCents, checkoutReturn.order.currency)} tax
               </p>
             )}
           </StatusNote>
@@ -427,18 +453,14 @@ export function WorkbenchStudioApp() {
                 quote={vm.checkoutSource === 'cart' ? vm.cart.quote : vm.quote}
                 quoting={vm.checkoutSource === 'cart' ? vm.cart.quoting : vm.busy.quoting}
                 quoteStale={vm.checkoutSource === 'cart' ? vm.cart.quoteStale : vm.quoteStale}
-                quoteExpired={
-                  vm.checkoutSource === 'cart' ? vm.cart.quoteExpired : vm.quoteExpired
-                }
+                quoteExpired={vm.checkoutSource === 'cart' ? vm.cart.quoteExpired : vm.quoteExpired}
                 onRefreshQuote={
                   vm.checkoutSource === 'cart' ? vm.cart.refreshQuote : vm.createQuote
                 }
                 email={vm.email}
                 onEmailChange={vm.setEmail}
                 readiness={
-                  vm.checkoutSource === 'cart'
-                    ? vm.cartCheckoutReadiness
-                    : vm.checkoutReadiness
+                  vm.checkoutSource === 'cart' ? vm.cartCheckoutReadiness : vm.checkoutReadiness
                 }
                 checkoutEnabled={publicConfig.enablePublicCheckout}
                 checkoutBusy={vm.busy.checkout}

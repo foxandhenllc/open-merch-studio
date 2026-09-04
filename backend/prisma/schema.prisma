@@ -369,12 +369,13 @@ model OrderAccessGrant {
   id         String    @id @default(uuid())
   orderId    String
   tokenHash  String    @unique
+  purpose    String    @default("browser")
   revokedAt  DateTime?
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
   order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@index([orderId, revokedAt])
+  @@index([orderId, purpose, revokedAt])
   @@map("order_access_grants")
 }
 

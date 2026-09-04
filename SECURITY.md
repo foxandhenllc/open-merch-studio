@@ -16,3 +16,5 @@ Open a [private GitHub security advisory](https://github.com/foxandhenllc/open-m
 - Rotate any credential that may have been committed, logged, or shared.
 - Treat customer order-access values as bearer credentials: store only their digest server-side,
   send them only in the `Authorization` header, and revoke them through the protected operator API.
+- Put emailed order-access handoffs in a URL fragment, never a query string. Capture and remove the
+  fragment before analytics mount, and never persist the raw value in a server or delivery record.

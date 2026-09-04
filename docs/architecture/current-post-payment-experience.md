@@ -1,6 +1,6 @@
 # Current post-payment customer experience
 
-Last verified from repository behavior and production configuration: September 3, 2026.
+Last verified from repository behavior and production configuration: September 4, 2026.
 
 ## What happens today
 
@@ -9,7 +9,8 @@ Last verified from repository behavior and production configuration: September 3
    but the signed Stripe webhook remains the authoritative payment event.
 3. OMS records the paid order durably and displays an OMS order number, items, charged total, and a
    customer-safe timeline. It also sends an idempotent OMS order-received email from the branded
-   `orders@openmerchstudio.com` sender.
+   `orders@openmerchstudio.com` sender with a private link for returning to the order or using
+   **Buy again** from another device.
 4. OMS validates the saved product, artwork, print areas, and shipping data, then creates an editable
    Printful draft.
 5. The draft stays in manual review. It is not automatically confirmed for production.
@@ -25,6 +26,7 @@ launch contract.
 - An OMS order number and safe status language such as Received or Under review.
 - A support path that uses the order number rather than exposing provider identifiers.
 - A manual artwork and fulfillment review before money is committed to Printful production.
+- A private receipt link that restores the safe order view and current-price **Buy again** flow.
 
 ## Notification and tracking foundation
 
@@ -83,9 +85,10 @@ is:
 
 1. Observe one supervised real order and shipment lifecycle, including each customer email.
 2. Add scheduled reconciliation for missed events and shipment-item allocation.
-3. **Completed September 4, 2026:** replace the public order lookup boundary with a rotating,
-   revocable opaque credential and use it for a safe **Buy again** cart reconstruction. A durable
-   customer-facing revisit link remains separate follow-up work.
+3. **Completed September 4, 2026:** replace the public order lookup boundary with rotating,
+   revocable, purpose-scoped opaque credentials; use them for a safe **Buy again** cart
+   reconstruction; and place an independently revocable private revisit link in the order-received
+   email. The browser removes that link's fragment before analytics mount.
 
 Official references:
 

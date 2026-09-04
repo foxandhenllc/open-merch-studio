@@ -22,6 +22,7 @@ import {
   customerOrderAccessIsValid,
   issueCustomerOrderAccess,
   revokeCustomerOrderAccess,
+  revokeCustomerOrderAccessToken,
 } from '../services/customer-order-access.service.js';
 
 test(
@@ -50,8 +51,28 @@ test(
       const second = await issueCustomerOrderAccess(orderId);
       assert.equal(await customerOrderAccessIsValid(orderId, first.token), false);
       assert.equal(await customerOrderAccessIsValid(orderId, second.token), true);
-      assert.equal(await revokeCustomerOrderAccess(orderId), 1);
+
+      const email = await issueCustomerOrderAccess(orderId, 'email_order_received');
+      assert.equal(await customerOrderAccessIsValid(orderId, second.token), true);
+      assert.equal(await customerOrderAccessIsValid(orderId, email.token), true);
+      const purposes = await prisma.orderAccessGrant.findMany({
+        where: { orderId, revokedAt: null },
+        select: { purpose: true },
+      });
+      assert.deepEqual(purposes.map(({ purpose }) => purpose).sort(), [
+        'browser',
+        'email_order_received',
+      ]);
+
+      const third = await issueCustomerOrderAccess(orderId);
       assert.equal(await customerOrderAccessIsValid(orderId, second.token), false);
+      assert.equal(await customerOrderAccessIsValid(orderId, third.token), true);
+      assert.equal(await customerOrderAccessIsValid(orderId, email.token), true);
+      assert.equal(await revokeCustomerOrderAccessToken(orderId, email.token), true);
+      assert.equal(await customerOrderAccessIsValid(orderId, email.token), false);
+      assert.equal(await customerOrderAccessIsValid(orderId, third.token), true);
+      assert.equal(await revokeCustomerOrderAccess(orderId), 1);
+      assert.equal(await customerOrderAccessIsValid(orderId, third.token), false);
     } finally {
       await prisma.order.deleteMany({ where: { id: orderId } });
     }

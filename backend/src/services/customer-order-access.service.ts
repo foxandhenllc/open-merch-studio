@@ -7,6 +7,7 @@ const TOKEN_PATTERN = /^oma_[A-Za-z0-9_-]{43}$/;
 
 type RuntimeGrant = {
   orderId: string;
+  purpose: CustomerOrderAccessPurpose;
   revokedAt?: string;
 };
 
@@ -22,30 +23,57 @@ export type CustomerOrderAccess = {
   token: string;
 };
 
+export type CustomerOrderAccessPurpose = 'browser' | 'email_order_received';
+
 /**
- * Rotates the active customer credential and stores only its digest.
+ * Rotates one purpose-scoped customer credential and stores only its digest.
  *
- * Rotation makes repeated Stripe-session exchanges safe: a newly issued browser credential
- * invalidates any older link without retaining a recoverable bearer value in OMS storage.
+ * Browser and email credentials rotate independently. This lets repeated Stripe-session exchanges
+ * replace stale browser credentials without invalidating the durable link sent in the receipt.
  */
-export async function issueCustomerOrderAccess(orderId: string): Promise<CustomerOrderAccess> {
+export async function issueCustomerOrderAccess(
+  orderId: string,
+  purpose: CustomerOrderAccessPurpose = 'browser'
+): Promise<CustomerOrderAccess> {
   const token = createToken();
   const hash = tokenHash(token);
   if (env.databaseUrl) {
     await prisma.$transaction([
       prisma.orderAccessGrant.updateMany({
-        where: { orderId, revokedAt: null },
+        where: { orderId, purpose, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
-      prisma.orderAccessGrant.create({ data: { orderId, tokenHash: hash } }),
+      prisma.orderAccessGrant.create({ data: { orderId, tokenHash: hash, purpose } }),
     ]);
   } else {
     for (const [storedHash, grant] of runtimeGrants) {
-      if (grant.orderId === orderId && !grant.revokedAt) runtimeGrants.delete(storedHash);
+      if (grant.orderId === orderId && grant.purpose === purpose && !grant.revokedAt) {
+        runtimeGrants.delete(storedHash);
+      }
     }
-    runtimeGrants.set(hash, { orderId });
+    runtimeGrants.set(hash, { orderId, purpose });
   }
   return { orderId, token };
+}
+
+/** Revokes one known bearer after a definite delivery failure without affecting other channels. */
+export async function revokeCustomerOrderAccessToken(
+  orderId: string,
+  token: string
+): Promise<boolean> {
+  if (!TOKEN_PATTERN.test(token)) return false;
+  const hash = tokenHash(token);
+  if (env.databaseUrl) {
+    const result = await prisma.orderAccessGrant.updateMany({
+      where: { orderId, tokenHash: hash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count === 1;
+  }
+  const grant = runtimeGrants.get(hash);
+  if (!grant || grant.orderId !== orderId || grant.revokedAt) return false;
+  runtimeGrants.set(hash, { ...grant, revokedAt: new Date().toISOString() });
+  return true;
 }
 
 export async function customerOrderAccessIsValid(

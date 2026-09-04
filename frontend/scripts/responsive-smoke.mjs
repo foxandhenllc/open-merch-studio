@@ -1219,7 +1219,10 @@ async function exerciseUploadedArtworkAndReferences(browser) {
   const assertNoPageErrors = watchPageErrors(page, 'uploaded artwork and references');
   const chooseTeeAndContinue = async () => {
     await openProduct(page);
-    await page.getByRole('button', { name: /Heavyweight Cotton Tee/ }).first().click();
+    await page
+      .getByRole('button', { name: /Heavyweight Cotton Tee/ })
+      .first()
+      .click();
     await page.getByRole('button', { name: 'White', exact: true }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
   };
@@ -1233,7 +1236,11 @@ async function exerciseUploadedArtworkAndReferences(browser) {
     await chooseTeeAndContinue();
     await page.getByRole('button', { name: /Use my artwork/ }).click();
     const prepare = page.getByRole('button', { name: 'Prepare my artwork', exact: true });
-    assert.equal(await prepare.isDisabled(), true, 'direct upload should require a file and rights');
+    assert.equal(
+      await prepare.isDisabled(),
+      true,
+      'direct upload should require a file and rights'
+    );
     await page.locator('.upload-drop input[type=file]').setInputFiles(sampleFile);
     assert.equal(await prepare.isDisabled(), true, 'a selected file should still require rights');
     await page.getByRole('checkbox', { name: /permission to reproduce/i }).check();
@@ -1256,7 +1263,10 @@ async function exerciseUploadedArtworkAndReferences(browser) {
 
     await page.goto(origin, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /^Step 1: Product/ }).click();
-    await page.getByRole('button', { name: /Heavyweight Cotton Tee/ }).first().click();
+    await page
+      .getByRole('button', { name: /Heavyweight Cotton Tee/ })
+      .first()
+      .click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('button', { name: /Use references/ }).click();
     const referenceInput = page.locator('.reference-add input[type=file]');
@@ -1268,9 +1278,11 @@ async function exerciseUploadedArtworkAndReferences(browser) {
     ]);
     await page.locator('.reference-strip figure').filter({ visible: true }).first().waitFor();
     assert.equal(await page.locator('.reference-strip figure').count(), 2);
-    await page.getByRole('textbox', { name: /What new design/ }).fill(
-      'Use the warm palette and hand-drawn texture to make a new original fox mechanic badge.'
-    );
+    await page
+      .getByRole('textbox', { name: /What new design/ })
+      .fill(
+        'Use the warm palette and hand-drawn texture to make a new original fox mechanic badge.'
+      );
     if (artifactDirectory) {
       await page.screenshot({ path: join(artifactDirectory, 'reference-selection-desktop.png') });
     }
@@ -1338,7 +1350,10 @@ async function exerciseGuestCartJourney(browser) {
     await page.getByLabel('2 items').waitFor();
 
     await page.getByRole('button', { name: 'Bags', exact: true }).click();
-    await makeProduct(/Everyday Canvas Tote/, 'A simple original black linework fox and hen emblem');
+    await makeProduct(
+      /Everyday Canvas Tote/,
+      'A simple original black linework fox and hen emblem'
+    );
     await page.getByRole('button', { name: /Add to cart/ }).click();
     await page.getByLabel('3 items').waitFor();
     await page.getByRole('button', { name: /Cart/ }).click();
@@ -1362,7 +1377,10 @@ async function exerciseGuestCartJourney(browser) {
     );
     await page.getByLabel('Quantity for Everyday Canvas Tote').selectOption('3');
     const updatedQuote = (await updatedQuoteRequest).postDataJSON();
-    assert.deepEqual(updatedQuote.items.map((item) => item.quantity), [2, 3]);
+    assert.deepEqual(
+      updatedQuote.items.map((item) => item.quantity),
+      [2, 3]
+    );
     await page.getByLabel('5 items').waitFor();
     await assertNoHorizontalOverflow(page, '390x844 guest cart');
 
@@ -1408,6 +1426,72 @@ async function exerciseGuestCartJourney(browser) {
   }
 }
 
+async function exerciseEmailOrderRevisit(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const token = `oma_${'a'.repeat(43)}`;
+  let authorization;
+  await context.route('**/api/orders/order_email_test', async (route) => {
+    authorization = route.request().headers().authorization;
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          orderNumber: 'OMS-EMAIL-TEST',
+          status: 'received',
+          message: 'Your order was received and is ready for review.',
+          totalCents: 3200,
+          taxCents: 200,
+          currency: 'USD',
+          items: [{ title: 'Heavyweight Cotton Tee', variantName: 'Black / L', quantity: 1 }],
+          fulfillment: {
+            provider: 'customer',
+            status: 'received',
+            message: 'The product and artwork are awaiting review.',
+          },
+          timeline: [
+            {
+              at: '2026-09-04T18:00:00.000Z',
+              status: 'received',
+              note: 'Payment was received.',
+            },
+          ],
+          shipments: [],
+          support: { email: 'support@openmerchstudio.com' },
+          createdAt: '2026-09-04T18:00:00.000Z',
+        },
+      }),
+    });
+  });
+  const page = await context.newPage();
+  const assertNoPageErrors = watchPageErrors(page, '390x844 email order revisit');
+  try {
+    await page.goto(`${origin}/#order=order_email_test&access=${token}`, {
+      waitUntil: 'networkidle',
+    });
+    await page.getByRole('heading', { name: 'OMS-EMAIL-TEST' }).waitFor();
+    assert.equal(authorization, `Bearer ${token}`);
+    assert.equal(new URL(page.url()).hash, '', 'the bearer fragment must be scrubbed immediately');
+    const stored = await page.evaluate(() =>
+      window.localStorage.getItem('open-merch-studio:order-access:v1')
+    );
+    assert.match(stored ?? '', /order_email_test/);
+    assert.doesNotMatch(page.url(), /oma_/, 'the active URL must never retain the bearer');
+    assert.equal(
+      await page.evaluate(() =>
+        window.sessionStorage.getItem('open-merch-studio:pending-order-revisit:v1')
+      ),
+      null,
+      'a successfully opened order should clear its one-time handoff state'
+    );
+    await page.getByRole('button', { name: 'Buy again', exact: true }).waitFor();
+    await assertNoHorizontalOverflow(page, '390x844 email order revisit');
+    assertNoPageErrors();
+  } finally {
+    await context.close();
+  }
+}
+
 async function exerciseMiniStore(browser) {
   for (const viewport of [
     { width: 390, height: 844 },
@@ -1423,10 +1507,18 @@ async function exerciseMiniStore(browser) {
       await page.getByRole('heading', { name: 'One Clear System', level: 1 }).waitFor();
       await page.getByText('Web + Workflow Studio', { exact: true }).waitFor();
       assert.equal(await page.locator('.mini-store__products article').count(), 5);
-      const brokenImages = await page.locator('.mini-store img').evaluateAll((images) =>
-        images.filter((image) => !image.complete || image.naturalWidth === 0).map((image) => image.src)
+      const brokenImages = await page
+        .locator('.mini-store img')
+        .evaluateAll((images) =>
+          images
+            .filter((image) => !image.complete || image.naturalWidth === 0)
+            .map((image) => image.src)
+        );
+      assert.deepEqual(
+        brokenImages,
+        [],
+        'published mini-store artwork must load without broken images'
       );
-      assert.deepEqual(brokenImages, [], 'published mini-store artwork must load without broken images');
       await assertNoHorizontalOverflow(page, `${viewport.width}x${viewport.height} mini-store`);
     } finally {
       await context.close();
@@ -1464,10 +1556,11 @@ try {
     await exerciseLegacyRecoveryExpiry(browser);
     await exerciseUploadedArtworkAndReferences(browser);
     await exerciseGuestCartJourney(browser);
+    await exerciseEmailOrderRevisit(browser);
     await exerciseMiniStore(browser);
     await exercisePolicyPages(browser);
     process.stdout.write(
-      'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, recoverable fixture checkout, and Buy again cart reconstruction.\n'
+      'Responsive browser smoke passed across 11 viewports, five products, upload/reference artwork paths, the persisted generation-failure contract, recoverable fixture checkout, email order revisit, and Buy again cart reconstruction.\n'
     );
   } finally {
     await browser.close();

@@ -12,9 +12,12 @@ import {
 import { saveOrder } from '../services/runtime-store.js';
 import type { OrderSummary } from '../types/catalog.js';
 import {
+  customerOrderAccessIsValid,
   issueCustomerOrderAccess,
   revokeCustomerOrderAccess,
+  revokeCustomerOrderAccessToken,
 } from '../services/customer-order-access.service.js';
+import { customerOrderRevisitUrl } from '../services/customer-order-revisit.service.js';
 
 const sensitiveOrder = (): OrderSummary => ({
   id: 'order_private_internal_id',
@@ -245,6 +248,35 @@ test('customer template escapes catalog text before placing it in HTML', () => {
   assert.match(rendered.html, /&lt;script&gt;/i);
 });
 
+test('the receipt carries a private order revisit link without adding it to later emails', () => {
+  const confirmation = toCustomerOrderConfirmation(sensitiveOrder(), 'support@example.com');
+  const orderUrl =
+    'https://openmerchstudio.com/#order=order_public_reference&access=oma_1234567890123456789012345678901234567890123';
+  const receipt = renderCustomerEmail('order_received', confirmation, { orderUrl });
+  assert.match(receipt.html, /View order/);
+  assert.match(receipt.text, /View your order or buy it again/);
+  assert.match(receipt.html, /#order=order_public_reference&amp;access=oma_/);
+  assert.match(receipt.text, /Keep this private link/);
+
+  const shipped = renderCustomerEmail('shipment_sent', confirmation, { orderUrl });
+  assert.doesNotMatch(shipped.html, /order_public_reference/);
+  assert.doesNotMatch(shipped.text, /order_public_reference/);
+});
+
+test('customer order revisit URLs keep the bearer in the fragment', () => {
+  const url = customerOrderRevisitUrl('https://openmerchstudio.com/path?ignored=yes', {
+    orderId: 'order_safe',
+    token: 'oma_1234567890123456789012345678901234567890123',
+  });
+  const parsed = new URL(url);
+  assert.equal(parsed.pathname, '/');
+  assert.equal(parsed.search, '');
+  assert.equal(
+    parsed.hash,
+    '#order=order_safe&access=oma_1234567890123456789012345678901234567890123'
+  );
+});
+
 test('public commerce endpoints return only customer-safe confirmations', async () => {
   const originalDatabaseUrl = env.databaseUrl;
   env.databaseUrl = undefined;
@@ -294,9 +326,23 @@ test('public commerce endpoints return only customer-safe confirmations', async 
     });
     assert.equal(currentAccess.status, 200);
 
+    const emailAccess = await issueCustomerOrderAccess(order.id, 'email_order_received');
+    const currentBrowserStillValid = await fetch(`http://127.0.0.1:${port}${orderPath}`, {
+      headers: { Authorization: `Bearer ${currentToken}` },
+    });
+    assert.equal(currentBrowserStillValid.status, 200);
+    assert.equal(await customerOrderAccessIsValid(order.id, emailAccess.token), true);
+
+    const nextBrowser = await issueCustomerOrderAccess(order.id, 'browser');
+    assert.equal(await customerOrderAccessIsValid(order.id, currentToken), false);
+    assert.equal(await customerOrderAccessIsValid(order.id, nextBrowser.token), true);
+    assert.equal(await customerOrderAccessIsValid(order.id, emailAccess.token), true);
+    assert.equal(await revokeCustomerOrderAccessToken(order.id, emailAccess.token), true);
+    assert.equal(await customerOrderAccessIsValid(order.id, emailAccess.token), false);
+
     assert.equal(await revokeCustomerOrderAccess(order.id), 1);
     const revoked = await fetch(`http://127.0.0.1:${port}${orderPath}`, {
-      headers: { Authorization: `Bearer ${currentToken}` },
+      headers: { Authorization: `Bearer ${nextBrowser.token}` },
     });
     assert.equal(revoked.status, 404);
   } finally {

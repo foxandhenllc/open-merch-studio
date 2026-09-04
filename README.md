@@ -20,6 +20,8 @@ Open Merch Studio is the public project name. The code, docs, and environment te
 - Lets customers assign different artwork to supported print areas, including separate front and back files on the launch tee and tote, with placement cost shown in the quote.
 - Supports bounded item quantities and a reload-safe guest cart with multiple configured products,
   then itemizes those products in hosted Stripe Checkout.
+- Sends paid customers a private, revocable receipt link for revisiting the safe order timeline or
+  building a fresh, current-price cart with **Buy again** from any device.
 - Creates fixture design drafts by default, with a guarded OpenAI image-generation adapter, prompt moderation, and print-ready prompt shaping available only when live generation is explicitly enabled.
 - Runs basic print-readiness checks before quoting.
 - Produces transparent cost-plus quotes with product cost, design allocation, margin, shipping estimate, payment fee estimate, and total.

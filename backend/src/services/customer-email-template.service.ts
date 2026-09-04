@@ -13,6 +13,11 @@ export type RenderedCustomerEmail = {
   text: string;
 };
 
+export type RenderCustomerEmailOptions = {
+  /** A customer-safe fragment handoff. Never pass an operator or provider URL here. */
+  orderUrl?: string;
+};
+
 const cleanText = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 const escapeHtml = (value: string): string =>
@@ -112,7 +117,8 @@ const templateCopy = (
 
 export function renderCustomerEmail(
   kind: CustomerEmailKind,
-  order: CustomerOrderConfirmation
+  order: CustomerOrderConfirmation,
+  options: RenderCustomerEmailOptions = {}
 ): RenderedCustomerEmail {
   const copy = templateCopy(kind, order);
   const orderNumber = cleanText(order.orderNumber);
@@ -141,6 +147,13 @@ export function renderCustomerEmail(
     : trackingText
       ? `<p style="margin:0 0 20px;color:#62645e">${escapeHtml(trackingText)}</p>`
       : '';
+  const orderUrl = kind === 'order_received' ? safeHttpUrl(options.orderUrl) : undefined;
+  const plainOrderLink = orderUrl
+    ? `View your order or buy it again:\n${orderUrl}\n\nKeep this private link. Anyone with it can view this order.`
+    : undefined;
+  const htmlOrderLink = orderUrl
+    ? `<p style="margin:0 0 20px"><a href="${escapeHtml(orderUrl)}" style="display:inline-block;padding:12px 18px;background:#171814;color:#fff;text-decoration:none;border-radius:999px;font-weight:700">View order</a><br><span style="display:inline-block;margin-top:10px;color:#62645e;font-size:13px">You can review this order or use Buy again. Keep this private link.</span></p>`
+    : '';
 
   return {
     subject: cleanText(copy.subject),
@@ -148,6 +161,7 @@ export function renderCustomerEmail(
       copy.heading,
       '',
       plainParagraphs,
+      ...(plainOrderLink ? ['', plainOrderLink] : []),
       ...(plainTracking ? ['', plainTracking] : []),
       '',
       `Order: ${orderNumber}`,
@@ -166,6 +180,7 @@ export function renderCustomerEmail(
         <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Open Merch Studio</p>
         <h1 style="margin:0 0 20px;font-size:26px;line-height:1.2">${escapeHtml(copy.heading)}</h1>
         ${htmlParagraphs}
+        ${htmlOrderLink}
         ${htmlTracking}
         <div style="margin:24px 0;padding:18px;background:#f7f7f4;border-radius:12px">
           <p style="margin:0 0 10px"><strong>Order ${escapeHtml(orderNumber)}</strong></p>

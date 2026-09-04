@@ -7,6 +7,10 @@ import './styles.css';
 import './styles/focused-workbench.css';
 import './styles/mini-store.css';
 import './styles/example-collection.css';
+import { captureCustomerOrderAccessHandoff } from './order-access';
+
+// Email capability fragments must be removed before analytics components can observe the page.
+captureCustomerOrderAccessHandoff();
 
 const observabilityEnabled =
   window.location.hostname === 'openmerchstudio.com' ||

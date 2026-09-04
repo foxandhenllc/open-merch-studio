@@ -5,6 +5,11 @@ import type { OrderSummary } from '../types/catalog.js';
 import { logOperationalEvent } from '../utils/operational-logger.js';
 import { toCustomerOrderConfirmation } from './customer-order.service.js';
 import { renderCustomerEmail, type CustomerEmailKind } from './customer-email-template.service.js';
+import {
+  issueCustomerOrderAccess,
+  revokeCustomerOrderAccessToken,
+} from './customer-order-access.service.js';
+import { customerOrderRevisitUrl } from './customer-order-revisit.service.js';
 
 export type CustomerEmailDeliveryResult =
   | 'skipped'
@@ -115,7 +120,25 @@ export async function deliverCustomerEmail(
   });
   if (claimed.count !== 1) return 'duplicate';
 
-  const rendered = renderCustomerEmail(kind, toCustomerOrderConfirmation(order, env.supportEmail));
+  // Issue the durable link only after this worker owns the exactly-once delivery claim. The raw
+  // credential exists only in memory and is never written to the delivery ledger or logs.
+  let emailAccess;
+  let rendered;
+  try {
+    emailAccess =
+      kind === 'order_received'
+        ? await issueCustomerOrderAccess(order.id, 'email_order_received')
+        : undefined;
+    rendered = renderCustomerEmail(
+      kind,
+      toCustomerOrderConfirmation(order, env.supportEmail),
+      emailAccess ? { orderUrl: customerOrderRevisitUrl(env.frontendUrl, emailAccess) } : undefined
+    );
+  } catch (error) {
+    if (emailAccess) await revokeCustomerOrderAccessToken(order.id, emailAccess.token);
+    await markDelivery(delivery.id, 'failed', { lastError: errorText(error) });
+    return 'failed';
+  }
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -136,6 +159,9 @@ export async function deliverCustomerEmail(
     });
     const body = (await response.json().catch(() => ({}))) as { id?: unknown; message?: unknown };
     if (!response.ok) {
+      if (emailAccess) {
+        await revokeCustomerOrderAccessToken(order.id, emailAccess.token);
+      }
       await markDelivery(delivery.id, 'failed', {
         lastError:
           `Resend HTTP ${response.status}: ${String(body.message ?? 'request rejected')}`.slice(

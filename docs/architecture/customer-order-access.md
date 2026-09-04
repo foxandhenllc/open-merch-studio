@@ -8,14 +8,17 @@ not authorization.
 1. Live checkout opens without an order-access credential.
 2. Stripe redirects the browser back with its Checkout Session ID. OMS reconciles that session
    against the durable order and signed webhook state.
-3. After confirmation is no longer processing, OMS rotates and returns a 256-bit order-access
+3. After confirmation is no longer processing, OMS rotates and returns a purpose-scoped 256-bit order-access
    credential. Fixture checkout may issue the same credential immediately because no real payment
    exists and its checkout result is already final.
 4. The browser stores the credential locally and sends it only as an `Authorization: Bearer` header
    to the customer order and reorder-draft routes. It is not placed in a query string or
    application log.
-5. OMS stores only the SHA-256 digest. Issuing a replacement revokes the prior grant, and an operator
-   can revoke the current grant through the protected admin API.
+5. The order-received email contains a second, independently rotating credential in a URL fragment.
+   The browser captures it before analytics mount, removes it from the address bar, and then follows
+   the same header-only request boundary. Stripe-return rotation cannot invalidate this email link.
+6. OMS stores only each credential's SHA-256 digest. Issuing a replacement revokes the prior grant
+   for the same purpose, and an operator can revoke every active grant through the protected admin API.
 
 Missing orders, malformed credentials, mismatched credentials, rotated credentials, and revoked
 credentials all receive the same `404` response. This prevents the public route from becoming an
@@ -27,6 +30,9 @@ order-identifier oracle.
   page credential.
 - The bearer value must never be logged, persisted in Prisma, included in analytics, or sent to a
   provider.
+- Email capabilities belong in a URL fragment, never a query string. The frontend must synchronously
+  scrub the fragment before observability mounts. Customers should treat the link as private and
+  avoid forwarding it.
 - The order response remains the reduced customer-safe DTO. Authorization does not expose internal
   order IDs, provider references, addresses, email addresses, or raw payloads.
 - Database RLS is enabled for `order_access_grants`, with no browser-role grants or policies.

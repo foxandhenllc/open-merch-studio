@@ -33,11 +33,12 @@ Build in this order:
    server-authoritative pre-tax quote total and current webhook idempotency. Configured quantities
    are visible in each product name; shipping/checkout adjustments are separately identified, and
    Studio Pass credits are allocated without sending a prohibited negative line item.
-4. **Completed September 4, 2026:** customer order reads now require a rotating, revocable opaque
+4. **Completed September 4, 2026:** customer order reads now require rotating, revocable, purpose-scoped opaque
    credential whose digest is stored in PostgreSQL. **Buy again** uses that boundary to create a new
    editable cart from immutable prior choices, verify retained print-ready artwork, revalidate the
    current catalog, and generate a new quote. It never replays an expired quote or charges
-   automatically. A durable emailed revisit link remains follow-up work.
+   automatically. The order-received email carries an independent private revisit link whose
+   fragment is captured and scrubbed before frontend analytics mount.
 5. Add optional customer accounts and order history only after the opaque guest-order access link is
    proven. Do not make account creation a checkout requirement.
 
