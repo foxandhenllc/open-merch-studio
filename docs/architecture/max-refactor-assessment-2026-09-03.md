@@ -704,6 +704,27 @@ test increased the backend suite to 91 tests (88 passed and three database-only 
 This checkpoint passed lint, typecheck, all 91 backend tests, both frontend contracts, production
 build/static-route verification, and the complete 11-viewport browser suite.
 
+## Design allowance policy checkpoint
+
+Completed September 4, 2026:
+
+- Added `design-allowance.service.ts` as the shared pure rule set for free drafts, Studio Pass
+  drafts, edits, finals, customer recovery actions, and the allowance bucket charged by a provider
+  reservation.
+- Reused the same derivation for runtime authorization and the locked PostgreSQL reservation path,
+  removing duplicated arithmetic that could otherwise make fixture and live behavior disagree.
+- Kept durable reservation/release mutation and its advisory lock in `runtime-store.ts`; this pass
+  moved policy, not transactional integrity.
+- Added direct tests for free, pass-backed, exhausted, checkout, and Studio Pass recovery states.
+
+`runtime-store.ts` moved from 857 to 794 lines; the allowance policy is 105 lines. The backend suite
+now contains 93 tests (90 passed and three database-only skips). The remaining runtime module is
+below the refactor size trigger and its largest block is one cohesive reserve/reconcile transaction,
+so further splitting should wait for a concrete ownership or testability benefit.
+
+This checkpoint passed lint, typecheck, all 93 backend tests, both frontend contracts, production
+build/static-route verification, and the complete 11-viewport browser suite.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:

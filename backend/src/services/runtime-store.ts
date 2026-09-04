@@ -13,6 +13,13 @@ import type {
 } from '../types/catalog.js';
 import { getRuntimeArtifactCounts, saveRuntimeQuote } from './runtime-artifact-store.js';
 import { assessLaunchReadiness } from './launch-readiness.service.js';
+import {
+  deriveDesignAllowance,
+  designActionDenial,
+  designAllowanceSource,
+  type DesignAllowanceAction,
+  type DesignAllowanceSource,
+} from './design-allowance.service.js';
 export {
   findReusableRuntimeMockup as findReusableMockup,
   getRuntimeDraft as getDraft,
@@ -29,7 +36,7 @@ type LedgerEvent = {
   id: string;
   sessionId: string;
   designAssetId?: string;
-  action: 'idea' | 'rough_draft' | 'edit' | 'final' | 'review' | 'mockup';
+  action: DesignAllowanceAction;
   provider: 'mock' | 'openai-ready' | 'openai' | 'fixture' | 'printful-ready' | 'printful';
   estimatedCostCents: number;
   createdAt: string;
@@ -40,7 +47,7 @@ export type LiveDesignSpendReservation = {
   allowance: AllowanceState;
   message?: string;
   event?: LedgerEvent;
-  allowanceSource?: 'free_draft' | 'rough_draft' | 'edit' | 'final' | 'none';
+  allowanceSource?: DesignAllowanceSource;
 };
 
 type RuntimeState = {
@@ -256,46 +263,7 @@ export function createStudioPass(
 export function getAllowanceState(sessionId: string): AllowanceState {
   const session = getOrCreateSession(sessionId);
   const pass = getStudioPassForSession(session.id);
-  const freeDraftsRemaining = Math.max(0, session.freeDraftLimit - session.freeDraftsUsed);
-  const roughDraftsRemaining = pass
-    ? Math.max(0, pass.includedRoughDrafts - pass.roughDraftsUsed)
-    : 0;
-  const editsRemaining = pass ? Math.max(0, pass.includedEdits - pass.editsUsed) : 0;
-  const finalsRemaining = pass ? Math.max(0, pass.includedFinals - pass.finalsUsed) : 0;
-  const studioPassStatus = pass
-    ? pass.status === 'applied'
-      ? 'applied'
-      : roughDraftsRemaining || editsRemaining || finalsRemaining
-        ? 'available'
-        : 'exhausted'
-    : freeDraftsRemaining
-      ? 'not_required'
-      : 'required';
-
-  return {
-    sessionId: session.id,
-    studioPassStatus,
-    freeDraftsRemaining,
-    roughDraftsRemaining,
-    editsRemaining,
-    finalsRemaining,
-    nextAction:
-      studioPassStatus === 'required' || studioPassStatus === 'exhausted'
-        ? env.studioPassEnabled
-          ? 'buy_studio_pass'
-          : 'checkout'
-        : 'continue_free',
-    message:
-      studioPassStatus === 'required'
-        ? env.studioPassEnabled
-          ? 'A $5 Studio Pass unlocks deeper drafting and applies to an eligible purchase.'
-          : 'You have used the three free drafts included with this studio session.'
-        : studioPassStatus === 'exhausted'
-          ? env.studioPassEnabled
-            ? 'This Studio Pass allowance is used. Checkout or contact support for more design help.'
-            : 'Continue with your current artwork or contact support for more design help.'
-          : `${freeDraftsRemaining} free draft${freeDraftsRemaining === 1 ? '' : 's'} remaining.`,
-  };
+  return deriveDesignAllowance(session, pass, env.studioPassEnabled);
 }
 
 const startOfToday = (): Date => {
@@ -534,49 +502,18 @@ export async function reserveLiveDesignSpend(
         };
       }
 
-      const freeDraftsRemaining = Math.max(
-        0,
-        durableSession.freeDraftLimit - durableSession.freeDraftsUsed
-      );
-      const roughDraftsRemaining = durablePass
-        ? Math.max(0, durablePass.includedRoughDrafts - durablePass.roughDraftsUsed)
-        : 0;
-      const editsRemaining = durablePass
-        ? Math.max(0, durablePass.includedEdits - durablePass.editsUsed)
-        : 0;
-      const finalsRemaining = durablePass
-        ? Math.max(0, durablePass.includedFinals - durablePass.finalsUsed)
-        : 0;
-      if (
-        (params.action === 'rough_draft' &&
-          freeDraftsRemaining <= 0 &&
-          roughDraftsRemaining <= 0) ||
-        (params.action === 'edit' && editsRemaining <= 0) ||
-        (params.action === 'final' && finalsRemaining <= 0)
-      ) {
+      const allowance = deriveDesignAllowance(durableSession, durablePass, env.studioPassEnabled);
+      const denial = designActionDenial(params.action, allowance);
+      if (denial) {
         return {
           allowed: false as const,
-          message:
-            params.action === 'edit'
-              ? 'No generated edits remain for this design session.'
-              : params.action === 'final'
-                ? 'No final generations remain for this design session.'
-                : 'No more generated drafts remain for this design session.',
+          message: denial,
           session: durableSession,
           pass: durablePass,
         };
       }
 
-      const allowanceSource: NonNullable<LiveDesignSpendReservation['allowanceSource']> =
-        params.action === 'rough_draft'
-          ? freeDraftsRemaining > 0
-            ? 'free_draft'
-            : 'rough_draft'
-          : params.action === 'edit'
-            ? 'edit'
-            : params.action === 'final'
-              ? 'final'
-              : 'none';
+      const allowanceSource = designAllowanceSource(params.action, allowance);
 
       await tx.aiSpendEvent.create({
         data: {
