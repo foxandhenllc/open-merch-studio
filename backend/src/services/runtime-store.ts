@@ -6,15 +6,23 @@ import type {
   AdminReport,
   AdminSettings,
   AllowanceState,
-  DesignDraft,
-  DesignIdea,
-  DesignMockup,
   LaunchReadiness,
-  OrderSummary,
   QuoteBreakdown,
   StudioPass,
   StudioSession,
 } from '../types/catalog.js';
+import { getRuntimeArtifactCounts, saveRuntimeQuote } from './runtime-artifact-store.js';
+export {
+  findReusableRuntimeMockup as findReusableMockup,
+  getRuntimeDraft as getDraft,
+  getRuntimeOrder as getOrder,
+  getRuntimeQuote as getQuote,
+  listRuntimeOrders as listOrders,
+  saveRuntimeDraft as saveDraft,
+  saveRuntimeIdea as saveIdea,
+  saveRuntimeMockup as saveMockup,
+  saveRuntimeOrder as saveOrder,
+} from './runtime-artifact-store.js';
 
 type LedgerEvent = {
   id: string;
@@ -37,11 +45,6 @@ export type LiveDesignSpendReservation = {
 type RuntimeState = {
   sessions: Map<string, StudioSession>;
   passes: Map<string, StudioPass>;
-  ideas: Map<string, DesignIdea>;
-  drafts: Map<string, DesignDraft>;
-  mockups: Map<string, DesignMockup>;
-  quotes: Map<string, QuoteBreakdown>;
-  orders: Map<string, OrderSummary>;
   ledger: LedgerEvent[];
   settings: AdminSettings;
 };
@@ -68,11 +71,6 @@ const defaultSettings = (): AdminSettings => ({
 const state: RuntimeState = {
   sessions: new Map(),
   passes: new Map(),
-  ideas: new Map(),
-  drafts: new Map(),
-  mockups: new Map(),
-  quotes: new Map(),
-  orders: new Map(),
   ledger: [],
   settings: defaultSettings(),
 };
@@ -833,67 +831,8 @@ export async function recordDesignSpend(params: {
   return event;
 }
 
-export function saveIdea(idea: DesignIdea): DesignIdea {
-  state.ideas.set(idea.id, idea);
-  return { ...idea };
-}
-
-export function saveDraft(draft: DesignDraft): DesignDraft {
-  if (draft.id) state.drafts.set(draft.id, draft);
-  return { ...draft };
-}
-
-export function getDraft(id?: string | null): DesignDraft | undefined {
-  return id ? state.drafts.get(id) : undefined;
-}
-
-export function saveMockup(mockup: DesignMockup): DesignMockup {
-  state.mockups.set(mockup.id, mockup);
-  return { ...mockup };
-}
-
-export function findReusableMockup(params: {
-  productId: string;
-  variantId: string;
-  designAssetId?: string;
-  placementCodes: string[];
-  orientation?: DesignMockup['orientation'];
-}): DesignMockup | undefined {
-  return Array.from(state.mockups.values())
-    .reverse()
-    .find(
-      (mockup) =>
-        mockup.status === 'complete' &&
-        mockup.productId === params.productId &&
-        mockup.variantId === params.variantId &&
-        mockup.designAssetId === params.designAssetId &&
-        mockup.orientation === params.orientation &&
-        mockup.placementCodes.join('|') === params.placementCodes.join('|')
-    );
-}
-
 export function saveQuote(quote: QuoteBreakdown): QuoteBreakdown {
-  const id = quote.id || createId('quote');
-  const saved = { ...quote, id };
-  state.quotes.set(id, saved);
-  return { ...saved };
-}
-
-export function getQuote(id?: string | null): QuoteBreakdown | undefined {
-  return id ? state.quotes.get(id) : undefined;
-}
-
-export function saveOrder(order: OrderSummary): OrderSummary {
-  state.orders.set(order.id, order);
-  return { ...order };
-}
-
-export function getOrder(id: string): OrderSummary | undefined {
-  return state.orders.get(id);
-}
-
-export function listOrders(): OrderSummary[] {
-  return Array.from(state.orders.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return saveRuntimeQuote(quote, createId);
 }
 
 export function buildLaunchReadiness(): LaunchReadiness {
@@ -948,12 +887,13 @@ export function buildLaunchReadiness(): LaunchReadiness {
 }
 
 export function buildAdminReport(): AdminReport {
+  const artifactCounts = getRuntimeArtifactCounts();
   return {
     settings: getRuntimeSettings(),
     sessions: state.sessions.size,
     studioPasses: state.passes.size,
-    designDrafts: state.drafts.size,
-    orders: state.orders.size,
+    designDrafts: artifactCounts.designDrafts,
+    orders: artifactCounts.orders,
     estimatedAiSpendCents: state.ledger.reduce(
       (total, event) => total + event.estimatedCostCents,
       0

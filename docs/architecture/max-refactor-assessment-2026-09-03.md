@@ -664,6 +664,28 @@ skips), both frontend contracts, production build/static-route verification, and
 11-viewport browser suite across five products, uploads, reference artwork, persisted failures, and
 the recoverable fixture checkout flow.
 
+## Runtime artifact-store checkpoint
+
+Completed September 4, 2026:
+
+- Added `runtime-artifact-store.ts` as the explicit owner of ephemeral ideas, artwork drafts,
+  previews, estimates, and fixture/fallback orders.
+- Documented the persistence boundary in code: these maps support fixture behavior and best-effort
+  live caching, but they are not durable commerce records and must not be mistaken for the
+  production order repository.
+- Kept the historical `runtime-store.ts` exports as a compatibility facade so service and test
+  imports remain stable while responsibilities move behind it.
+- Replaced direct map access in the admin report with a narrow aggregate-count API, avoiding export
+  of mutable maps merely for diagnostics.
+
+`runtime-store.ts` moved from 963 to 903 lines; the focused artifact store is 96 lines. Its remaining
+large responsibility is AI allowance and spend reservation/reconciliation, whose PostgreSQL
+transaction and in-memory fallback must be extracted together rather than split mechanically.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, production build/static-route verification, and the complete
+11-viewport browser suite.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:
