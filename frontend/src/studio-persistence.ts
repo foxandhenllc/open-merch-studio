@@ -1,12 +1,13 @@
 import type { DesignMockup } from './types/catalog';
 
 export type StudioResumeState = {
-  version: 4;
+  version: 5;
   savedAt: string;
   sessionId: string;
   selectedCategory: string;
   productId: string;
   variantId: string;
+  quantity: number;
   placementCodes: string[];
   placementDesignAssetIds: Record<string, string>;
   mugLayout?: 'center' | 'left' | 'right';
@@ -24,7 +25,7 @@ const RESUME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 type PersistableStudioResumeState = Omit<StudioResumeState, 'savedAt'>;
 type StoredStudioResumeState = Omit<Partial<StudioResumeState>, 'version' | 'savedAt'> & {
-  version?: 2 | 3 | 4;
+  version?: 2 | 3 | 4 | 5;
   savedAt?: unknown;
 };
 
@@ -50,7 +51,7 @@ export function readStudioResumeState(): StudioResumeState | null {
     if (!value) return null;
     const parsed = JSON.parse(value) as StoredStudioResumeState;
     if (
-      ![2, 3, 4].includes(Number(parsed.version)) ||
+      ![2, 3, 4, 5].includes(Number(parsed.version)) ||
       typeof parsed.sessionId !== 'string' ||
       !parsed.sessionId
     ) {
@@ -62,12 +63,16 @@ export function readStudioResumeState(): StudioResumeState | null {
       return null;
     }
     const restored: StudioResumeState = {
-      version: 4,
+      version: 5,
       savedAt: parsed.savedAt,
       sessionId: parsed.sessionId,
       selectedCategory: typeof parsed.selectedCategory === 'string' ? parsed.selectedCategory : '',
       productId: typeof parsed.productId === 'string' ? parsed.productId : '',
       variantId: typeof parsed.variantId === 'string' ? parsed.variantId : '',
+      quantity:
+        typeof parsed.quantity === 'number' && Number.isInteger(parsed.quantity)
+          ? Math.min(25, Math.max(1, parsed.quantity))
+          : 1,
       placementCodes: Array.isArray(parsed.placementCodes)
         ? parsed.placementCodes.filter((value): value is string => typeof value === 'string')
         : [],

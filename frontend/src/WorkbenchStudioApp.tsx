@@ -126,7 +126,7 @@ export function WorkbenchStudioApp() {
   const reviewSettling =
     vm.workbenchMode === 'review' &&
     (vm.busy.mockup ||
-      vm.busy.quoting ||
+      (vm.busy.quoting && !vm.quote) ||
       (vm.artworkQuoteEligible && !vm.quote && !vm.errors.mockup && !vm.errors.quote));
   const hasDesignOptions = vm.canRevise || vm.designHistory.length > 0 || vm.canGenerateAnother;
   const activePlacement = vm.selectedProduct?.placements.find(
@@ -356,6 +356,7 @@ export function WorkbenchStudioApp() {
                 product={vm.selectedProduct!}
                 design={vm.design}
                 quote={vm.quote}
+                quantity={vm.quantity}
                 placementArtwork={vm.placementArtwork}
                 selectedPlacementCodes={vm.selectedPlacements}
                 mugLayout={vm.mugLayout}
@@ -379,6 +380,7 @@ export function WorkbenchStudioApp() {
                   revision: vm.revision,
                 }}
                 actions={{
+                  onQuantityChange: vm.setQuantity,
                   onEditAreas: vm.showConfigure,
                   onCustomizePlacement: vm.customizePlacement,
                   onReusePlacementArtwork: vm.reusePlacementArtwork,

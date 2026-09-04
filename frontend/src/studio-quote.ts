@@ -8,6 +8,14 @@ import type {
 import type { PreviewOrientation } from './studio-view-model.types';
 import { buildPlacementSelections } from './studio-view-model.selectors';
 
+export const MAX_STUDIO_ITEM_QUANTITY = 25;
+
+/** Normalizes browser input for presentation; the quote API independently validates the result. */
+export function normalizeStudioItemQuantity(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(MAX_STUDIO_ITEM_QUANTITY, Math.max(1, Math.floor(value)));
+}
+
 export function prepareQuoteRequest(params: {
   sessionId?: string;
   studioPassId?: string;
@@ -16,6 +24,7 @@ export function prepareQuoteRequest(params: {
   selectedPlacements: string[];
   design: DesignDraft;
   placementArtwork: Record<string, DesignDraft>;
+  quantity: number;
   mugLayout: PlacementLayout;
   orientation?: PreviewOrientation;
 }) {
@@ -27,7 +36,7 @@ export function prepareQuoteRequest(params: {
       {
         productId: params.product.id,
         variantId: params.variant.id,
-        quantity: 1,
+        quantity: normalizeStudioItemQuantity(params.quantity),
         placementCodes: params.selectedPlacements,
         placements: buildPlacementSelections(
           params.selectedPlacements,

@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQuoteBreakdown, estimateRetailTotalCents } from '../services/pricing.service.js';
+import {
+  buildQuoteBreakdown,
+  estimateRetailTotalCents,
+  MAX_QUOTE_ITEM_QUANTITY,
+  validateQuoteItemQuantity,
+} from '../services/pricing.service.js';
 import { sampleCatalog } from '../services/catalog-fixtures.js';
 
 test('buildQuoteBreakdown creates transparent cost-plus totals', () => {
@@ -198,4 +203,12 @@ test('buildQuoteBreakdown rejects unknown variants', () => {
       ]
     )
   );
+});
+
+test('quote quantities are bounded before a customer can create an oversized charge', () => {
+  assert.equal(validateQuoteItemQuantity(1), 1);
+  assert.equal(validateQuoteItemQuantity(MAX_QUOTE_ITEM_QUANTITY), MAX_QUOTE_ITEM_QUANTITY);
+  assert.throws(() => validateQuoteItemQuantity(0), /whole number/);
+  assert.throws(() => validateQuoteItemQuantity(1.5), /whole number/);
+  assert.throws(() => validateQuoteItemQuantity(MAX_QUOTE_ITEM_QUANTITY + 1), /whole number/);
 });

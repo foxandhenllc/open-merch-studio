@@ -23,7 +23,9 @@ shipment lifecycle before describing shipment communication as guaranteed.
 
 Build in this order:
 
-1. Add quantity to the current product review and re-quote every change server-side.
+1. **Completed September 3, 2026:** add quantity to the current product review and re-quote every
+   change server-side. Guest recovery retains the quantity, restored quotes must match it, and both
+   browser and server enforce the current 1–25 item boundary.
 2. Add a guest cart that can hold multiple configured products. The backend quote and order models
    already support multiple items and quantities; the frontend currently submits one item, and
    Stripe currently receives one aggregate line item.

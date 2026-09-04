@@ -29,6 +29,19 @@ export const pricingSettingsFromEnv = (): PricingSettings => ({
 
 const roundCents = (value: number) => Math.max(0, Math.round(value));
 
+export const MAX_QUOTE_ITEM_QUANTITY = 25;
+
+/**
+ * Enforces the commerce-wide per-line quantity limit at the pricing boundary.
+ * Callers must reject invalid input instead of silently rounding it before a quote is persisted.
+ */
+export function validateQuoteItemQuantity(value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_QUOTE_ITEM_QUANTITY) {
+    throw new Error(`Quantity must be a whole number from 1 to ${MAX_QUOTE_ITEM_QUANTITY}.`);
+  }
+  return value;
+}
+
 export function estimateShippingCents(productCount: number): number {
   if (productCount <= 0) return 0;
   return 495 + Math.max(0, productCount - 1) * 175;
@@ -121,7 +134,7 @@ export function buildQuoteBreakdown(
       throw new Error(`No print placement selected for ${product.title}`);
     }
 
-    const quantity = Math.max(1, Math.floor(input.quantity || 1));
+    const quantity = validateQuoteItemQuantity(input.quantity);
     const unavailablePlacement = placementCodes.find(
       (placementCode) => !product.placements.some((placement) => placement.code === placementCode)
     );

@@ -21,7 +21,12 @@ import {
   undoArtworkRevision,
 } from '../src/studio-artwork.transitions.ts';
 import { classifyMockupResult, prepareMockupRequest } from '../src/studio-mockup.ts';
-import { prepareQuoteRequest, quoteAnnouncement } from '../src/studio-quote.ts';
+import {
+  MAX_STUDIO_ITEM_QUANTITY,
+  normalizeStudioItemQuantity,
+  prepareQuoteRequest,
+  quoteAnnouncement,
+} from '../src/studio-quote.ts';
 import {
   checkoutNotReadyError,
   checkoutUnavailable,
@@ -334,10 +339,14 @@ const preparedQuote = prepareQuoteRequest({
   selectedPlacements: ['front', 'back'],
   design: front,
   placementArtwork: { front, back },
+  quantity: 2,
   mugLayout: 'center',
 });
 assert.ok(preparedQuote);
-assert.equal(preparedQuote.items[0]?.quantity, 1);
+assert.equal(preparedQuote.items[0]?.quantity, 2);
+assert.equal(normalizeStudioItemQuantity(0), 1);
+assert.equal(normalizeStudioItemQuantity(2.8), 2);
+assert.equal(normalizeStudioItemQuantity(99), MAX_STUDIO_ITEM_QUANTITY);
 assert.deepEqual(
   preparedQuote.items[0]?.placements.map((placement) => placement.designAssetId),
   [front.id, back.id],

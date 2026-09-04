@@ -324,6 +324,24 @@ async function exerciseFixtureJourney(browser) {
       'a two-sided tee should show both print areas in review'
     );
     await page.getByText('$5.95 for additional printing', { exact: true }).waitFor();
+    const initialTotal = await page.locator('.review-total strong').textContent();
+
+    const quantityQuoteRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname === '/api/catalog/quotes'
+    );
+    await page.getByLabel('Quantity').selectOption('2');
+    const quantityQuoteBody = (await quantityQuoteRequest).postDataJSON();
+    assert.equal(
+      quantityQuoteBody.items[0]?.quantity,
+      2,
+      'changing quantity must request a fresh server price for the selected amount'
+    );
+    await page.waitForFunction(
+      (previousTotal) =>
+        document.querySelector('.review-total strong')?.textContent !== previousTotal,
+      initialTotal
+    );
+    assert.equal(await page.getByLabel('Quantity').inputValue(), '2');
 
     await page.getByRole('button', { name: 'Create different artwork', exact: true }).click();
     await page.getByRole('heading', { name: 'Create the Back print' }).waitFor();
@@ -993,7 +1011,8 @@ async function exerciseLegacyRecoveryExpiry(browser) {
       JSON.parse(window.localStorage.getItem('open-merch-studio:guest-workbench:v1') || 'null')
     );
     assert.notEqual(saved?.sessionId, 'sess_legacy_unknown_age');
-    assert.equal(saved?.version, 4);
+    assert.equal(saved?.version, 5);
+    assert.equal(saved?.quantity, 1);
   } finally {
     await context.close();
   }

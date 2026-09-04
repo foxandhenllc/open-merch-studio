@@ -61,7 +61,11 @@ import {
   undoArtworkRevision,
 } from './studio-artwork.transitions';
 import { classifyMockupResult, prepareMockupRequest } from './studio-mockup';
-import { prepareQuoteRequest, quoteAnnouncement } from './studio-quote';
+import {
+  normalizeStudioItemQuantity,
+  prepareQuoteRequest,
+  quoteAnnouncement,
+} from './studio-quote';
 import {
   checkoutNotReadyError,
   checkoutUnavailable,
@@ -108,6 +112,7 @@ export function useStudioViewModel() {
   const [selectedCategory, setSelectedCategoryState] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedVariantId, setSelectedVariantIdState] = useState('');
+  const [quantity, setQuantityState] = useState(1);
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
   const [placementArtwork, setPlacementArtwork] = useState<Record<string, DesignDraft>>({});
   const [activePlacementCode, setActivePlacementCode] = useState('');
@@ -254,6 +259,7 @@ export function useStudioViewModel() {
       const orientation = saved.orientation ?? previewOrientation(product, variant);
       setSelectedProductId(product.id);
       setSelectedVariantIdState(variant.id);
+      setQuantityState(saved.quantity);
       setSelectedPlacements(placements);
       setMugLayoutState(saved.mugLayout ?? 'center');
       setSelectedOrientationState(orientation);
@@ -305,7 +311,8 @@ export function useStudioViewModel() {
           if (
             item?.productId === product.id &&
             item.variantId === variant.id &&
-            item.designAssetId === restoredDraft.id
+            item.designAssetId === restoredDraft.id &&
+            item.quantity === saved.quantity
           ) {
             restoredQuote = candidate;
           }
@@ -397,11 +404,12 @@ export function useStudioViewModel() {
   useEffect(() => {
     if (startingFresh.current || !session || flow === 'booting' || flow === 'boot_failed') return;
     writeStudioResumeState({
-      version: 4,
+      version: 5,
       sessionId: session.id,
       selectedCategory,
       productId: selectedProductId,
       variantId: selectedVariantId,
+      quantity,
       placementCodes: selectedPlacements,
       placementDesignAssetIds: Object.fromEntries(
         Object.entries(placementArtwork).flatMap(([code, draft]) =>
@@ -426,6 +434,7 @@ export function useStudioViewModel() {
     mugLayout,
     placementArtwork,
     quote?.id,
+    quantity,
     referenceAssets,
     selectedCategory,
     selectedOrientation,
@@ -569,6 +578,22 @@ export function useStudioViewModel() {
     else setFlow(design ? 'drafted' : 'configuring');
     setCheckout(null);
     setOrder(null);
+  };
+  const setQuantity = (value: number) => {
+    const nextQuantity = normalizeStudioItemQuantity(value);
+    if (nextQuantity === quantity) return;
+    quoteRequestId.current += 1;
+    quoteController.current?.abort();
+    quoteController.current = null;
+    setAction('quoting', false);
+    setQuantityState(nextQuantity);
+    if (quote) {
+      setQuoteStale(true);
+      setFlow('quote_stale');
+    }
+    setCheckout(null);
+    setOrder(null);
+    setAnnouncement(`Quantity updated to ${nextQuantity}. Refreshing your price estimate.`);
   };
   const selectProduct = (product: CatalogProduct) => {
     setRecoveryMessage('');
@@ -1132,6 +1157,7 @@ export function useStudioViewModel() {
         selectedPlacements,
         design,
         placementArtwork,
+        quantity,
         mugLayout,
         orientation: selectedOrientation,
       });
@@ -1181,6 +1207,7 @@ export function useStudioViewModel() {
     quoteExpired,
     quoteStale,
     placementArtworkSignature,
+    quantity,
     mugLayout,
     selectedOrientation,
     selectedPlacements,
@@ -1350,6 +1377,7 @@ export function useStudioViewModel() {
     selectedVariant,
     selectedProductId,
     selectedVariantId,
+    quantity,
     selectedPlacements,
     placementArtwork,
     activePlacementCode,
@@ -1396,6 +1424,7 @@ export function useStudioViewModel() {
     setSelectedOrientation,
     togglePlacement,
     setMugLayout,
+    setQuantity,
     customizePlacement,
     reusePlacementArtwork,
     refineIdea,

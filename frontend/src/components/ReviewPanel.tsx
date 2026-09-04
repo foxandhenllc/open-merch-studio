@@ -8,6 +8,7 @@ export function ReviewPanel({
   product,
   design,
   quote,
+  quantity,
   placementArtwork,
   selectedPlacementCodes,
   mugLayout,
@@ -51,14 +52,36 @@ export function ReviewPanel({
           </div>
         </div>
       )}
-      {!status.settling && quote ? (
-        <div className="review-total">
-          <span>Estimated total before tax</span>
-          <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
+      {!status.settling && (
+        <div className="review-purchase-summary">
+          <label className="quantity-control">
+            <span>Quantity</span>
+            <select
+              aria-label="Quantity"
+              value={quantity}
+              onChange={(event) => actions.onQuantityChange(Number(event.target.value))}
+            >
+              {Array.from({ length: 25 }, (_, index) => index + 1).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          {quote && !status.quoteStale && !status.quoting ? (
+            <div className="review-total">
+              <span>Estimated total before tax</span>
+              <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
+            </div>
+          ) : status.quoteStale || status.quoting ? (
+            <p className="muted-copy" role="status">
+              Updating estimate for {quantity} {quantity === 1 ? 'item' : 'items'}…
+            </p>
+          ) : (
+            <p className="muted-copy">Price unavailable right now.</p>
+          )}
         </div>
-      ) : !status.settling ? (
-        <p className="muted-copy">Price unavailable right now.</p>
-      ) : null}
+      )}
       {!status.settling && (
         <PrintAreaReview
           categorySlug={product.categorySlug}

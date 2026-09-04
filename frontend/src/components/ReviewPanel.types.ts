@@ -28,6 +28,7 @@ export type ReviewDesignOptions = {
 };
 
 export type ReviewPanelActions = {
+  onQuantityChange: (quantity: number) => void;
   onEditAreas: () => void;
   onCustomizePlacement: (code: string) => void;
   onReusePlacementArtwork: (sourceCode: string, targetCode: string) => void;
@@ -46,6 +47,7 @@ export type ReviewPanelProps = {
   product: CatalogProduct;
   design: DesignDraft;
   quote: QuoteBreakdown | null;
+  quantity: number;
   placementArtwork: Record<string, DesignDraft>;
   selectedPlacementCodes: string[];
   mugLayout: PlacementLayout;

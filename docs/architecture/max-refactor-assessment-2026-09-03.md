@@ -455,3 +455,27 @@ quantity work; quantity must land as a separate feature because it changes quote
 This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
 contracts, lint, typecheck, production build/static-route checks, and the complete 11-viewport
 browser suite across five products plus upload/reference and recoverable checkout flows.
+
+## Quantity product checkpoint
+
+Completed September 3, 2026 as product work after the behavior-preserving refactor checkpoints:
+
+- Added a 1–25 quantity control to product review and made every change invalidate checkout and
+  request a fresh server-authoritative quote.
+- Persisted quantity in guest recovery state and rejected restored quotes whose line quantity does
+  not match the recovered selection.
+- Added the same integer boundary to the quote service and API controller, so direct requests cannot
+  bypass the customer control or create unexpectedly large charges.
+- Kept the completed product review visible during quantity-only repricing, while hiding the stale
+  total and disabling checkout until the replacement quote arrives.
+- Added pure request/normalization coverage, server validation coverage, and a browser assertion
+  that verifies the actual quote payload and visibly updated total on a phone viewport.
+
+The backend quote, order, Printful payload, fixture fulfillment, and customer-email models already
+carry line quantities. The next product checkpoint is a guest cart that submits multiple configured
+quote items without weakening artwork ownership or quote freshness checks. Itemized Stripe display
+should follow that cart boundary rather than be folded into it.
+
+This checkpoint passed lint, typecheck, 86 backend tests (83 passed and three database-only skips),
+both frontend contracts, the explicit fixture smoke, production build/static-route verification,
+the production dependency audit, and the complete 11-viewport browser suite.
