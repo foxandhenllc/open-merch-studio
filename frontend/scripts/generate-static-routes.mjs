@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import {
   CANONICAL_ORIGIN,
   DEFAULT_SOCIAL_IMAGE,
+  ICON_PATH,
   NOT_FOUND_ROUTE,
+  SITE_NAME,
   STATIC_ROUTES,
 } from './static-route-config.mjs';
 
@@ -82,6 +84,16 @@ const renderDocument = ({
   );
   html = replaceOrInsertHeadTag(
     html,
+    /<meta\s+[^>]*property=["']og:site_name["'][^>]*>/i,
+    `<meta property="og:site_name" content="${escapeHtml(SITE_NAME)}" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
+    /<link\s+[^>]*rel=["']icon["'][^>]*>/i,
+    `<link rel="icon" href="${ICON_PATH}" type="image/svg+xml" />`
+  );
+  html = replaceOrInsertHeadTag(
+    html,
     /<meta\s+[^>]*name=["']robots["'][^>]*>/i,
     `<meta name="robots" content="${canonicalUrl ? 'index,follow' : 'noindex,follow'}" />`
   );
@@ -115,6 +127,18 @@ for (const route of STATIC_ROUTES) {
 await writeFile(
   path.join(distDirectory, NOT_FOUND_ROUTE.output),
   renderDocument(NOT_FOUND_ROUTE),
+  'utf8'
+);
+
+await writeFile(
+  path.join(distDirectory, 'robots.txt'),
+  `User-agent: *\nAllow: /\n\n# Public open-source routes are indexable; checkout and fulfillment use separate server-side gates.\nSitemap: ${CANONICAL_ORIGIN}/sitemap.xml\n`,
+  'utf8'
+);
+
+await writeFile(
+  path.join(distDirectory, 'sitemap.xml'),
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${STATIC_ROUTES.map((route) => `  <url><loc>${escapeHtml(`${CANONICAL_ORIGIN}${route.path}`)}</loc></url>`).join('\n')}\n</urlset>\n`,
   'utf8'
 );
 

@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 import {
   CANONICAL_ORIGIN,
   DEFAULT_SOCIAL_IMAGE,
+  ICON_PATH,
   NOT_FOUND_ROUTE,
+  SITE_NAME,
   STATIC_ROUTES,
 } from './static-route-config.mjs';
 
@@ -44,9 +46,7 @@ for (const route of STATIC_ROUTES) {
     `${route.path} Open Graph title`
   );
   assert.ok(
-    html.includes(
-      `<meta property="og:description" content="${escapeHtml(route.description)}" />`
-    ),
+    html.includes(`<meta property="og:description" content="${escapeHtml(route.description)}" />`),
     `${route.path} Open Graph description`
   );
   const socialImageUrl = `${CANONICAL_ORIGIN}${route.socialImage ?? DEFAULT_SOCIAL_IMAGE}`;
@@ -61,6 +61,10 @@ for (const route of STATIC_ROUTES) {
   assert.ok(
     html.includes(`<meta name="twitter:image" content="${socialImageUrl}" />`),
     `${route.path} Twitter image`
+  );
+  assert.ok(
+    html.includes(`<meta property="og:site_name" content="${escapeHtml(SITE_NAME)}" />`),
+    `${route.path} Open Graph site name`
   );
   assert.equal(occurrences(html, /rel="canonical"/g), 1, `${route.path} canonical count`);
   assert.equal(occurrences(html, /property="og:url"/g), 1, `${route.path} og:url count`);
@@ -77,7 +81,7 @@ assert.match(notFoundHtml, /<meta\s+name="robots"\s+content="[^"]*noindex[^"]*"\
 const robots = await readFile(path.join(distDirectory, 'robots.txt'), 'utf8');
 assert.match(robots, /^Allow:\s*\/$/m);
 assert.doesNotMatch(robots, /^Disallow:\s*\/$/m);
-assert.match(robots, /^Sitemap:\s*https:\/\/openmerchstudio\.com\/sitemap\.xml$/m);
+assert.ok(robots.includes(`Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`));
 
 const sitemap = await readFile(path.join(distDirectory, 'sitemap.xml'), 'utf8');
 const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
@@ -86,15 +90,19 @@ assert.deepEqual(
   STATIC_ROUTES.map((route) => `${CANONICAL_ORIGIN}${route.path}`)
 );
 
-const manifest = JSON.parse(await readFile(path.join(distDirectory, 'manifest.webmanifest'), 'utf8'));
+const manifest = JSON.parse(
+  await readFile(path.join(distDirectory, 'manifest.webmanifest'), 'utf8')
+);
 assert.ok(
-  manifest.icons?.some((icon) => icon.src === '/icon.svg' && icon.type === 'image/svg+xml'),
+  manifest.icons?.some((icon) => icon.src === ICON_PATH && icon.type === 'image/svg+xml'),
   'the web app manifest must expose the OMS icon'
 );
-await access(path.join(distDirectory, 'icon.svg'));
+await access(path.join(distDirectory, ICON_PATH.replace(/^\//, '')));
 await access(path.join(distDirectory, DEFAULT_SOCIAL_IMAGE.replace(/^\//, '')));
 
-const vercelConfig = JSON.parse(await readFile(path.join(repositoryDirectory, 'vercel.json'), 'utf8'));
+const vercelConfig = JSON.parse(
+  await readFile(path.join(repositoryDirectory, 'vercel.json'), 'utf8')
+);
 const rewrites = vercelConfig.rewrites ?? [];
 const globalHeaders = (vercelConfig.headers ?? []).find((rule) => rule.source === '/(.*)')?.headers;
 const apiHeaders = (vercelConfig.headers ?? []).find(

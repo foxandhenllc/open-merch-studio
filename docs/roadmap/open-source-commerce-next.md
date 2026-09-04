@@ -74,6 +74,9 @@ does not.** A reusable store should require:
   immutable typed frontend and backend modules. Builds reject stale generated output, and current
   brand, support, currency, pricing, Stripe-item, email, attribution, and order-prefix consumers no
   longer require source edits for a fork;
+- **Build identity completed September 4, 2026:** canonical URLs, titles, descriptions, social
+  metadata, icons, robots directives, and sitemaps now derive from the same manifest. The remaining
+  clean-clone blocker is deliberately separate, operator-approved policy prose—not code or secrets;
 - one documented Vercel template path and equivalent platform-neutral deployment contract;
 - fixture mode that works from a clean clone before any provider is enabled.
 

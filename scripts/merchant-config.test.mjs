@@ -6,6 +6,7 @@ import {
   renderMerchantConfigModule,
   validateMerchantConfig,
 } from "./merchant-config.mjs";
+import { buildStaticRouteConfig } from "../frontend/scripts/static-route-config.mjs";
 
 test("reference and synthetic merchant profiles satisfy the versioned contract", () => {
   for (const path of [
@@ -59,12 +60,15 @@ test("committed frontend and backend typed modules match the active manifest", a
 });
 
 test("the synthetic merchant profile renders without Open Merch Studio brand coupling", async () => {
-  const rendered = await renderMerchantConfigModule(
-    readMerchantConfig(
-      "config/examples/community-gear-lab.merchant.config.json",
-    ),
+  const syntheticConfig = readMerchantConfig(
+    "config/examples/community-gear-lab.merchant.config.json",
   );
+  const rendered = await renderMerchantConfigModule(syntheticConfig);
+  const staticConfig = buildStaticRouteConfig(syntheticConfig);
   assert.match(rendered, /Community Gear Lab/);
   assert.match(rendered, /CGL/);
   assert.doesNotMatch(rendered, /Fox&Hen, LLC/);
+  assert.equal(staticConfig.canonicalOrigin, "https://merch.example.org");
+  assert.equal(staticConfig.staticRoutes[0].title, "Community Gear Lab");
+  assert.match(staticConfig.notFoundRoute.title, /Community Gear Lab/);
 });

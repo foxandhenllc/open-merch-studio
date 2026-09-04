@@ -71,6 +71,10 @@ with `npm run config:validate`. Type-checking and builds reject stale generated 
 live commerce authorization remain environment-managed and are never part of that manifest. See
 the [merchant configuration RFC](./docs/architecture/merchant-configuration-rfc.md).
 
+Production builds also derive canonical URLs, search/social metadata, `robots.txt`, and the sitemap
+from the manifest. Policy prose remains an explicitly reviewed operator artifact; changing merchant
+identity does not silently rewrite legal terms.
+
 The example environment keeps live payment and fulfillment gates disabled and permits simulated
 local checkout. Production activation requires deployment-managed credentials and the supervised
 commerce runbook; never copy production secrets into a local or committed environment file.

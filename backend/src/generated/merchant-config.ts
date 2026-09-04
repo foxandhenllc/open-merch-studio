@@ -17,8 +17,9 @@ export const merchantConfig = {
   },
   web: {
     canonicalUrl: 'https://openmerchstudio.com',
-    title: 'Open Merch Studio | Create Custom Merch',
-    description: 'Upload, create, prepare, preview, and order custom merchandise.',
+    title: 'Open Merch Studio | Create Original Custom Merch',
+    description:
+      'Upload artwork, create from references, improve photos for print, preview placements, and order custom merchandise in Open Merch Studio.',
   },
   operator: {
     legalName: 'Fox&Hen, LLC',

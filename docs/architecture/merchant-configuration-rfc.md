@@ -1,6 +1,6 @@
 # Merchant configuration RFC
 
-**Status:** Runtime foundation implemented; clean-clone rehearsal pending
+**Status:** Runtime and build identity implemented; policy-content rehearsal pending
 
 **Schema:** `config/merchant.config.json`, version 1
 
@@ -79,7 +79,10 @@ fail closed. Runtime code must not guess a nearest version.
 3. **Completed September 4, 2026:** migrate low-risk consumers for workbench presentation,
    attribution, customer-email branding, support contact, currency default, Stripe item names,
    pricing label, and order prefix. The active profile preserves current Open Merch Studio output.
-4. Migrate SEO/static generation and operator-approved policy metadata.
+4. **SEO completed September 4, 2026:** derive canonical origins, route titles/descriptions, social
+   identity, icon references, robots output, and sitemap output from the manifest. Runtime policy
+   prose remains operator-approved application content and must be decoupled before a second
+   merchant can pass the clean-clone rehearsal.
 5. Rehearse the synthetic profile from a clean clone in fixture mode before calling version 1 stable.
 6. Only then build owner authentication and editable mini-store administration on top of the
    organization boundary.
