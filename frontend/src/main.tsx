@@ -4,6 +4,9 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import App from './App';
 import './styles.css';
+import './styles/focused-workbench.css';
+import './styles/mini-store.css';
+import './styles/example-collection.css';
 
 const observabilityEnabled =
   window.location.hostname === 'openmerchstudio.com' ||

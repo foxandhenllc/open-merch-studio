@@ -801,6 +801,29 @@ skips), both frontend contracts, production build/static-route verification, and
 11-viewport browser suite across five products, upload/reference artwork paths, persisted failure
 recovery, and recoverable fixture checkout.
 
+## Stylesheet ownership checkpoint
+
+Completed September 4, 2026:
+
+- Replaced the single 4,096-line stylesheet with ordered modules for shared/core studio rules,
+  focused workbench rules, themed mini-stores, and the Fox & Hen example collection.
+- Preserved cascade order in `main.tsx`; no selector or declaration was intentionally changed, and
+  the production build retained the same CSS asset size and content hash.
+- Kept route-specific responsive rules beside their owning surface so a contributor changing a
+  mini-store or the example collection no longer has to search through unrelated workbench CSS.
+- Retained file-level comments where ownership is not obvious, especially the mini-store's deliberate
+  separation from the creation workbench.
+
+The former 4,096-line `styles.css` is now 2,170 shared/core lines, with 1,274 focused-workbench
+lines, 477 example-collection lines, and 172 mini-store lines. The two remaining files above 1,000
+lines are intentionally reported rather than hidden: shared responsive overrides still depend on
+the core cascade, and the focused workbench has several breakpoint layers that should be normalized
+by component ownership in a later checkpoint, not moved mechanically solely to satisfy a metric.
+
+This checkpoint passed lint, typecheck, all 93 backend tests, both frontend contracts, production
+build/static-route verification, and the complete 11-viewport browser suite. The generated CSS
+remained 66.68 kB (13.50 kB gzip) with the same `index-BbVBwxR4.css` build artifact name.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:
