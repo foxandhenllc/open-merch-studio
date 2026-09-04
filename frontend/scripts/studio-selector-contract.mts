@@ -30,6 +30,10 @@ import {
   prepareCheckoutRequest,
 } from '../src/studio-checkout.ts';
 import {
+  parseCheckoutHandoff,
+  removeCheckoutHandoffParams,
+} from '../src/checkout-return.ts';
+import {
   artworkAssignmentsForDraft,
   buildPlacementSelections,
   deriveArtworkState,
@@ -392,6 +396,26 @@ assert.deepEqual(
 assert.equal(checkoutUnavailable('quote-1').quoteId, 'quote-1');
 assert.equal(checkoutNotReadyError('Enter an email.').retryable, false);
 assert.match(orderDetailsPendingError(new Error('Still processing.')).message, /Still processing/);
+
+assert.deepEqual(parseCheckoutHandoff('?checkout=success&session_id=cs_live_123', null), {
+  state: 'success',
+  sessionId: 'cs_live_123',
+  pendingSessionUpdate: 'cs_live_123',
+});
+assert.deepEqual(parseCheckoutHandoff('?checkout=cancelled&session_id=cs_live_123', 'cs_saved'), {
+  state: 'cancelled',
+  sessionId: null,
+  pendingSessionUpdate: null,
+});
+assert.deepEqual(parseCheckoutHandoff('', 'cs_saved'), {
+  state: 'success',
+  sessionId: 'cs_saved',
+});
+assert.equal(
+  removeCheckoutHandoffParams('?checkout=success&session_id=cs_live_123&campaign=launch'),
+  'campaign=launch',
+  'Stripe return cleanup must preserve unrelated campaign parameters'
+);
 
 assert.deepEqual(
   mapStudioError(new ApiError('Request budget reached.', 429, 'rate_limit'), 'generation'),

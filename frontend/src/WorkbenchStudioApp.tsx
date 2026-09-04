@@ -11,50 +11,9 @@ import { ReviewPanel } from '@components/ReviewPanel';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
 import { publicConfig } from './config';
-import { api } from './services/api';
+import { useCheckoutReturn } from './hooks/useCheckoutReturn';
 import { useStudioViewModel } from './studio-view-model';
-import type { CheckoutConfirmation } from './types/catalog';
-import { trackEvent } from './utils/analytics';
 import { formatMoney } from './utils/currency';
-
-const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
-const pendingCheckoutSession = (): string | null => {
-  try {
-    const value = window.sessionStorage.getItem(PENDING_CHECKOUT_KEY);
-    return value?.startsWith('cs_') ? value : null;
-  } catch {
-    return null;
-  }
-};
-
-const savePendingCheckoutSession = (sessionId: string | null) => {
-  try {
-    if (sessionId) window.sessionStorage.setItem(PENDING_CHECKOUT_KEY, sessionId);
-    else window.sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
-  } catch {
-    // Confirmation can still continue in the active page when session storage is unavailable.
-  }
-};
-
-const checkoutHandoff = (): { state: string | null; sessionId: string | null } => {
-  const params = new URLSearchParams(window.location.search);
-  const state = params.get('checkout');
-  const urlSessionId = params.get('session_id');
-  const validUrlSessionId = urlSessionId?.startsWith('cs_') ? urlSessionId : null;
-  if (state === 'cancelled') {
-    savePendingCheckoutSession(null);
-    return { state, sessionId: null };
-  }
-  if (state === 'success' && validUrlSessionId) {
-    savePendingCheckoutSession(validUrlSessionId);
-    return { state, sessionId: validUrlSessionId };
-  }
-  const savedSessionId = pendingCheckoutSession();
-  return {
-    state: state ?? (savedSessionId ? 'success' : null),
-    sessionId: validUrlSessionId ?? savedSessionId,
-  };
-};
 
 function Footer({ onStartFresh }: { onStartFresh: () => void }) {
   return (
@@ -86,13 +45,6 @@ export function WorkbenchStudioApp() {
   const catalogHeading = useRef<HTMLHeadingElement>(null);
   const promptField = useRef<HTMLTextAreaElement>(null);
   const taskPanelScroll = useRef<HTMLDivElement>(null);
-  const checkoutParams = useRef<{ state: string | null; sessionId: string | null } | null>(null);
-  if (!checkoutParams.current) {
-    checkoutParams.current = checkoutHandoff();
-  }
-  const [checkoutReturn, setCheckoutReturn] = useState<CheckoutConfirmation | null>(null);
-  const [checkoutPolling, setCheckoutPolling] = useState(false);
-  const [checkoutAttempt, setCheckoutAttempt] = useState(0);
   const [designOptionsOpen, setDesignOptionsOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -100,84 +52,20 @@ export function WorkbenchStudioApp() {
   const [removeUploadBackground, setRemoveUploadBackground] = useState(false);
   const [referenceRightsConfirmed, setReferenceRightsConfirmed] = useState(false);
   const studioReady = vm.flow !== 'booting' && vm.flow !== 'boot_failed';
-
-  useLayoutEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkoutState = checkoutParams.current?.state ?? null;
-    const stripeSessionId = checkoutParams.current?.sessionId ?? null;
-    if (checkoutState || stripeSessionId) {
-      params.delete('checkout');
-      params.delete('session_id');
-      const remainingQuery = params.toString();
-      window.history.replaceState(
-        window.history.state,
-        document.title,
-        `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ''}${window.location.hash}`
-      );
-    }
-  }, []);
+  const {
+    confirmation: checkoutReturn,
+    polling: checkoutPolling,
+    retry: retryCheckoutReturn,
+    dismiss: dismissCheckoutReturn,
+  } = useCheckoutReturn({
+    studioReady,
+    onConfirmedOrder: vm.acceptConfirmedOrder,
+  });
 
   useLayoutEffect(() => {
     if (taskPanelScroll.current) taskPanelScroll.current.scrollTop = 0;
   }, [vm.workbenchMode]);
 
-  useEffect(() => {
-    if (!studioReady) return undefined;
-    const checkoutState = checkoutParams.current?.state ?? null;
-    const stripeSessionId = checkoutParams.current?.sessionId ?? null;
-    if (checkoutState === 'cancelled') {
-      savePendingCheckoutSession(null);
-      trackEvent('checkout_returned', { result: 'cancelled', mode: 'live' });
-      setCheckoutReturn({
-        state: 'failed',
-        message: 'Checkout was cancelled. No payment was made.',
-      });
-      return undefined;
-    }
-    if (checkoutState !== 'success' || !stripeSessionId) return undefined;
-    let cancelled = false;
-    setCheckoutPolling(true);
-    setCheckoutReturn({
-      state: 'processing',
-      message: 'Stripe returned successfully. Confirming your payment now.',
-    });
-    const confirm = async () => {
-      try {
-        for (let attempt = 0; attempt < 30 && !cancelled; attempt += 1) {
-          try {
-            const result = await api.checkoutOrder(stripeSessionId);
-            const confirmation = result.data;
-            setCheckoutReturn(confirmation);
-            if (confirmation.state !== 'processing') {
-              savePendingCheckoutSession(null);
-              if (confirmation.order) vm.acceptConfirmedOrder(confirmation.order);
-              trackEvent('checkout_returned', {
-                result: confirmation.state === 'failed' ? 'unknown' : 'success',
-                mode: 'live',
-              });
-              return;
-            }
-          } catch {
-            // Stripe may redirect before the signed webhook is reconciled.
-          }
-          await new Promise((resolve) => window.setTimeout(resolve, 2000));
-        }
-        if (!cancelled) {
-          trackEvent('checkout_returned', { result: 'unknown', mode: 'live' });
-          setCheckoutReturn({
-            state: 'processing',
-            message: 'Confirmation is still processing. Do not submit another payment.',
-          });
-        }
-      } finally {
-        if (!cancelled) setCheckoutPolling(false);
-      }
-    };
-    void confirm();
-    return () => {
-      cancelled = true;
-    };
-  }, [checkoutAttempt, studioReady, vm.acceptConfirmedOrder]);
 
   useEffect(() => {
     if (!studioReady || vm.workbenchMode === 'generating') return undefined;
@@ -294,9 +182,9 @@ export function WorkbenchStudioApp() {
                   ? undefined
                   : {
                       label: 'Check again',
-                      onClick: () => setCheckoutAttempt((value) => value + 1),
+                      onClick: retryCheckoutReturn,
                     }
-                : { label: 'Dismiss', onClick: () => setCheckoutReturn(null) }
+                : { label: 'Dismiss', onClick: dismissCheckoutReturn }
             }
           >
             <p>{checkoutReturn.message}</p>

@@ -435,3 +435,23 @@ Completed September 3, 2026:
 The replacement audit inspected 150 production package versions and found no applicable OSV
 advisories. This gate supplements the clean install and application test matrix; it does not make
 dependency installation permissive or convert advisory-service failure into success.
+
+## Checkout-return controller checkpoint
+
+Completed September 3, 2026:
+
+- Added `hooks/useCheckoutReturn.ts` to own Stripe return URL cleanup, pending-session recovery,
+  bounded order reconciliation polling, retry/dismiss state, and checkout-return analytics.
+- Added `checkout-return.ts` as the pure parsing boundary and characterized successful, cancelled,
+  resumed, and unrelated-query-parameter behavior.
+- Kept the signed Stripe webhook authoritative: the hook only asks the existing customer-safe order
+  endpoint for reconciled state and never fulfills from the browser redirect.
+- Preserved the exact no-double-payment timeout message and session-storage fallback behavior.
+
+`WorkbenchStudioApp.tsx` moved from 538 to 426 lines. The checkout-return hook is 123 lines and the
+pure URL boundary is 33 lines. This completes the high-value workbench lifecycle extraction before
+quantity work; quantity must land as a separate feature because it changes quote and checkout data.
+
+This checkpoint passed 85 backend tests (82 passed and three database-only skips), both frontend
+contracts, lint, typecheck, production build/static-route checks, and the complete 11-viewport
+browser suite across five products plus upload/reference and recoverable checkout flows.
