@@ -663,3 +663,28 @@ This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and thre
 skips), both frontend contracts, production build/static-route verification, and the complete
 11-viewport browser suite across five products, uploads, reference artwork, persisted failures, and
 the recoverable fixture checkout flow.
+
+## Studio quote lifecycle checkpoint
+
+Completed September 4, 2026:
+
+- Added `useStudioQuote.ts` as the owner of the active-design quote, cancellation controller,
+  request ordering, freshness state, progress, expiry calculation, analytics, and quote errors.
+- Kept automatic-refresh policy in the parent workflow and kept guest-cart quoting in
+  `useGuestCart`; a single-product estimate and a persisted multi-line cart have different
+  invalidation rules and should not share mutable state.
+- Added explicit `invalidate`, `clear`, and `cancel` commands so product, quantity, artwork, reset,
+  and navigation transitions no longer manipulate request-controller internals.
+- Closed a stale-response window during artwork revision and undo. Those transitions now invalidate
+  the active request as well as the displayed price, so an old-artwork estimate cannot become
+  current after the design changes.
+
+`studio-view-model.ts` moved from 1,510 to 1,471 lines. The new quote hook is 140 lines. The central
+model is still large because artwork creation/revision and boot/session restoration remain genuine
+multi-state workflows. The next useful extraction should target one of those cohesive lifecycles,
+not individual setters or presentation-only helpers.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, production build/static-route verification, and the complete
+11-viewport browser suite across five products, uploads, reference artwork, persisted failures, and
+the recoverable fixture checkout flow.

@@ -20,7 +20,7 @@ import {
   readStudioResumeState,
   writeStudioResumeState,
 } from './studio-persistence';
-import { productType, revisionBand, totalBand, trackEvent } from './utils/analytics';
+import { productType, revisionBand, trackEvent } from './utils/analytics';
 import type {
   ActionKey,
   CreationPath,
@@ -58,11 +58,7 @@ import {
   selectReferenceFiles,
   undoArtworkRevision,
 } from './studio-artwork.transitions';
-import {
-  normalizeStudioItemQuantity,
-  prepareQuoteRequest,
-  quoteAnnouncement,
-} from './studio-quote';
+import { normalizeStudioItemQuantity } from './studio-quote';
 import {
   checkoutNotReadyError,
   checkoutUnavailable,
@@ -73,6 +69,7 @@ import {
 import { createStudioCartItem, MAX_STUDIO_CART_LINES, studioCartUnitCount } from './studio-cart';
 import { useGuestCart } from './hooks/useGuestCart';
 import { useStudioMockup, type StudioMockupRequest } from './hooks/useStudioMockup';
+import { useStudioQuote } from './hooks/useStudioQuote';
 
 export type {
   ActionKey,
@@ -127,7 +124,6 @@ export function useStudioViewModel() {
   const [email, setEmail] = useState('');
   const [idea, setIdea] = useState<DesignIdea | null>(null);
   const [design, setDesign] = useState<DesignDraft | null>(null);
-  const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [checkoutSource, setCheckoutSource] = useState<'design' | 'cart'>('design');
   const [order, setOrder] = useState<CustomerOrderConfirmation | null>(null);
@@ -135,7 +131,6 @@ export function useStudioViewModel() {
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
   const [fallback, setFallback] = useState<{ visible: boolean; reason: string } | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>('live');
-  const [quoteStale, setQuoteStale] = useState(false);
   const [generationPhase, setGenerationPhase] = useState('Queued');
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
@@ -143,8 +138,6 @@ export function useStudioViewModel() {
   const [designHistory, setDesignHistory] = useState<DesignDraft[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const generationController = useRef<AbortController | null>(null);
-  const quoteController = useRef<AbortController | null>(null);
-  const quoteRequestId = useRef(0);
   const startingFresh = useRef(false);
   const productSelections = useRef(new Map<string, RememberedProductSelection>());
 
@@ -156,12 +149,34 @@ export function useStudioViewModel() {
     () => selectedProduct?.variants.find((variant) => variant.id === selectedVariantId) ?? null,
     [selectedProduct, selectedVariantId]
   );
-  const quoteExpired = Boolean(quote && new Date(quote.expiresAt).getTime() <= Date.now());
   const { artworkReady, artworkQuoteEligible } = deriveArtworkState({
     selectedPlacements,
     placementArtwork,
     design,
   });
+  const { canGenerateAnother, canRevise } = deriveDesignAllowance(design);
+
+  const consumeSource = useCallback(<T>(result: Sourced<T>): T => {
+    setDataSource(result.source);
+    if (result.fallbackReason) setFallback({ visible: true, reason: result.fallbackReason });
+    return result.data;
+  }, []);
+  const studioQuote = useStudioQuote({
+    sessionId: session?.id,
+    studioPassId: studioPass?.id,
+    onSource: consumeSource,
+    onFlowChange: setFlow,
+    onAnnouncement: setAnnouncement,
+  });
+  const {
+    quote,
+    setQuote,
+    stale: quoteStale,
+    setStale: setQuoteStale,
+    expired: quoteExpired,
+    busy: quoteBusy,
+    error: quoteError,
+  } = studioQuote;
   const checkoutReadiness = useMemo(
     () =>
       deriveCheckoutReadiness({
@@ -174,13 +189,6 @@ export function useStudioViewModel() {
       }),
     [artworkReady, email, quote, quoteExpired, quoteStale]
   );
-  const { canGenerateAnother, canRevise } = deriveDesignAllowance(design);
-
-  const consumeSource = useCallback(<T>(result: Sourced<T>): T => {
-    setDataSource(result.source);
-    if (result.fallbackReason) setFallback({ visible: true, reason: result.fallbackReason });
-    return result.data;
-  }, []);
   const studioMockup = useStudioMockup({
     sessionId: session?.id,
     quotePresent: Boolean(quote),
@@ -224,6 +232,10 @@ export function useStudioViewModel() {
   const clearError = (surface: Surface) => {
     if (surface === 'mockup') {
       studioMockup.clearError();
+      return;
+    }
+    if (surface === 'quote') {
+      studioQuote.clearError();
       return;
     }
     setErrors((current) => ({ ...current, [surface]: undefined }));
@@ -530,12 +542,8 @@ export function useStudioViewModel() {
       mugLayout: params.mugLayout ?? mugLayout,
     });
   const markStale = () => {
-    quoteRequestId.current += 1;
-    quoteController.current?.abort();
-    quoteController.current = null;
-    setAction('quoting', false);
+    studioQuote.invalidate();
     if (mockup) setMockupStale(true);
-    if (quote) setQuoteStale(true);
     if (quote) setFlow('quote_stale');
     else setFlow(design ? 'drafted' : 'configuring');
     setCheckout(null);
@@ -544,13 +552,9 @@ export function useStudioViewModel() {
   const setQuantity = (value: number) => {
     const nextQuantity = normalizeStudioItemQuantity(value);
     if (nextQuantity === quantity) return;
-    quoteRequestId.current += 1;
-    quoteController.current?.abort();
-    quoteController.current = null;
-    setAction('quoting', false);
+    studioQuote.invalidate();
     setQuantityState(nextQuantity);
     if (quote) {
-      setQuoteStale(true);
       setFlow('quote_stale');
     }
     setCheckout(null);
@@ -794,9 +798,8 @@ export function useStudioViewModel() {
       setPlacementArtwork(nextPlacementArtwork);
       setActivePlacementCode('');
       setMockup(null);
-      setQuote(null);
+      studioQuote.clear();
       setMockupStale(false);
-      setQuoteStale(false);
       setFlow('drafted');
       setAnnouncement('Your artwork is prepared. Building the product preview now.');
       trackEvent('design_generation_completed', {
@@ -946,9 +949,8 @@ export function useStudioViewModel() {
       setPlacementArtwork(nextPlacementArtwork);
       setActivePlacementCode('');
       setMockup(null);
-      setQuote(null);
+      studioQuote.clear();
       setMockupStale(false);
-      setQuoteStale(false);
       setFlow('drafted');
       setAnnouncement('Artwork ready. Building your product mockup now.');
       trackEvent('design_generation_completed', {
@@ -1026,7 +1028,7 @@ export function useStudioViewModel() {
       setDesign(revised);
       setPlacementArtwork(nextPlacementArtwork);
       setMockup(null);
-      setQuoteStale(Boolean(quote));
+      studioQuote.invalidate();
       setFlow('drafted');
       setRevision('');
       setAnnouncement('New variation ready. Rebuilding your product mockup.');
@@ -1068,7 +1070,7 @@ export function useStudioViewModel() {
     setDesign(undone.design);
     setPlacementArtwork(undone.placementArtwork);
     setRevision('');
-    setQuoteStale(Boolean(quote));
+    studioQuote.invalidate();
     setCheckout(null);
     setOrder(null);
     setAnnouncement('Previous artwork restored. Rebuilding its product preview.');
@@ -1106,53 +1108,21 @@ export function useStudioViewModel() {
   );
   const createQuote = async (options: { automatic?: boolean } = {}) => {
     if (!selectedProduct || !selectedVariant || !artworkQuoteEligible || !design?.id) return;
-    const requestId = ++quoteRequestId.current;
-    quoteController.current?.abort();
-    const controller = new AbortController();
-    quoteController.current = controller;
-    setAction('quoting', true);
-    clearError('quote');
-    try {
-      const request = prepareQuoteRequest({
-        sessionId: session?.id,
-        studioPassId: studioPass?.id,
-        product: selectedProduct,
-        variant: selectedVariant,
-        selectedPlacements,
-        design,
-        placementArtwork,
-        quantity,
-        mugLayout,
-        orientation: selectedOrientation,
-      });
-      if (!request) return;
-      const sourced = await api.quote(request, controller.signal);
-      const result = consumeSource(sourced);
-      if (requestId !== quoteRequestId.current) return;
-      setQuote(result);
-      setQuoteStale(false);
-      setFlow('quoted');
-      trackEvent('quote_created', {
-        source: sourced.source,
-        total_band: totalBand(result.totalCents),
-      });
-      setAnnouncement(quoteAnnouncement(result, Boolean(options.automatic)));
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      if (requestId !== quoteRequestId.current) return;
-      fail('quote', error);
-    } finally {
-      if (requestId === quoteRequestId.current) {
-        setAction('quoting', false);
-        quoteController.current = null;
-      }
-    }
+    await studioQuote.request({
+      product: selectedProduct,
+      variant: selectedVariant,
+      selectedPlacements,
+      design,
+      placementArtwork,
+      quantity,
+      mugLayout,
+      orientation: selectedOrientation,
+      automatic: options.automatic,
+    });
   };
   useEffect(() => {
     if (!artworkQuoteEligible || !design?.id || !selectedProduct || !selectedVariant) {
-      quoteController.current?.abort();
-      setQuote(null);
-      setQuoteStale(false);
+      studioQuote.clear();
       setCheckout(null);
       return undefined;
     }
@@ -1176,12 +1146,6 @@ export function useStudioViewModel() {
     selectedVariant?.id,
     studioPass?.id,
   ]);
-  useEffect(
-    () => () => {
-      quoteController.current?.abort();
-    },
-    []
-  );
   const buyStudioPass = async () => {
     if (!session) return;
     if (!canUseCustomerCheckout) {
@@ -1306,8 +1270,7 @@ export function useStudioViewModel() {
   };
 
   const resetCurrentDesign = () => {
-    quoteRequestId.current += 1;
-    quoteController.current?.abort();
+    studioQuote.clear();
     setSelectedProductId('');
     setSelectedVariantIdState('');
     setQuantityState(1);
@@ -1320,8 +1283,6 @@ export function useStudioViewModel() {
     setIdea(null);
     setDesign(null);
     setMockup(null);
-    setQuote(null);
-    setQuoteStale(false);
     setCheckout(null);
     setFlow('configuring');
     setWorkbenchMode('product');
@@ -1395,7 +1356,7 @@ export function useStudioViewModel() {
     if (!confirmed) return;
     startingFresh.current = true;
     generationController.current?.abort();
-    quoteController.current?.abort();
+    studioQuote.cancel();
     clearStudioResumeState();
     cart.clear();
     window.sessionStorage.removeItem('open-merch-studio:pending-cart-checkout:v1');
@@ -1436,8 +1397,8 @@ export function useStudioViewModel() {
     checkoutSource,
     checkout,
     order,
-    busy: { ...busy, mockup: mockupBusy },
-    errors: { ...errors, mockup: mockupError },
+    busy: { ...busy, mockup: mockupBusy, quoting: quoteBusy },
+    errors: { ...errors, mockup: mockupError, quote: quoteError },
     fallback,
     dataSource,
     mockupStale,
