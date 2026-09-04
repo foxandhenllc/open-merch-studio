@@ -97,8 +97,12 @@ defines fresh organization membership/roles, a dedicated RLS-constrained owner r
 ownership constraints, private revisions, explicit publish/unpublish, atomic audit records, safe
 public DTOs, and two-organization test gates. No owner mutations or real owner memberships are live.
 
-Next: implement the identity adapter and read-only owner context with fixture denial tests. Then
-add and verify the database boundary before draft writes. Existing operator-only behavior that
+**Identity checkpoint implemented September 4, 2026:** server-verified Supabase identity adapter,
+read-only organization context, role policy, and two-organization fixture denial tests. The registered
+owner route remains unavailable in production until an issuer-aware membership repository is wired
+in after the database boundary is verified. No real sign-in, memberships, or owner writes are enabled.
+
+Next: add and verify the database boundary before draft writes. Existing operator-only behavior that
 allows in-place publication edits, insufficient cross-organization relationship constraints, or
 fallback resurrection after unpublish must not be reused for owner administration. Per-organization
 commerce remains separately gated.

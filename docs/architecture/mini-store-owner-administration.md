@@ -1,7 +1,8 @@
 # Authenticated mini-store administration
 
 September 4, 2026. Architecture checkpoint after the merchant configuration rehearsal.
-No owner endpoints, sign-in settings, database roles, or migrations are activated by this document.
+The read-only owner endpoint is registered but unavailable in production composition. No sign-in
+settings, database roles, real memberships, or migrations are activated by this checkpoint.
 
 ## Decision and scope
 
@@ -131,6 +132,42 @@ different type and does not become public by changing a status flag.
    QA across two organizations. Only then expose administration. Per-organization Stripe/Printful,
    tax, support, policy approval, and supervised real order authorization remain separate gates.
 
-The safest next implementation is checkpoint 1. Production Auth configuration, initial real owner
-membership, and a restricted database credential need verified project/account targets before
-activation; this architecture does not create or enable them.
+### Checkpoint 1 evidence — September 4, 2026
+
+Implemented `backend/src/owner/supabase-owner-identity.ts`, `owner-access.ts`, and
+`backend/src/routes/owner.routes.ts`. The adapter uses the pinned SDK's explicit `getUser(token)`
+network path, bounded to five seconds with redirects rejected and session persistence/refresh off.
+It rejects anonymous, deleted, banned, invalid, and expired identities and discards email/metadata.
+Issuer comes from the configured Auth origin, never the request. Provider failures are replaced with
+safe errors. No Auth project configuration or service-role fallback is inferred from storage settings.
+
+`GET /api/owner/organizations/:organizationSlug/context` accepts only an Authorization bearer header.
+Its reader contract requires fresh issuer/subject membership and active organization/membership,
+known role, and no revocation. The response projects organization ID/slug/name, role, and
+`readOnly: true`; it contains no private designs, provider payloads, identity claims, or write grants.
+Responses are private/no-store. Unsupported owner routes/methods return a fixed 404. Owner request
+paths and query strings are redacted from operational/access logs, including case variants.
+
+The production router has **no dependencies wired in**: missing bearer credentials return 401 and
+presented credentials return 503 `owner_access_unavailable`. Neither environment flags, an existing
+Prisma connection, nor fixture mode can activate it. This is deliberate: subject-only legacy
+memberships are not a safe substitute for the next database checkpoint. The role matrix describes
+policy; it does not implement or authorize any mutation endpoint.
+
+`backend/src/tests/owner-access.test.ts` exercises the SDK through a fake HTTP transport and a
+test-only two-organization membership reader. It verifies cross-organization/issuer denials,
+revocation on the next request, unknown roles, inactive membership/organization, safe projection,
+non-cacheability, rejected admin/cookie/query/header claims, and the closed production composition.
+This proves application contracts, not real sign-in or database isolation. No live Auth or order
+provider is called by those tests.
+
+Local verification passed configuration validation/staleness checks, lint, type-check, build,
+fixture smoke, production dependency audit, 101 backend tests (four database integration tests
+require PostgreSQL), 15 script tests, frontend contracts, and the browser suite across 11 viewports.
+The isolated Community Gear Lab rehearsal also passed with live gates disabled. These checks retain
+the existing customer workflow and read-only storefront; they do not substitute for RLS tests.
+
+The safest next implementation is checkpoint 2: local database constraints and a nonprivileged
+owner repository with RLS denial tests before draft writes. Production Auth configuration, initial
+real owner membership, and a restricted database credential need verified project/account targets
+before activation; this checkpoint does not create or enable them.

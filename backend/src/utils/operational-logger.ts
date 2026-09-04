@@ -35,7 +35,10 @@ const safeFingerprint = (value: string | undefined): string | undefined => {
 };
 
 export const redactRequestUrl = (url: string) =>
-  url.replace(/\/api\/checkout\/sessions\/[^/?#]+/g, '/api/checkout/sessions/[redacted]');
+  url
+    // Owner credentials belong in headers, but accidental URL credentials must not reach logs.
+    .replace(/^\/api\/owner(?:[/?#].*)?$/i, '/api/owner/[redacted]')
+    .replace(/\/api\/checkout\/sessions\/[^/?#]+/g, '/api/checkout/sessions/[redacted]');
 
 export function buildOperationalRecord(
   severity: OperationalSeverity,
