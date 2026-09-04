@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { merchantConfig } from '../generated/merchant-config.js';
 
 dotenv.config();
 
@@ -39,7 +40,7 @@ export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => 
   provider: emailProviderFromEnv(source.EMAIL_PROVIDER),
   from: source.EMAIL_FROM?.trim() || undefined,
   replyTo: source.EMAIL_REPLY_TO?.trim() || undefined,
-  supportEmail: source.SUPPORT_EMAIL?.trim() || 'support@openmerchstudio.com',
+  supportEmail: source.SUPPORT_EMAIL?.trim() || merchantConfig.operator.supportEmail,
   resendApiKey: source.RESEND_API_KEY?.trim() || undefined,
   resendWebhookSecret: source.RESEND_WEBHOOK_SECRET?.trim() || undefined,
 });
@@ -101,7 +102,7 @@ export const env = {
   checkoutAllowedEmails: checkoutAllowedEmailsFromEnv(process.env.CHECKOUT_ALLOWED_EMAILS),
   allowLiveFulfillment: booleanFromEnv('ALLOW_LIVE_FULFILLMENT', false),
   printfulAutoConfirmOrders: booleanFromEnv('PRINTFUL_AUTO_CONFIRM_ORDERS', false),
-  defaultCurrency: process.env.DEFAULT_CURRENCY || 'USD',
+  defaultCurrency: process.env.DEFAULT_CURRENCY || merchantConfig.catalog.currency,
   targetMarginPercent: numberFromEnv('TARGET_MARGIN_PERCENT', 30),
   minMarginCents: numberFromEnv('MIN_MARGIN_CENTS', 500),
   aiDesignFeeCents: numberFromEnv('AI_DESIGN_FEE_CENTS', 300),

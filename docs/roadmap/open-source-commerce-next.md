@@ -70,6 +70,10 @@ does not.** A reusable store should require:
 - **Foundation completed September 4, 2026:** `npm run doctor` reports Node, URL, provider,
   database, and commerce-gate conflicts without printing values. Database reachability and merchant
   profile validation remain part of the post-RFC setup slice;
+- **Runtime foundation completed September 4, 2026:** the versioned merchant manifest generates
+  immutable typed frontend and backend modules. Builds reject stale generated output, and current
+  brand, support, currency, pricing, Stripe-item, email, attribution, and order-prefix consumers no
+  longer require source edits for a fork;
 - one documented Vercel template path and equivalent platform-neutral deployment contract;
 - fixture mode that works from a clean clone before any provider is enabled.
 

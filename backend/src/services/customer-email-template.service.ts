@@ -1,4 +1,5 @@
 import type { CustomerOrderConfirmation } from '../types/catalog.js';
+import { merchantConfig } from '../generated/merchant-config.js';
 
 export type CustomerEmailKind =
   | 'order_received'
@@ -170,14 +171,14 @@ export function renderCustomerEmail(
       '',
       `Questions? Contact ${supportEmail} and include order ${orderNumber}.`,
       '',
-      'Open Merch Studio',
+      merchantConfig.brand.displayName,
     ].join('\n'),
     html: `<!doctype html>
 <html lang="en">
   <body style="margin:0;background:#f5f5f2;color:#171814;font-family:Arial,sans-serif">
     <main style="max-width:560px;margin:0 auto;padding:32px 20px">
       <div style="background:#ffffff;border:1px solid #deded8;border-radius:16px;padding:28px">
-        <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Open Merch Studio</p>
+        <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">${escapeHtml(merchantConfig.brand.displayName)}</p>
         <h1 style="margin:0 0 20px;font-size:26px;line-height:1.2">${escapeHtml(copy.heading)}</h1>
         ${htmlParagraphs}
         ${htmlOrderLink}

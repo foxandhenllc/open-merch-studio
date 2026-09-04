@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { merchantConfig } from '../generated/merchant-config.js';
 import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import type { QuoteBreakdown } from '../types/catalog.js';
@@ -235,7 +236,7 @@ export async function createMerchCheckoutSession(params: {
     kind: 'merch_order',
     amountCents: params.quote.totalCents,
     currency: params.quote.currency,
-    name: 'Open Merch Studio order',
+    name: `${merchantConfig.brand.displayName} order`,
     description: params.quote.items
       .map((item) => item.title)
       .join(', ')
@@ -259,7 +260,7 @@ export async function createStudioPassStripeSession(params: {
     kind: 'studio_pass',
     amountCents: params.amountCents,
     currency: env.defaultCurrency,
-    name: 'Open Merch Studio Pass',
+    name: `${merchantConfig.brand.displayName} Pass`,
     description: 'Unlocks additional design drafts and applies as credit to an eligible purchase.',
     customerEmail: params.customerEmail,
     collectShipping: false,

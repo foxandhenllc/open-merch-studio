@@ -1,22 +1,24 @@
-const sourceUrl = 'https://github.com/foxandhenllc/open-merch-studio';
-const licenseUrl = `${sourceUrl}/blob/main/LICENSE`;
+import { merchantConfig } from '../generated/merchant-config';
+
+const { attribution } = merchantConfig;
+const licenseUrl = `${attribution.sourceUrl}/blob/main/LICENSE`;
 
 export function OpenSourceAttribution() {
   return (
     <p className="open-source-attribution">
       <span>
-        Open Merch Studio is an open-source product by{' '}
-        <a href="https://foxandhenllc.com/merch" target="_blank" rel="noreferrer">
-          Fox &amp; Hen
+        {attribution.projectName} is an open-source product by{' '}
+        <a href={attribution.creatorUrl} target="_blank" rel="noreferrer">
+          {attribution.creatorName}
         </a>
         .
       </span>
-      <a href={sourceUrl} target="_blank" rel="noreferrer">
+      <a href={attribution.sourceUrl} target="_blank" rel="noreferrer">
         Source on GitHub
       </a>
       <span aria-hidden="true">·</span>
       <a href={licenseUrl} target="_blank" rel="noreferrer">
-        MIT license
+        {attribution.licenseName} license
       </a>
     </p>
   );

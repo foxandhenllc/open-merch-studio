@@ -66,9 +66,10 @@ values. A clean clone should report `fixture-ready`; provider presence is not th
 payment or fulfillment authorization.
 
 Public merchant identity lives in [`config/merchant.config.json`](./config/merchant.config.json).
-Validate it and the synthetic second profile with `npm run config:validate`. Secrets and live
-commerce authorization remain environment-managed and are never part of that manifest. See the
-[merchant configuration RFC](./docs/architecture/merchant-configuration-rfc.md).
+After changing it, run `npm run config:generate`, then validate it and the synthetic second profile
+with `npm run config:validate`. Type-checking and builds reject stale generated modules. Secrets and
+live commerce authorization remain environment-managed and are never part of that manifest. See
+the [merchant configuration RFC](./docs/architecture/merchant-configuration-rfc.md).
 
 The example environment keeps live payment and fulfillment gates disabled and permits simulated
 local checkout. Production activation requires deployment-managed credentials and the supervised

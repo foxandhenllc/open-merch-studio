@@ -1,6 +1,6 @@
 # Merchant configuration RFC
 
-**Status:** Draft schema implemented for review
+**Status:** Runtime foundation implemented; clean-clone rehearsal pending
 
 **Schema:** `config/merchant.config.json`, version 1
 
@@ -26,10 +26,13 @@ license accurately.
    brand, operator, policy, or attribution fields.
 4. Built-in fixture data remains available only when fixture fallbacks are enabled.
 
-`npm run config:validate` validates the reference and synthetic profiles. `npm run doctor` includes
-the active profile check. Invalid JSON, an unsupported schema version, missing public assets, unsafe
-URLs, malformed order prefixes, or missing launch-critical fields returns a nonzero exit code.
-Validation reports field paths and fixed remediation text, never configured secret values.
+`npm run config:generate` validates the active profile and emits immutable typed modules for the
+browser and server. `npm run config:check` proves those committed modules are current; type-checking,
+builds, and the test suite enforce that invariant. `npm run config:validate` validates the reference
+and synthetic profiles, while `npm run doctor` includes the active profile check. Invalid JSON, an
+unsupported schema version, missing public assets, unsafe URLs, malformed order prefixes, or missing
+launch-critical fields returns a nonzero exit code. Validation reports field paths and fixed
+remediation text, never configured secret values.
 
 ## Field ownership
 
@@ -71,10 +74,11 @@ fail closed. Runtime code must not guess a nearest version.
 
 1. **Completed:** reference and synthetic profiles, JSON Schema, deterministic validator, doctor
    integration, missing-asset checks, and redaction tests.
-2. Generate typed frontend/backend constants from the validated manifest at build time; do not read
-   mutable files from request handlers.
-3. Migrate low-risk consumers first: presentation, attribution, email sender copy, pricing label,
-   and order prefix. Preserve current Open Merch Studio output with snapshots.
+2. **Completed September 4, 2026:** generate committed, typed frontend/backend constants from the
+   validated manifest; request handlers never read mutable configuration files.
+3. **Completed September 4, 2026:** migrate low-risk consumers for workbench presentation,
+   attribution, customer-email branding, support contact, currency default, Stripe item names,
+   pricing label, and order prefix. The active profile preserves current Open Merch Studio output.
 4. Migrate SEO/static generation and operator-approved policy metadata.
 5. Rehearse the synthetic profile from a clean clone in fixture mode before calling version 1 stable.
 6. Only then build owner authentication and editable mini-store administration on top of the

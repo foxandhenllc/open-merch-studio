@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { merchantConfig } from '../generated/merchant-config.js';
 import type {
   CatalogProductDto,
   PlacementSelection,
@@ -281,7 +282,7 @@ export function buildQuoteBreakdown(
     },
     {
       code: 'margin',
-      label: 'Open Merch Studio margin',
+      label: merchantConfig.pricing.marginLabel,
       amountCents: targetMarginCents,
       kind: 'margin',
     },

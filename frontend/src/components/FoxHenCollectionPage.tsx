@@ -1,5 +1,6 @@
 import { OpenSourceAttribution } from './OpenSourceAttribution';
 import { foxHenProducts } from '../examples/fox-hen-collection';
+import { merchantConfig } from '../generated/merchant-config';
 
 function ProductVisual({ product }: { product: (typeof foxHenProducts)[number] }) {
   return (
@@ -24,30 +25,37 @@ export function FoxHenCollectionPage() {
   return (
     <main className="example-collection">
       <nav className="example-nav" aria-label="Example collection navigation">
-        <a className="brand" href="/" aria-label="Open Merch Studio home">
-          <span className="brand-symbol">OMS</span>
+        <a className="brand" href="/" aria-label={`${merchantConfig.brand.displayName} home`}>
+          <span className="brand-symbol">{merchantConfig.brand.shortName}</span>
           <span>
-            <b>Open Merch Studio</b>
+            <b>{merchantConfig.brand.displayName}</b>
             <small>Collection proof</small>
           </span>
         </a>
         <div>
           <a href="/">Create your own</a>
-          <a href="https://github.com/foxandhenllc/open-merch-studio">View source ↗</a>
+          <a href={merchantConfig.attribution.sourceUrl}>View source ↗</a>
         </div>
       </nav>
 
       <header className="example-hero">
         <div className="example-hero__copy">
           <span className="kicker">Fox &amp; Hen / collection 001</span>
-          <h1>One clear system,<br />printed five ways.</h1>
+          <h1>
+            One clear system,
+            <br />
+            printed five ways.
+          </h1>
           <p>
-            A real five-product capsule built from the catalog already available in Open Merch
-            Studio. Every piece starts with the approved Fox &amp; Hen identity used on the live
-            website—horizontal, stacked, ampersand, and circular marks—then adapts it for print.
+            A real five-product capsule built from the catalog already available in{' '}
+            {merchantConfig.attribution.projectName}. Every piece starts with the approved Fox &amp;
+            Hen identity used on the live website—horizontal, stacked, ampersand, and circular
+            marks—then adapts it for print.
           </p>
           <div className="example-hero__actions">
-            <a className="example-button" href="/">Make your own merch</a>
+            <a className="example-button" href="/">
+              Make your own merch
+            </a>
             <a className="example-text-link" href="https://foxandhenllc.com/merch">
               See the Fox &amp; Hen story ↗
             </a>
@@ -55,7 +63,10 @@ export function FoxHenCollectionPage() {
         </div>
         <div className="example-hero__art" aria-hidden="true">
           <span>Collection 001</span>
-          <img src="/examples/fox-and-hen/brand/fox-and-hen-logo-primary-stacked-light.svg" alt="" />
+          <img
+            src="/examples/fox-and-hen/brand/fox-and-hen-logo-primary-stacked-light.svg"
+            alt=""
+          />
         </div>
       </header>
 
@@ -65,10 +76,34 @@ export function FoxHenCollectionPage() {
           <h2 id="example-methods-title">More than a prompt box.</h2>
         </div>
         <ol>
-          <li><span>01</span><strong>Use supplied artwork</strong><p>Approved Fox &amp; Hen marks were prepared directly for products.</p></li>
-          <li><span>02</span><strong>Keep the identity intact</strong><p>The live header, footer, ampersand, and social marks stay recognizable across five print formats.</p></li>
-          <li><span>03</span><strong>Make it printworthy</strong><p>Transparency, safe areas, output dimensions, and legibility were verified before handoff.</p></li>
-          <li><span>04</span><strong>Control each placement</strong><p>The tee and tote use separate front and back print files with visible cost impact.</p></li>
+          <li>
+            <span>01</span>
+            <strong>Use supplied artwork</strong>
+            <p>Approved Fox &amp; Hen marks were prepared directly for products.</p>
+          </li>
+          <li>
+            <span>02</span>
+            <strong>Keep the identity intact</strong>
+            <p>
+              The live header, footer, ampersand, and social marks stay recognizable across five
+              print formats.
+            </p>
+          </li>
+          <li>
+            <span>03</span>
+            <strong>Make it printworthy</strong>
+            <p>
+              Transparency, safe areas, output dimensions, and legibility were verified before
+              handoff.
+            </p>
+          </li>
+          <li>
+            <span>04</span>
+            <strong>Control each placement</strong>
+            <p>
+              The tee and tote use separate front and back print files with visible cost impact.
+            </p>
+          </li>
         </ol>
       </section>
 
@@ -79,9 +114,9 @@ export function FoxHenCollectionPage() {
             <h2 id="example-products-title">A collection, not a catalog dump.</h2>
           </div>
           <p>
-            These are live Printful-generated product proofs. Suggested retail is editorial
-            guidance for the example collection, not a live offer; final store prices and
-            shipping appear before purchase.
+            These are live Printful-generated product proofs. Suggested retail is editorial guidance
+            for the example collection, not a live offer; final store prices and shipping appear
+            before purchase.
           </p>
         </div>
         <div className="example-product-grid">
@@ -97,8 +132,14 @@ export function FoxHenCollectionPage() {
                 </div>
               </div>
               <dl>
-                <div><dt>Placement</dt><dd>{product.placement}</dd></div>
-                <div><dt>Retail</dt><dd>{product.suggestedRetail}</dd></div>
+                <div>
+                  <dt>Placement</dt>
+                  <dd>{product.placement}</dd>
+                </div>
+                <div>
+                  <dt>Retail</dt>
+                  <dd>{product.suggestedRetail}</dd>
+                </div>
               </dl>
               <p className="example-product-card__cost">{product.costNote}</p>
             </article>
@@ -110,12 +151,15 @@ export function FoxHenCollectionPage() {
         <span className="kicker">Open by design</span>
         <h2>Try the workflow. Inspect the code. Build a version you own.</h2>
         <p>
-          Open Merch Studio supports direct uploads, reference-led creation, photo cleanup,
-          multi-placement previews, live Stripe Checkout, and review-first Printful fulfillment.
+          {merchantConfig.attribution.projectName} supports direct uploads, reference-led creation,
+          photo cleanup, multi-placement previews, live Stripe Checkout, and review-first Printful
+          fulfillment.
         </p>
         <div>
-          <a className="example-button example-button--light" href="/">Open the studio</a>
-          <a className="example-text-link" href="https://github.com/foxandhenllc/open-merch-studio">
+          <a className="example-button example-button--light" href="/">
+            Open the studio
+          </a>
+          <a className="example-text-link" href={merchantConfig.attribution.sourceUrl}>
             Fork on GitHub ↗
           </a>
         </div>

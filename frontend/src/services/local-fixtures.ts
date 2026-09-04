@@ -13,6 +13,7 @@ import type {
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
+import { merchantConfig } from '../generated/merchant-config';
 
 export const localCategories: CatalogCategory[] = [
   {
@@ -496,10 +497,15 @@ export function createLocalQuote(
             },
           ]
         : []),
-      { code: 'design-allocation', label: 'Design work', amountCents: aiDesignFeeCents, kind: 'fee' },
+      {
+        code: 'design-allocation',
+        label: 'Design work',
+        amountCents: aiDesignFeeCents,
+        kind: 'fee',
+      },
       {
         code: 'margin',
-        label: 'Open Merch Studio margin',
+        label: merchantConfig.pricing.marginLabel,
         amountCents: targetMarginCents,
         kind: 'margin',
       },
@@ -704,7 +710,7 @@ export function createLocalMockup(params: {
 export function createLocalCheckout(quote: QuoteBreakdown, email?: string): CheckoutSession {
   localOrder = {
     id: localId('order'),
-    orderNumber: `OMS-${new Date().getFullYear()}-FIXTURE`,
+    orderNumber: `${merchantConfig.orders.prefix}-${new Date().getFullYear()}-FIXTURE`,
     taxCents: 0,
     status: 'submitted',
     customerEmail: email,

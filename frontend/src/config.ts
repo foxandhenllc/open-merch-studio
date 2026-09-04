@@ -1,3 +1,5 @@
+import { merchantConfig } from './generated/merchant-config';
+
 const normalizeBoolean = (value: unknown, defaultValue = false) => {
   if (typeof value !== 'string') return defaultValue;
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
@@ -7,7 +9,7 @@ const appMode = String(import.meta.env.VITE_PUBLIC_APP_MODE || 'oss').toLowerCas
 
 export const publicConfig = {
   appMode,
-  supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@openmerchstudio.com',
+  supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || merchantConfig.operator.supportEmail,
   isProductionMode: appMode === 'production',
   enablePublicCheckout: normalizeBoolean(import.meta.env.VITE_ENABLE_PUBLIC_CHECKOUT),
   enableLocalFallbacks: normalizeBoolean(

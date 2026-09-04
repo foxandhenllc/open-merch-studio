@@ -12,6 +12,7 @@ import { ReviewPanel } from '@components/ReviewPanel';
 import { StatusNote } from '@components/StatusNote';
 import { StepRail } from '@components/StepRail';
 import { publicConfig } from './config';
+import { merchantConfig } from './generated/merchant-config';
 import { useCheckoutReturn } from './hooks/useCheckoutReturn';
 import { useOrderRevisit } from './hooks/useOrderRevisit';
 import { useStudioViewModel } from './studio-view-model';
@@ -105,9 +106,9 @@ export function WorkbenchStudioApp() {
       <main className="loading-shell" aria-busy="true">
         <div className="loading-card">
           <span className="brand-symbol" aria-hidden="true">
-            OM
+            {merchantConfig.brand.shortName}
           </span>
-          <h1>Open Merch Studio</h1>
+          <h1>{merchantConfig.brand.displayName}</h1>
           <p>Getting the studio ready…</p>
         </div>
       </main>
@@ -156,12 +157,12 @@ export function WorkbenchStudioApp() {
         {vm.announcement}
       </div>
       <header className="app-header compact-header">
-        <a className="brand" href="/" aria-label="Open Merch Studio home">
+        <a className="brand" href="/" aria-label={`${merchantConfig.brand.displayName} home`}>
           <span className="brand-symbol" aria-hidden="true">
-            OM
+            {merchantConfig.brand.shortName}
           </span>
           <span>
-            <b>Open Merch Studio</b>
+            <b>{merchantConfig.brand.displayName}</b>
             {publicConfig.enablePublicCheckout && <small>Now accepting orders</small>}
           </span>
         </a>

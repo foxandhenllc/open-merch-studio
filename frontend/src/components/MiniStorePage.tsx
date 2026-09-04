@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import type { PublicStorefront } from '../types/storefront';
 import { OpenSourceAttribution } from './OpenSourceAttribution';
+import { merchantConfig } from '../generated/merchant-config';
 
 export function MiniStorePage({
   organizationSlug,
@@ -32,7 +33,7 @@ export function MiniStorePage({
       <main className="mini-store mini-store--message">
         <h1>Storefront unavailable</h1>
         <p>This collection may still be in review or no longer published.</p>
-        <a href="/">Open Merch Studio</a>
+        <a href="/">{merchantConfig.brand.displayName}</a>
       </main>
     );
   }
@@ -56,9 +57,13 @@ export function MiniStorePage({
     >
       <header className="mini-store__header">
         <a href="/" className="mini-store__oms">
-          Made with Open Merch Studio
+          Made with {merchantConfig.attribution.projectName}
         </a>
-        {brand.logoUrl ? <img src={brand.logoUrl} alt={brand.displayName} /> : <b>{brand.displayName}</b>}
+        {brand.logoUrl ? (
+          <img src={brand.logoUrl} alt={brand.displayName} />
+        ) : (
+          <b>{brand.displayName}</b>
+        )}
         {brand.shortDescription && <span>{brand.shortDescription}</span>}
       </header>
       <section className="mini-store__hero">
@@ -74,7 +79,11 @@ export function MiniStorePage({
       <section className="mini-store__products" aria-label="Products">
         {store.products.map((product) => (
           <article key={product.id}>
-            {product.mockupUrl ? <img src={product.mockupUrl} alt="" /> : <div aria-hidden="true" />}
+            {product.mockupUrl ? (
+              <img src={product.mockupUrl} alt="" />
+            ) : (
+              <div aria-hidden="true" />
+            )}
             <span>{product.productTitle}</span>
             <h2>{product.title}</h2>
             <p>

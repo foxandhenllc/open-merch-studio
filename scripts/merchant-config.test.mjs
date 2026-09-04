@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   readMerchantConfig,
+  renderMerchantConfigModule,
   validateMerchantConfig,
 } from "./merchant-config.mjs";
 
@@ -42,4 +44,27 @@ test("merchant validation output never inspects environment secrets", () => {
     JSON.stringify(validateMerchantConfig(config)),
     /synthetic-secret/,
   );
+});
+
+test("committed frontend and backend typed modules match the active manifest", async () => {
+  const rendered = await renderMerchantConfigModule(
+    readMerchantConfig("config/merchant.config.json"),
+  );
+  for (const path of [
+    "backend/src/generated/merchant-config.ts",
+    "frontend/src/generated/merchant-config.ts",
+  ]) {
+    assert.equal(readFileSync(path, "utf8"), rendered);
+  }
+});
+
+test("the synthetic merchant profile renders without Open Merch Studio brand coupling", async () => {
+  const rendered = await renderMerchantConfigModule(
+    readMerchantConfig(
+      "config/examples/community-gear-lab.merchant.config.json",
+    ),
+  );
+  assert.match(rendered, /Community Gear Lab/);
+  assert.match(rendered, /CGL/);
+  assert.doesNotMatch(rendered, /Fox&Hen, LLC/);
 });

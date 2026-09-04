@@ -36,6 +36,7 @@ import {
 } from './stripe.service.js';
 import type Stripe from 'stripe';
 import { prisma } from '../config/database.js';
+import { merchantConfig } from '../generated/merchant-config.js';
 import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
 import {
   checkoutPolicyAcceptanceIssue,
@@ -113,7 +114,7 @@ type CheckoutInput = {
 };
 
 const orderNumber = () =>
-  `OMS-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  `${merchantConfig.orders.prefix}-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
 async function loadDesignForCheckout(
   designAssetId: string
