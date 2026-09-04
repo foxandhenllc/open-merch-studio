@@ -7,7 +7,6 @@ import type {
   CheckoutSession,
   CustomerOrderConfirmation,
   DesignDraft,
-  DesignIdea,
   PlacementLayout,
   QuoteBreakdown,
   StudioCapabilities,
@@ -20,10 +19,9 @@ import {
   readStudioResumeState,
   writeStudioResumeState,
 } from './studio-persistence';
-import { productType, revisionBand, trackEvent } from './utils/analytics';
+import { productType, trackEvent } from './utils/analytics';
 import type {
   ActionKey,
-  CreationPath,
   FlowState,
   PreviewOrientation,
   Surface,
@@ -33,7 +31,6 @@ import type {
 import {
   deriveArtworkState,
   deriveCheckoutReadiness,
-  deriveDesignAllowance,
   deriveStepStates,
   emptyBusy,
   mapStudioError,
@@ -48,16 +45,7 @@ import {
   togglePlacementConfiguration,
   type RememberedProductSelection,
 } from './studio-configuration.transitions';
-import {
-  acceptArtworkDraft,
-  appendDesignHistory,
-  appendReferenceAssets,
-  assertUsableGeneratedDraft,
-  referenceAssetIds,
-  replaceDraftAssignments,
-  selectReferenceFiles,
-  undoArtworkRevision,
-} from './studio-artwork.transitions';
+import { referenceAssetIds } from './studio-artwork.transitions';
 import { normalizeStudioItemQuantity } from './studio-quote';
 import {
   checkoutNotReadyError,
@@ -70,6 +58,7 @@ import { createStudioCartItem, MAX_STUDIO_CART_LINES, studioCartUnitCount } from
 import { useGuestCart } from './hooks/useGuestCart';
 import { useStudioMockup, type StudioMockupRequest } from './hooks/useStudioMockup';
 import { useStudioQuote } from './hooks/useStudioQuote';
+import { useStudioArtwork, type ArtworkCommit } from './hooks/useStudioArtwork';
 
 export type {
   ActionKey,
@@ -80,19 +69,6 @@ export type {
   SurfaceError,
   WorkbenchMode,
 } from './studio-view-model.types';
-
-const delay = (milliseconds: number, signal?: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(resolve, milliseconds);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        window.clearTimeout(timer);
-        reject(new DOMException('Cancelled', 'AbortError'));
-      },
-      { once: true }
-    );
-  });
 
 export function useStudioViewModel() {
   const [flow, setFlow] = useState<FlowState>('booting');
@@ -111,19 +87,11 @@ export function useStudioViewModel() {
   const [selectedVariantId, setSelectedVariantIdState] = useState('');
   const [quantity, setQuantityState] = useState(1);
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
-  const [placementArtwork, setPlacementArtwork] = useState<Record<string, DesignDraft>>({});
-  const [activePlacementCode, setActivePlacementCode] = useState('');
   const [mugLayout, setMugLayoutState] = useState<PlacementLayout>('center');
   const [selectedOrientation, setSelectedOrientationState] = useState<
     PreviewOrientation | undefined
   >();
-  const [prompt, setPrompt] = useState('');
-  const [creationPath, setCreationPath] = useState<CreationPath>('generate');
-  const [referenceAssets, setReferenceAssets] = useState<DesignDraft[]>([]);
-  const [revision, setRevision] = useState('');
   const [email, setEmail] = useState('');
-  const [idea, setIdea] = useState<DesignIdea | null>(null);
-  const [design, setDesign] = useState<DesignDraft | null>(null);
   const [checkout, setCheckout] = useState<CheckoutSession | null>(null);
   const [checkoutSource, setCheckoutSource] = useState<'design' | 'cart'>('design');
   const [order, setOrder] = useState<CustomerOrderConfirmation | null>(null);
@@ -131,13 +99,10 @@ export function useStudioViewModel() {
   const [errors, setErrors] = useState<Partial<Record<Surface, SurfaceError>>>({});
   const [fallback, setFallback] = useState<{ visible: boolean; reason: string } | null>(null);
   const [dataSource, setDataSource] = useState<DataSource>('live');
-  const [generationPhase, setGenerationPhase] = useState('Queued');
   const [operationStartedAt, setOperationStartedAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [recoveryMessage, setRecoveryMessage] = useState('');
-  const [designHistory, setDesignHistory] = useState<DesignDraft[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
-  const generationController = useRef<AbortController | null>(null);
   const startingFresh = useRef(false);
   const productSelections = useRef(new Map<string, RememberedProductSelection>());
 
@@ -149,13 +114,6 @@ export function useStudioViewModel() {
     () => selectedProduct?.variants.find((variant) => variant.id === selectedVariantId) ?? null,
     [selectedProduct, selectedVariantId]
   );
-  const { artworkReady, artworkQuoteEligible } = deriveArtworkState({
-    selectedPlacements,
-    placementArtwork,
-    design,
-  });
-  const { canGenerateAnother, canRevise } = deriveDesignAllowance(design);
-
   const consumeSource = useCallback(<T>(result: Sourced<T>): T => {
     setDataSource(result.source);
     if (result.fallbackReason) setFallback({ visible: true, reason: result.fallbackReason });
@@ -177,18 +135,6 @@ export function useStudioViewModel() {
     busy: quoteBusy,
     error: quoteError,
   } = studioQuote;
-  const checkoutReadiness = useMemo(
-    () =>
-      deriveCheckoutReadiness({
-        artworkReady,
-        quote,
-        quoteStale,
-        quoteExpired,
-        email,
-        paymentAvailable: canUseCustomerCheckout,
-      }),
-    [artworkReady, email, quote, quoteExpired, quoteStale]
-  );
   const studioMockup = useStudioMockup({
     sessionId: session?.id,
     quotePresent: Boolean(quote),
@@ -209,7 +155,86 @@ export function useStudioViewModel() {
     activeViewIndex: activeMockupViewIndex,
     setActiveViewIndex: setActiveMockupViewIndex,
     cacheMockup,
+    request: requestStudioMockup,
   } = studioMockup;
+  const commitArtwork = useCallback(
+    async (commit: ArtworkCommit) => {
+      setMockup(null);
+      if (commit.kind === 'replacement') {
+        studioQuote.clear();
+        setMockupStale(false);
+      } else {
+        studioQuote.invalidate();
+      }
+      if (commit.kind === 'undo') {
+        setCheckout(null);
+        setOrder(null);
+      }
+      await requestStudioMockup({
+        product: commit.product,
+        variant: commit.variant,
+        placements: commit.selectedPlacements,
+        draft: commit.draft,
+        artworkByCode: commit.placementArtwork,
+        mugLayout: commit.mugLayout,
+        orientation: commit.orientation,
+      });
+    },
+    [requestStudioMockup, setMockup, setMockupStale, studioQuote]
+  );
+  const artwork = useStudioArtwork({
+    sessionId: session?.id,
+    capabilities,
+    dataSource,
+    onSource: consumeSource,
+    onFlowChange: setFlow,
+    onModeChange: setWorkbenchMode,
+    onAnnouncement: setAnnouncement,
+    onRecoveryClear: () => setRecoveryMessage(''),
+    onOperationStartedAt: setOperationStartedAt,
+    onArtworkCommit: commitArtwork,
+  });
+  const {
+    prompt,
+    setPrompt,
+    updatePrompt,
+    creationPath,
+    setCreationPath,
+    referenceAssets,
+    setReferenceAssets,
+    revision,
+    setRevision,
+    idea,
+    setIdea,
+    design,
+    setDesign,
+    placementArtwork,
+    setPlacementArtwork,
+    activePlacementCode,
+    setActivePlacementCode,
+    designHistory,
+    setDesignHistory,
+    generationPhase,
+    canGenerateAnother,
+    canRevise,
+  } = artwork;
+  const { artworkReady, artworkQuoteEligible } = deriveArtworkState({
+    selectedPlacements,
+    placementArtwork,
+    design,
+  });
+  const checkoutReadiness = useMemo(
+    () =>
+      deriveCheckoutReadiness({
+        artworkReady,
+        quote,
+        quoteStale,
+        quoteExpired,
+        email,
+        paymentAvailable: canUseCustomerCheckout,
+      }),
+    [artworkReady, email, quote, quoteExpired, quoteStale]
+  );
   const cart = useGuestCart({
     sessionId: session?.id,
     studioPassId: studioPass?.id,
@@ -236,6 +261,10 @@ export function useStudioViewModel() {
     }
     if (surface === 'quote') {
       studioQuote.clearError();
+      return;
+    }
+    if (surface === 'generation') {
+      artwork.clearError();
       return;
     }
     setErrors((current) => ({ ...current, [surface]: undefined }));
@@ -760,335 +789,33 @@ export function useStudioViewModel() {
     }
   };
 
-  const updatePrompt = (value: string) => {
-    setPrompt(value);
-    if (idea) setIdea(null);
-  };
-
-  const uploadArtwork = async (file: File, removeBackground = false) => {
-    if (!selectedProduct || !selectedVariant) return;
-    setRecoveryMessage('');
-    setAction('generating', true);
-    setFlow('generating');
-    setWorkbenchMode('generating');
-    setGenerationPhase('Uploading artwork');
-    setOperationStartedAt(Date.now());
-    clearError('generation');
-    try {
-      const result = await api.uploadArtwork({
-        file,
-        sessionId: session?.id,
-        purpose: 'print',
-        rightsConfirmed: true,
-        placementCodes: selectedPlacements,
-        removeBackground,
-      });
-      const draft = consumeSource(result);
-      const nextPlacementArtwork = acceptArtworkDraft({
-        draft,
-        activePlacementCode,
-        selectedPlacements,
-        placementArtwork,
-      });
-      if (design?.id) {
-        setDesignHistory((current) => appendDesignHistory(current, design));
-      }
-      setPrompt(draft.prompt);
-      setDesign(draft);
-      setPlacementArtwork(nextPlacementArtwork);
-      setActivePlacementCode('');
-      setMockup(null);
-      studioQuote.clear();
-      setMockupStale(false);
-      setFlow('drafted');
-      setAnnouncement('Your artwork is prepared. Building the product preview now.');
-      trackEvent('design_generation_completed', {
-        result: 'success',
-        source: 'upload',
-      });
-      setAction('generating', false);
-      setOperationStartedAt(null);
-      await requestMockup({
-        product: selectedProduct,
-        variant: selectedVariant,
-        placements: selectedPlacements,
-        draft,
-        artworkByCode: nextPlacementArtwork,
-        orientation: selectedOrientation,
-      });
-    } catch (error) {
-      fail('generation', error);
-      setFlow('configuring');
-      setWorkbenchMode('describe');
-    } finally {
-      setAction('generating', false);
-      setOperationStartedAt(null);
-    }
-  };
-
-  const addReferenceImages = async (files: File[]) => {
-    const selectedFiles = selectReferenceFiles(files, referenceAssets.length);
-    if (!selectedFiles.length) return;
-    setAction('generating', true);
-    setGenerationPhase('Uploading references');
-    clearError('generation');
-    try {
-      const results: DesignDraft[] = [];
-      for (const file of selectedFiles) {
-        const result = await api.uploadArtwork({
-          file,
-          sessionId: session?.id,
-          purpose: 'reference',
-          rightsConfirmed: true,
-          placementCodes: selectedPlacements,
-        });
-        results.push(consumeSource(result));
-      }
-      setReferenceAssets((current) => appendReferenceAssets(current, results));
-      setAnnouncement(`${results.length} reference image${results.length === 1 ? '' : 's'} ready.`);
-    } catch (error) {
-      fail('generation', error);
-    } finally {
-      setAction('generating', false);
-    }
-  };
-
-  const removeReferenceAsset = (assetId: string | null) => {
-    setReferenceAssets((current) => current.filter((asset) => asset.id !== assetId));
-    if (assetId && session?.id) void api.deleteUploadAsset(assetId, session.id);
-  };
-
-  const refineIdea = async () => {
-    if (!prompt.trim()) return;
-    setFlow('refining');
-    setAction('refining', true);
-    clearError('generation');
-    try {
-      const result = await api.designIdea({
-        prompt,
-        sessionId: session?.id,
-        productId: selectedProduct?.id,
-        placementCodes: selectedPlacements,
-      });
-      setIdea(consumeSource(result));
-      trackEvent('design_idea_refined', {
-        result: result.source === 'live' ? 'success' : 'fixture',
-        source: result.source === 'live' ? 'api' : 'fallback',
-      });
-      setFlow('configuring');
-      setAnnouncement('Prompt refined. Review it, then generate your draft.');
-    } catch (error) {
-      trackEvent('design_idea_refined', {
-        result: 'failed',
-        source: dataSource === 'live' ? 'api' : 'fallback',
-      });
-      fail('generation', error);
-      setFlow('configuring');
-    } finally {
-      setAction('refining', false);
-    }
-  };
-  const generate = async () => {
-    if (!selectedProduct || !selectedVariant || !prompt.trim()) return;
-    if (creationPath === 'reference' && !referenceAssets.some((asset) => asset.id)) return;
-    setRecoveryMessage('');
-    const controller = new AbortController();
-    generationController.current = controller;
-    setAction('generating', true);
-    setFlow('generating');
-    setWorkbenchMode('generating');
-    setGenerationPhase('Queued');
-    setOperationStartedAt(Date.now());
-    clearError('generation');
-    trackEvent('design_generation_started', {
-      quality: 'standard',
-      source: capabilities.ai === 'live' ? 'api' : 'fixture',
-    });
-    const phaseOne = window.setTimeout(() => setGenerationPhase('Generating artwork'), 1000);
-    const phaseTwo = window.setTimeout(() => setGenerationPhase('Preparing the print file'), 10000);
-    let completionSource = capabilities.ai === 'live' ? 'api' : 'fixture';
-    try {
-      const [result] = await Promise.all([
-        creationPath === 'reference'
-          ? api.designFromReferences(
-              {
-                prompt,
-                referenceAssetIds: referenceAssetIds(referenceAssets),
-                sessionId: session?.id,
-                productId: selectedProduct.id,
-                variantId: selectedVariant.id,
-                placementCodes: selectedPlacements,
-              },
-              controller.signal
-            )
-          : api.designDraft(
-              {
-                prompt: idea?.refinedPrompt ?? prompt,
-                sessionId: session?.id,
-                productId: selectedProduct.id,
-                variantId: selectedVariant.id,
-                placementCodes: selectedPlacements,
-              },
-              controller.signal
-            ),
-        delay(1500, controller.signal),
-      ]);
-      completionSource = result.source === 'live' ? 'api' : 'fixture';
-      const draft = consumeSource(result);
-      assertUsableGeneratedDraft(draft);
-      const nextPlacementArtwork = acceptArtworkDraft({
-        draft,
-        activePlacementCode,
-        selectedPlacements,
-        placementArtwork,
-      });
-      if (design?.id) {
-        setDesignHistory((current) => appendDesignHistory(current, design));
-      }
-      setDesign(draft);
-      setPlacementArtwork(nextPlacementArtwork);
-      setActivePlacementCode('');
-      setMockup(null);
-      studioQuote.clear();
-      setMockupStale(false);
-      setFlow('drafted');
-      setAnnouncement('Artwork ready. Building your product mockup now.');
-      trackEvent('design_generation_completed', {
-        result: 'success',
-        source: result.source === 'live' ? 'api' : 'fixture',
-      });
-      setAction('generating', false);
-      setOperationStartedAt(null);
-      await requestMockup({
-        product: selectedProduct,
-        variant: selectedVariant,
-        placements: selectedPlacements,
-        draft,
-        artworkByCode: nextPlacementArtwork,
-        orientation: selectedOrientation,
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        trackEvent('design_generation_completed', {
-          result: 'cancelled',
-          source: completionSource,
-        });
-        setFlow('configuring');
-        setWorkbenchMode('describe');
-        setAnnouncement(
-          'Generation cancelled on this screen. Your prompt is unchanged. If provider processing already started, a draft may still be counted.'
-        );
-      } else {
-        trackEvent('design_generation_completed', {
-          result: 'failed',
-          source: completionSource,
-        });
-        fail('generation', error);
-        setFlow('configuring');
-        setWorkbenchMode('describe');
-      }
-    } finally {
-      window.clearTimeout(phaseOne);
-      window.clearTimeout(phaseTwo);
-      setAction('generating', false);
-      setOperationStartedAt(null);
-      generationController.current = null;
-    }
-  };
-  const cancelGeneration = () => generationController.current?.abort();
-  const reviseDraft = async () => {
-    if (!design?.id || !revision.trim()) return;
-    setRecoveryMessage('');
-    if (!canRevise) {
-      setErrors((current) => ({
-        ...current,
-        generation: {
-          cause: 'revision_allowance_required',
-          title: 'No more variations are available in this studio session',
-          message: 'This session has no revision allowance remaining.',
-          recovery: 'Your current artwork, product preview, and price are unchanged.',
-          retryable: false,
-        },
-      }));
-      setAnnouncement('Revision blocked. Your current artwork is unchanged.');
-      return;
-    }
-    setAction('revising', true);
-    setWorkbenchMode('generating');
-    clearError('generation');
-    try {
-      const result = await api.reviseDraft({
-        draftId: design.id,
-        instructions: revision,
-        sessionId: session?.id,
-      });
-      const revised = consumeSource(result);
-      const nextPlacementArtwork = replaceDraftAssignments(placementArtwork, design.id, revised);
-      setDesignHistory((current) => appendDesignHistory(current, design));
-      setDesign(revised);
-      setPlacementArtwork(nextPlacementArtwork);
-      setMockup(null);
-      studioQuote.invalidate();
-      setFlow('drafted');
-      setRevision('');
-      setAnnouncement('New variation ready. Rebuilding your product mockup.');
-      trackEvent('design_revision_completed', {
-        result: 'success',
-        remaining: revisionBand(revised.allowance.editsRemaining),
-      });
-      setAction('revising', false);
-      if (selectedProduct && selectedVariant) {
-        await requestMockup({
+  const artworkContext =
+    selectedProduct && selectedVariant
+      ? {
           product: selectedProduct,
           variant: selectedVariant,
-          placements: selectedPlacements,
-          draft: revised,
-          artworkByCode: nextPlacementArtwork,
+          selectedPlacements,
+          mugLayout,
           orientation: selectedOrientation,
-        });
-      }
-      setWorkbenchMode('review');
-    } catch (error) {
-      trackEvent('design_revision_completed', {
-        result: 'failed',
-        remaining: revisionBand(design.allowance.editsRemaining),
-      });
-      fail('generation', error);
-      setWorkbenchMode('review');
-    } finally {
-      setAction('revising', false);
-    }
+        }
+      : null;
+  const uploadArtwork = async (file: File, removeBackground = false) => {
+    if (artworkContext) await artwork.uploadArtwork(file, removeBackground, artworkContext);
+  };
+  const addReferenceImages = (files: File[]) =>
+    artwork.addReferenceImages(files, selectedPlacements);
+  const removeReferenceAsset = (assetId: string | null) => artwork.removeReferenceAsset(assetId);
+  const refineIdea = () => artwork.refineIdea(selectedProduct, selectedPlacements);
+  const generate = async () => {
+    if (artworkContext) await artwork.generate(artworkContext);
+  };
+  const reviseDraft = async () => {
+    if (artworkContext) await artwork.reviseDraft(artworkContext);
   };
   const undoDraft = async () => {
-    const undone = undoArtworkRevision({
-      history: designHistory,
-      currentDesign: design,
-      placementArtwork,
-    });
-    if (!undone) return;
-    setDesignHistory(undone.history);
-    setDesign(undone.design);
-    setPlacementArtwork(undone.placementArtwork);
-    setRevision('');
-    studioQuote.invalidate();
-    setCheckout(null);
-    setOrder(null);
-    setAnnouncement('Previous artwork restored. Rebuilding its product preview.');
-    trackEvent('design_revision_completed', {
-      result: 'undone',
-      remaining: revisionBand(undone.design.allowance.editsRemaining),
-    });
-    if (selectedProduct && selectedVariant) {
-      await requestMockup({
-        product: selectedProduct,
-        variant: selectedVariant,
-        placements: selectedPlacements,
-        draft: undone.design,
-        artworkByCode: undone.placementArtwork,
-        orientation: selectedOrientation,
-      });
-    }
+    if (artworkContext) await artwork.undoDraft(artworkContext);
   };
+  const cancelGeneration = artwork.cancelGeneration;
   const createMockup = async () => {
     if (!selectedProduct || !selectedVariant || !design) return;
     await requestMockup({
@@ -1327,7 +1054,7 @@ export function useStudioViewModel() {
     [selectedProduct, design, workbenchMode]
   );
   const navigate = (step: StudioStep) => {
-    if (workbenchMode === 'generating' || busy.generating || busy.revising) return;
+    if (workbenchMode === 'generating' || artwork.busy.generating || artwork.busy.revising) return;
     if (step === 'product') setWorkbenchMode('product');
     if (step === 'make' && selectedProduct) setWorkbenchMode(design ? 'review' : 'configure');
     if (step === 'order' && cart.items.length) setWorkbenchMode('cart');
@@ -1355,7 +1082,7 @@ export function useStudioViewModel() {
     );
     if (!confirmed) return;
     startingFresh.current = true;
-    generationController.current?.abort();
+    artwork.cancelGeneration();
     studioQuote.cancel();
     clearStudioResumeState();
     cart.clear();
@@ -1397,8 +1124,18 @@ export function useStudioViewModel() {
     checkoutSource,
     checkout,
     order,
-    busy: { ...busy, mockup: mockupBusy, quoting: quoteBusy },
-    errors: { ...errors, mockup: mockupError, quote: quoteError },
+    busy: {
+      ...busy,
+      ...artwork.busy,
+      mockup: mockupBusy,
+      quoting: quoteBusy,
+    },
+    errors: {
+      ...errors,
+      generation: artwork.error,
+      mockup: mockupError,
+      quote: quoteError,
+    },
     fallback,
     dataSource,
     mockupStale,

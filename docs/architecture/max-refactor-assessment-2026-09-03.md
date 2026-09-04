@@ -725,6 +725,31 @@ so further splitting should wait for a concrete ownership or testability benefit
 This checkpoint passed lint, typecheck, all 93 backend tests, both frontend contracts, production
 build/static-route verification, and the complete 11-viewport browser suite.
 
+## Studio artwork lifecycle checkpoint
+
+Completed September 4, 2026:
+
+- Added `useStudioArtwork.ts` as the owner of prompt and revision buffers, creation path, reference
+  assets, current artwork, per-placement assignments, revision history, provider progress,
+  cancellation, and generation errors.
+- Reduced cross-domain coupling to one typed `ArtworkCommit` event. The parent remains responsible
+  for invalidating an estimate, clearing checkout state on undo, and asking the separate mockup hook
+  for a new product preview.
+- Preserved the five-reference cap, direct upload, reference-led and prompt-led generation, true
+  image revision, targeted front/back assignment replacement, and undo history semantics.
+- Added comments only for non-obvious ownership and behavior: the cross-domain commit boundary, the
+  abortable minimum progress-screen dwell, and why product/mockup/quote state stays outside the hook.
+
+`studio-view-model.ts` moved from 1,471 to 1,208 lines; the cohesive artwork hook is 483 lines. The
+parent remains above 1,000 lines because boot and guest-session restoration still reconstruct
+catalog, artwork, per-placement assignments, estimate, and preview state together. That restoration
+lifecycle is the next concrete extraction target.
+
+This checkpoint passed lint, typecheck, all 93 backend tests (90 passed and three database-only
+skips), both frontend contracts, production build/static-route verification, and the complete
+11-viewport browser suite across five products, uploads, references, persisted failure recovery,
+and recoverable checkout.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:
