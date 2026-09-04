@@ -21,6 +21,16 @@ import { trackServerEvent } from '../utils/analytics.js';
 import { logOperationalEvent } from '../utils/operational-logger.js';
 import { env } from '../config/env.js';
 import { safelyDeliverCustomerEmail } from '../services/customer-email-delivery.service.js';
+import {
+  customerOrderAccessIsValid,
+  issueCustomerOrderAccess,
+} from '../services/customer-order-access.service.js';
+
+const bearerToken = (req: Request): string | undefined => {
+  const authorization = req.header('authorization') ?? '';
+  const match = authorization.match(/^Bearer\s+(\S+)$/i);
+  return match?.[1];
+};
 
 export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Response) => {
   const sessionId = String(req.body?.sessionId ?? '').trim();
@@ -35,7 +45,7 @@ export const postStudioPassCheckout = asyncHandler(async (req: Request, res: Res
 });
 
 export const postCheckoutSession = asyncHandler(async (req: Request, res: Response) => {
-  const checkout = await createCheckoutSession({
+  let checkout = await createCheckoutSession({
     quoteId: String(req.body?.quoteId ?? '') || undefined,
     sessionId: String(req.body?.sessionId ?? '') || undefined,
     studioPassId: String(req.body?.studioPassId ?? '') || undefined,
@@ -44,6 +54,12 @@ export const postCheckoutSession = asyncHandler(async (req: Request, res: Respon
     policyAccepted: req.body?.policyAccepted === true,
     policyVersion: typeof req.body?.policyVersion === 'string' ? req.body.policyVersion : '',
   });
+  if (checkout.status === 'paid' && checkout.orderId) {
+    checkout = {
+      ...checkout,
+      orderAccess: await issueCustomerOrderAccess(checkout.orderId),
+    };
+  }
   logOperationalEvent(
     checkout.status === 'blocked' ? 'warning' : 'info',
     'checkout_session_result',
@@ -64,7 +80,10 @@ export const postFixtureFulfillment = asyncHandler(async (req: Request, res: Res
 });
 
 export const getOrder = asyncHandler(async (req: Request, res: Response) => {
-  const order = await getOrderSummary(String(req.params.orderId ?? ''));
+  const orderId = String(req.params.orderId ?? '');
+  const authorized = await customerOrderAccessIsValid(orderId, bearerToken(req));
+  const order = authorized ? await getOrderSummary(orderId) : undefined;
+  // Use one response for missing and unauthorized orders so the route is not an identifier oracle.
   if (!order) {
     throw new HttpError('Order not found.', 404);
   }
@@ -79,10 +98,11 @@ export const getCheckoutOrder = asyncHandler(async (req: Request, res: Response)
   if (!sessionId.startsWith('cs_')) {
     throw new HttpError('A valid Stripe Checkout Session ID is required.', 400);
   }
-  const confirmation = toCustomerCheckoutConfirmation(
-    await getOrderByCheckoutSession(sessionId),
-    env.supportEmail
-  );
+  const internalConfirmation = await getOrderByCheckoutSession(sessionId);
+  const confirmation = toCustomerCheckoutConfirmation(internalConfirmation, env.supportEmail);
+  if (internalConfirmation.order && confirmation.state !== 'processing') {
+    confirmation.orderAccess = await issueCustomerOrderAccess(internalConfirmation.order.id);
+  }
   res.status(confirmation.state === 'processing' ? 202 : 200).json({
     success: true,
     data: confirmation,

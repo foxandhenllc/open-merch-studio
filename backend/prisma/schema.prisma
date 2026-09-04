@@ -357,11 +357,25 @@ model Order {
   shipments               Shipment[]
   customerEmailDeliveries CustomerEmailDelivery[]
   providerWebhookEvents   ProviderWebhookEvent[]
+  customerAccessGrants    OrderAccessGrant[]
 
   @@index([status, createdAt])
   @@index([stripeSessionId])
   @@index([operatorReviewStatus, createdAt])
   @@map("orders")
+}
+
+model OrderAccessGrant {
+  id         String    @id @default(uuid())
+  orderId    String
+  tokenHash  String    @unique
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, revokedAt])
+  @@map("order_access_grants")
 }
 
 model OrderTransition {

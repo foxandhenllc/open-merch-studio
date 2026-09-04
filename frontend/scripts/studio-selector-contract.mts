@@ -425,6 +425,16 @@ assert.deepEqual(
   classifyCheckoutResult({ ...checkoutBase, status: 'paid', checkoutUrl: null, orderId: 'order-1' }),
   { kind: 'lookup-order', orderId: 'order-1' }
 );
+assert.deepEqual(
+  classifyCheckoutResult({
+    ...checkoutBase,
+    status: 'paid',
+    checkoutUrl: null,
+    orderId: 'order-1',
+    orderAccess: { orderId: 'order-1', token: `oma_${'a'.repeat(43)}` },
+  }),
+  { kind: 'lookup-order', orderId: 'order-1', accessToken: `oma_${'a'.repeat(43)}` }
+);
 assert.equal(checkoutUnavailable('quote-1').quoteId, 'quote-1');
 assert.equal(checkoutNotReadyError('Enter an email.').retryable, false);
 assert.match(orderDetailsPendingError(new Error('Still processing.')).message, /Still processing/);

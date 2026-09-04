@@ -20,7 +20,7 @@ export type CheckoutRequest = {
 export type CheckoutOutcome =
   | { kind: 'redirect'; checkoutUrl: string }
   | { kind: 'inline-order'; order: CustomerOrderConfirmation }
-  | { kind: 'lookup-order'; orderId: string }
+  | { kind: 'lookup-order'; orderId: string; accessToken?: string }
   | { kind: 'pending' };
 
 export function prepareCheckoutRequest(params: {
@@ -73,7 +73,15 @@ export function classifyCheckoutResult(result: CheckoutSession): CheckoutOutcome
 
   const inlineOrder = (result as CheckoutSession & { order?: CustomerOrderConfirmation }).order;
   if (inlineOrder) return { kind: 'inline-order', order: inlineOrder };
-  if (result.orderId) return { kind: 'lookup-order', orderId: result.orderId };
+  if (result.orderId) {
+    const accessToken =
+      result.orderAccess?.orderId === result.orderId ? result.orderAccess.token : undefined;
+    return {
+      kind: 'lookup-order',
+      orderId: result.orderId,
+      ...(accessToken ? { accessToken } : {}),
+    };
+  }
   return { kind: 'pending' };
 }
 

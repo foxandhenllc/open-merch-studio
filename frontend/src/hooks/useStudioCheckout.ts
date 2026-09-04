@@ -19,6 +19,7 @@ import type {
   StudioSession,
 } from '../types/catalog';
 import { trackEvent } from '../utils/analytics';
+import { saveCustomerOrderAccess } from '../order-access';
 
 const PENDING_CART_CHECKOUT_KEY = 'open-merch-studio:pending-cart-checkout:v1';
 
@@ -174,6 +175,7 @@ export function useStudioCheckout({
         )
       );
       setCheckout(result);
+      saveCustomerOrderAccess(result.orderAccess);
       const outcome = classifyCheckoutResult(result);
       if (outcome.kind === 'redirect') {
         trackEvent('checkout_started', {
@@ -193,7 +195,7 @@ export function useStudioCheckout({
         onModeChange('order');
       } else if (outcome.kind === 'lookup-order') {
         try {
-          const nextOrder = onSource(await api.order(outcome.orderId));
+          const nextOrder = onSource(await api.order(outcome.orderId, outcome.accessToken));
           if (source === 'cart') onCartClear();
           setOrder(nextOrder);
           onFlowChange('confirmed');

@@ -14,3 +14,5 @@ Open a [private GitHub security advisory](https://github.com/foxandhenllc/open-m
 - Keep `.env`, `.env.*`, local database dumps, and generated provider artifacts ignored.
 - Use fixture data for tests and screenshots.
 - Rotate any credential that may have been committed, logged, or shared.
+- Treat customer order-access values as bearer credentials: store only their digest server-side,
+  send them only in the `Authorization` header, and revoke them through the protected operator API.

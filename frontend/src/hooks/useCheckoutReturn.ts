@@ -3,6 +3,7 @@ import { parseCheckoutHandoff, removeCheckoutHandoffParams } from '../checkout-r
 import { api } from '../services/api';
 import type { CheckoutConfirmation, CustomerOrderConfirmation } from '../types/catalog';
 import { trackEvent } from '../utils/analytics';
+import { saveCustomerOrderAccess } from '../order-access';
 
 const PENDING_CHECKOUT_KEY = 'open-merch-studio:pending-checkout:v1';
 
@@ -29,10 +30,7 @@ type UseCheckoutReturnOptions = {
   onConfirmedOrder: (order: CustomerOrderConfirmation) => void;
 };
 
-export function useCheckoutReturn({
-  studioReady,
-  onConfirmedOrder,
-}: UseCheckoutReturnOptions) {
+export function useCheckoutReturn({ studioReady, onConfirmedOrder }: UseCheckoutReturnOptions) {
   const handoff = useRef<ReturnType<typeof parseCheckoutHandoff> | null>(null);
   if (!handoff.current) {
     handoff.current = parseCheckoutHandoff(window.location.search, readPendingCheckoutSession());
@@ -81,10 +79,12 @@ export function useCheckoutReturn({
         for (let poll = 0; poll < 30 && !cancelled; poll += 1) {
           try {
             const result = await api.checkoutOrder(stripeSessionId);
+            if (cancelled) return;
             const nextConfirmation = result.data;
             setConfirmation(nextConfirmation);
             if (nextConfirmation.state !== 'processing') {
               savePendingCheckoutSession(null);
+              saveCustomerOrderAccess(nextConfirmation.orderAccess);
               if (nextConfirmation.order) onConfirmedOrder(nextConfirmation.order);
               trackEvent('checkout_returned', {
                 result: nextConfirmation.state === 'failed' ? 'unknown' : 'success',

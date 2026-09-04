@@ -11,6 +11,10 @@ import {
 } from '../services/customer-order.service.js';
 import { saveOrder } from '../services/runtime-store.js';
 import type { OrderSummary } from '../types/catalog.js';
+import {
+  issueCustomerOrderAccess,
+  revokeCustomerOrderAccess,
+} from '../services/customer-order-access.service.js';
 
 const sensitiveOrder = (): OrderSummary => ({
   id: 'order_private_internal_id',
@@ -252,15 +256,45 @@ test('public commerce endpoints return only customer-safe confirmations', async 
   const port = (server.address() as AddressInfo).port;
 
   try {
-    for (const path of [
-      `/api/orders/${order.id}`,
-      `/api/checkout/sessions/${order.stripeSessionId}/order`,
-    ]) {
-      const response = await fetch(`http://127.0.0.1:${port}${path}`);
-      assert.equal(response.status, 200);
-      const body = (await response.json()) as { data: unknown };
-      assert.doesNotMatch(JSON.stringify(body.data), privatePattern);
-    }
+    const orderPath = `/api/orders/${order.id}`;
+    const unauthorized = await fetch(`http://127.0.0.1:${port}${orderPath}`);
+    assert.equal(unauthorized.status, 404);
+
+    const initialAccess = await issueCustomerOrderAccess(order.id);
+    const authorized = await fetch(`http://127.0.0.1:${port}${orderPath}`, {
+      headers: { Authorization: `Bearer ${initialAccess.token}` },
+    });
+    assert.equal(authorized.status, 200);
+    const authorizedBody = (await authorized.json()) as { data: unknown };
+    assert.doesNotMatch(JSON.stringify(authorizedBody.data), privatePattern);
+
+    const checkoutResponse = await fetch(
+      `http://127.0.0.1:${port}/api/checkout/sessions/${order.stripeSessionId}/order`
+    );
+    assert.equal(checkoutResponse.status, 200);
+    const checkoutBody = (await checkoutResponse.json()) as {
+      data: { orderAccess?: { orderId: string; token: string } };
+    };
+    assert.equal(checkoutBody.data.orderAccess?.orderId, order.id);
+    assert.match(checkoutBody.data.orderAccess?.token ?? '', /^oma_[A-Za-z0-9_-]{43}$/);
+    assert.doesNotMatch(JSON.stringify(checkoutBody.data), privatePattern);
+
+    const rotatedOut = await fetch(`http://127.0.0.1:${port}${orderPath}`, {
+      headers: { Authorization: `Bearer ${initialAccess.token}` },
+    });
+    assert.equal(rotatedOut.status, 404);
+
+    const currentToken = checkoutBody.data.orderAccess?.token ?? '';
+    const currentAccess = await fetch(`http://127.0.0.1:${port}${orderPath}`, {
+      headers: { Authorization: `Bearer ${currentToken}` },
+    });
+    assert.equal(currentAccess.status, 200);
+
+    assert.equal(await revokeCustomerOrderAccess(order.id), 1);
+    const revoked = await fetch(`http://127.0.0.1:${port}${orderPath}`, {
+      headers: { Authorization: `Bearer ${currentToken}` },
+    });
+    assert.equal(revoked.status, 404);
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve()))

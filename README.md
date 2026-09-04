@@ -103,13 +103,14 @@ npm run dev:frontend
 - `POST /api/checkout/sessions`
 - `POST /api/stripe/webhook`
 - `POST /api/printful/webhook`
-- `GET /api/orders/:orderId`
+- `GET /api/orders/:orderId` (customer order-access bearer required)
 - `POST /api/admin/catalog/sync`
 - `GET /api/admin/settings`
 - `GET /api/admin/orders`
 - `GET /api/admin/orders/:orderId`
 - `POST /api/admin/orders/:orderId/fulfillment/retry`
 - `POST /api/admin/orders/:orderId/review`
+- `POST /api/admin/orders/:orderId/customer-access/revoke`
 - `GET /api/admin/report`
 - `GET /api/admin/launch-readiness`
 - `POST /api/admin/storefronts/bootstrap`
@@ -131,6 +132,7 @@ npm run dev:frontend
 
 - Uploaded/reference artwork architecture: [docs/architecture/uploaded-artwork-flow.md](./docs/architecture/uploaded-artwork-flow.md)
 - Current post-payment customer experience: [docs/architecture/current-post-payment-experience.md](./docs/architecture/current-post-payment-experience.md)
+- Revocable customer order-access boundary: [docs/architecture/customer-order-access.md](./docs/architecture/customer-order-access.md)
 - Staged Max Refactor assessment: [docs/architecture/max-refactor-assessment-2026-09-03.md](./docs/architecture/max-refactor-assessment-2026-09-03.md)
 - Cart, reorder, reusable distribution, plugin, and service roadmap: [docs/roadmap/open-source-commerce-next.md](./docs/roadmap/open-source-commerce-next.md)
 - Themed saved products and embeddable mini-stores: [docs/roadmap/themed-mini-stores.md](./docs/roadmap/themed-mini-stores.md)

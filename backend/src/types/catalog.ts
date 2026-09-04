@@ -232,7 +232,13 @@ export type CheckoutSession = {
   quoteId?: string | null;
   studioPassId?: string;
   orderId?: string;
+  orderAccess?: CustomerOrderAccess;
   message: string;
+};
+
+export type CustomerOrderAccess = {
+  orderId: string;
+  token: string;
 };
 
 export type OrderSummary = {
@@ -336,6 +342,7 @@ export type CheckoutConfirmation = {
   state: 'processing' | 'paid' | 'needs_review' | 'failed';
   message: string;
   order?: CustomerOrderConfirmation;
+  orderAccess?: CustomerOrderAccess;
 };
 
 export type OperatorReviewStatus = 'unreviewed' | 'acknowledged' | 'resolved';

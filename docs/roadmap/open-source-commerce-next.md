@@ -33,7 +33,9 @@ Build in this order:
    server-authoritative pre-tax quote total and current webhook idempotency. Configured quantities
    are visible in each product name; shipping/checkout adjustments are separately identified, and
    Studio Pass credits are allocated without sending a prohibited negative line item.
-4. Add **Buy again** to the protected order page. It should create a new editable cart from immutable
+4. **Access foundation completed September 4, 2026:** customer order reads now require a rotating,
+   revocable opaque credential whose digest is stored in PostgreSQL. Add **Buy again** to that
+   protected order experience. It should create a new editable cart from immutable
    prior order items, verify retained artwork access, revalidate current catalog availability, and
    generate a new quote. It must never replay an expired quote or charge automatically.
 5. Add optional customer accounts and order history only after the opaque guest-order access link is

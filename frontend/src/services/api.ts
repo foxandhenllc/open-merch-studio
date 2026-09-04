@@ -264,7 +264,10 @@ export const api = {
         body: form,
       });
       if (!uploaded.ok) {
-        throw new ApiError('The image could not be transferred to secure storage.', uploaded.status);
+        throw new ApiError(
+          'The image could not be transferred to secure storage.',
+          uploaded.status
+        );
       }
     } else {
       inlineDataUrl = await new Promise<string>((resolve, reject) => {
@@ -375,9 +378,11 @@ export const api = {
           : { state: 'processing' as const, message: 'Checkout confirmation is still processing.' };
       }
     ),
-  order: (orderId: string) =>
+  order: (orderId: string, accessToken?: string) =>
     withFallback(
-      request<CustomerOrderConfirmation>(`/api/orders/${encodeURIComponent(orderId)}`),
+      request<CustomerOrderConfirmation>(`/api/orders/${encodeURIComponent(orderId)}`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      }),
       () => {
         const order = getLocalCustomerOrder(publicConfig.supportEmail);
         if (!order) throw new Error('Order details are still pending.');

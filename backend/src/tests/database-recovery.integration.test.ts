@@ -18,6 +18,45 @@ import {
   reserveLiveDesignSpend,
   updateRuntimeSettings,
 } from '../services/runtime-store.js';
+import {
+  customerOrderAccessIsValid,
+  issueCustomerOrderAccess,
+  revokeCustomerOrderAccess,
+} from '../services/customer-order-access.service.js';
+
+test(
+  'PostgreSQL customer order access stores only digests and supports rotation and revocation',
+  { skip: !env.databaseUrl },
+  async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const orderId = `integration-order-access-${suffix}`;
+    try {
+      await prisma.order.create({
+        data: {
+          id: orderId,
+          orderNumber: `OMS-INT-ACCESS-${suffix}`,
+          status: 'PAID',
+          totalCents: 2500,
+          currency: 'USD',
+        },
+      });
+
+      const first = await issueCustomerOrderAccess(orderId);
+      assert.equal(await customerOrderAccessIsValid(orderId, first.token), true);
+      const stored = await prisma.orderAccessGrant.findFirstOrThrow({ where: { orderId } });
+      assert.notEqual(stored.tokenHash, first.token);
+      assert.doesNotMatch(stored.tokenHash, /^oma_/);
+
+      const second = await issueCustomerOrderAccess(orderId);
+      assert.equal(await customerOrderAccessIsValid(orderId, first.token), false);
+      assert.equal(await customerOrderAccessIsValid(orderId, second.token), true);
+      assert.equal(await revokeCustomerOrderAccess(orderId), 1);
+      assert.equal(await customerOrderAccessIsValid(orderId, second.token), false);
+    } finally {
+      await prisma.order.deleteMany({ where: { id: orderId } });
+    }
+  }
+);
 
 test(
   'PostgreSQL live AI spend reservation acquires a Prisma-compatible advisory lock',

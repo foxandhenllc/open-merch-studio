@@ -18,6 +18,8 @@ import {
 import type { AdminOrderFilters } from '../services/order.service.js';
 import type { OperatorReviewStatus, OrderSummary } from '../types/catalog.js';
 import { HttpError } from '../middleware.js';
+import { revokeCustomerOrderAccess } from '../services/customer-order-access.service.js';
+import { logOperationalEvent } from '../utils/operational-logger.js';
 
 const orderStatuses = new Set<OrderSummary['status']>([
   'draft',
@@ -177,6 +179,19 @@ export const postAdminOrderReview = asyncHandler(async (req: Request, res: Respo
   } catch (error) {
     recoveryHttpError(error);
   }
+});
+
+export const postAdminOrderAccessRevoke = asyncHandler(async (req: Request, res: Response) => {
+  const orderId = validOrderId(req.params.orderId);
+  const detail = await getAdminOrderDetail(orderId);
+  if (!detail) throw new HttpError('Order not found.', 404, 'order_not_found');
+  const revoked = await revokeCustomerOrderAccess(orderId);
+  logOperationalEvent('info', 'customer_order_access_revoked', {
+    orderId,
+    requestId: String(res.locals.requestId ?? ''),
+    outcome: revoked > 0 ? 'revoked' : 'no_active_grant',
+  });
+  res.json({ success: true, data: { orderId, revoked } });
 });
 
 export const getAdminReport = asyncHandler(async (_req: Request, res: Response) => {

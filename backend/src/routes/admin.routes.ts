@@ -7,6 +7,7 @@ import {
   getLaunchReadiness,
   patchAdminSettings,
   postAdminOrderRetry,
+  postAdminOrderAccessRevoke,
   postAdminOrderReview,
   postCatalogSync,
 } from '../controllers/admin.controller.js';
@@ -27,6 +28,7 @@ router.get('/orders', getAdminOrders);
 router.get('/orders/:orderId', getAdminOrder);
 router.post('/orders/:orderId/fulfillment/retry', postAdminOrderRetry);
 router.post('/orders/:orderId/review', postAdminOrderReview);
+router.post('/orders/:orderId/customer-access/revoke', postAdminOrderAccessRevoke);
 router.get('/report', getAdminReport);
 router.get('/launch-readiness', getLaunchReadiness);
 router.post('/storefronts/bootstrap', postStorefrontBootstrap);
