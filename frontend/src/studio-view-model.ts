@@ -8,17 +8,12 @@ import type {
   CustomerOrderConfirmation,
   DesignDraft,
   PlacementLayout,
-  QuoteBreakdown,
   StudioCapabilities,
   StudioPass,
   StudioSession,
 } from '@app-types/catalog';
 import type { StudioStep } from '@components/StepRail.types';
-import {
-  clearStudioResumeState,
-  readStudioResumeState,
-  writeStudioResumeState,
-} from './studio-persistence';
+import { clearStudioResumeState, writeStudioResumeState } from './studio-persistence';
 import { productType, trackEvent } from './utils/analytics';
 import type {
   ActionKey,
@@ -34,9 +29,7 @@ import {
   deriveStepStates,
   emptyBusy,
   mapStudioError,
-  mockupKey,
   placementArtworkKey,
-  previewOrientation,
 } from './studio-view-model.selectors';
 import {
   reusePlacementAssignment,
@@ -59,6 +52,7 @@ import { useGuestCart } from './hooks/useGuestCart';
 import { useStudioMockup, type StudioMockupRequest } from './hooks/useStudioMockup';
 import { useStudioQuote } from './hooks/useStudioQuote';
 import { useStudioArtwork, type ArtworkCommit } from './hooks/useStudioArtwork';
+import { restoreStudioSession } from './studio-session-restoration';
 
 export type {
   ActionKey,
@@ -277,208 +271,53 @@ export function useStudioViewModel() {
     clearError('boot');
     setRecoveryMessage('');
     try {
-      const saved = readStudioResumeState();
-      const [categoryResult, productResult, sessionResult, capabilityResult] = await Promise.all([
-        api.categories(),
-        api.products(saved?.selectedCategory || undefined),
-        api.session(saved?.sessionId),
-        api.capabilities(),
-      ]);
-      const nextProducts = consumeSource(productResult);
-      setCategories(consumeSource(categoryResult));
-      setProducts(nextProducts);
-      const nextSession = consumeSource(sessionResult);
-      setCapabilities(consumeSource(capabilityResult));
-      setSession(nextSession);
-      setStudioPass(nextSession.studioPass ?? null);
+      const restored = await restoreStudioSession({ onSource: consumeSource });
+      setCategories(restored.categories);
+      setProducts(restored.products);
+      setCapabilities(restored.capabilities);
+      setSession(restored.session);
+      setStudioPass(restored.session.studioPass ?? null);
+      setSelectedCategoryState(restored.selectedCategory);
+      setPrompt(restored.prompt);
+      setReferenceAssets(restored.references);
+      setCreationPath(restored.creationPath);
 
-      if (saved?.referenceAssetIds.length) {
-        const restoredReferences = await Promise.all(
-          saved.referenceAssetIds.map(async (assetId) => {
-            try {
-              return consumeSource(await api.designDraftById(assetId, nextSession.id));
-            } catch {
-              return null;
-            }
-          })
-        );
-        const availableReferences = restoredReferences.filter((asset): asset is DesignDraft =>
-          Boolean(asset?.id)
-        );
-        setReferenceAssets(availableReferences);
-        if (availableReferences.length) setCreationPath('reference');
+      if (restored.selection) {
+        const { product, variant, placements, orientation } = restored.selection;
+        setSelectedProductId(product.id);
+        setSelectedVariantIdState(variant.id);
+        setQuantityState(restored.selection.quantity);
+        setSelectedPlacements(placements);
+        setMugLayoutState(restored.selection.mugLayout);
+        setSelectedOrientationState(orientation);
+        productSelections.current.set(product.id, {
+          variantId: variant.id,
+          placements,
+          orientation,
+        });
       }
 
-      if (!saved) {
-        setFlow('configuring');
-        setWorkbenchMode('product');
-        return;
-      }
-
-      setSelectedCategoryState(saved.selectedCategory);
-      setPrompt(saved.prompt);
-      const product = nextProducts.find((candidate) => candidate.id === saved.productId);
-      const variant = product?.variants.find(
-        (candidate) => candidate.id === saved.variantId && candidate.isAvailable
-      );
-      if (!product || !variant) {
-        setRecoveryMessage(
-          'Your previous product selection is no longer available. Your guest session was restored so you can choose another product.'
-        );
-        setFlow('configuring');
-        setWorkbenchMode('product');
-        return;
-      }
-
-      const placementCodes = saved.placementCodes.filter((code) =>
-        product.placements.some((placement) => placement.code === code)
-      );
-      const placements = placementCodes.length
-        ? placementCodes
-        : product.placements.filter((placement) => placement.isDefault).map((item) => item.code);
-      const orientation = saved.orientation ?? previewOrientation(product, variant);
-      setSelectedProductId(product.id);
-      setSelectedVariantIdState(variant.id);
-      setQuantityState(saved.quantity);
-      setSelectedPlacements(placements);
-      setMugLayoutState(saved.mugLayout ?? 'center');
-      setSelectedOrientationState(orientation);
-      productSelections.current.set(product.id, {
-        variantId: variant.id,
-        placements,
-        orientation,
-      });
-
-      let restoredDraft: DesignDraft | null = null;
-      if (saved.designId) {
-        try {
-          restoredDraft = consumeSource(await api.designDraftById(saved.designId, nextSession.id));
-          if (!restoredDraft.id) restoredDraft = null;
-        } catch {
-          setRecoveryMessage(
-            'Your saved artwork is no longer available. The product and prompt were restored so you can generate a new draft.'
-          );
-        }
-      }
-      setDesign(restoredDraft);
-      const restoredPlacementArtworkEntries = await Promise.all(
-        placements.map(async (code) => {
-          const assetId = saved.placementDesignAssetIds[code];
-          if (!assetId) return restoredDraft ? ([code, restoredDraft] as const) : null;
-          if (restoredDraft?.id === assetId) return [code, restoredDraft] as const;
-          try {
-            const asset = consumeSource(await api.designDraftById(assetId, nextSession.id));
-            return asset.id ? ([code, asset] as const) : null;
-          } catch {
-            return restoredDraft ? ([code, restoredDraft] as const) : null;
-          }
-        })
-      );
-      const restoredPlacementArtwork = Object.fromEntries(
-        restoredPlacementArtworkEntries.filter((entry): entry is readonly [string, DesignDraft] =>
-          Boolean(entry)
-        )
-      );
-      setPlacementArtwork(restoredPlacementArtwork);
+      setDesign(restored.design);
+      setPlacementArtwork(restored.placementArtwork);
       setDesignHistory([]);
-      setActiveMockupViewIndex(saved.mockupViewIndex);
-
-      let restoredQuote: QuoteBreakdown | null = null;
-      if (saved.quoteId && restoredDraft?.id) {
-        try {
-          const candidate = consumeSource(await api.quoteById(saved.quoteId));
-          const item = candidate.items[0];
-          if (
-            item?.productId === product.id &&
-            item.variantId === variant.id &&
-            item.designAssetId === restoredDraft.id &&
-            item.quantity === saved.quantity
-          ) {
-            restoredQuote = candidate;
-          }
-        } catch {
-          setRecoveryMessage(
-            'Your saved price estimate expired or is unavailable. A fresh estimate will be prepared automatically.'
-          );
+      setActiveMockupViewIndex(restored.mockupViewIndex);
+      setQuote(restored.quote);
+      setQuoteStale(false);
+      if (restored.mockup) {
+        setMockup(restored.mockup);
+        if (restored.mockupCacheKey) {
+          cacheMockup(restored.mockupCacheKey, restored.mockup);
         }
       }
-      setQuote(restoredQuote);
-      setQuoteStale(false);
-
-      if (restoredDraft?.id && restoredDraft.readiness.status !== 'blocked') {
-        const savedMockup = saved.mockup;
-        const savedMockupMatches = Boolean(
-          savedMockup &&
-          savedMockup.productId === product.id &&
-          savedMockup.variantId === variant.id &&
-          savedMockup.designAssetId === restoredDraft.id &&
-          savedMockup.placementCodes.join('|') === placements.join('|') &&
-          savedMockup.orientation === orientation
-        );
-        if (savedMockup && savedMockupMatches) {
-          setMockup(savedMockup);
-          cacheMockup(
-            mockupKey({
-              productId: product.id,
-              variantId: variant.id,
-              placements,
-              draftId: restoredDraft.id,
-              placementDesigns: saved.placementDesignAssetIds,
-              mugLayout: saved.mugLayout,
-              orientation,
-            }),
-            savedMockup
-          );
-        } else
-          try {
-            const restoredMockup = consumeSource(
-              await api.mockup({
-                sessionId: nextSession.id,
-                productId: product.id,
-                variantId: variant.id,
-                placementCodes: placements,
-                placements: placements.map((code) => ({
-                  code,
-                  designAssetId:
-                    restoredPlacementArtwork[code]?.id ?? restoredDraft.id ?? undefined,
-                  layout: code === 'default' ? saved.mugLayout : undefined,
-                })),
-                designAssetId: restoredDraft.id,
-                imageUrl: restoredDraft.imageUrl,
-                orientation,
-              })
-            );
-            setMockup(restoredMockup);
-            if (restoredMockup.status === 'complete') {
-              cacheMockup(
-                mockupKey({
-                  productId: product.id,
-                  variantId: variant.id,
-                  placements,
-                  draftId: restoredDraft.id,
-                  placementDesigns: saved.placementDesignAssetIds,
-                  mugLayout: saved.mugLayout,
-                  orientation,
-                }),
-                restoredMockup
-              );
-            }
-          } catch {
-            setRecoveryMessage(
-              'Your artwork was restored, but its saved product preview needs to be rebuilt.'
-            );
-          }
-      }
-
-      setFlow(restoredQuote ? 'quoted' : restoredDraft ? 'drafted' : 'configuring');
-      setWorkbenchMode(restoredDraft ? 'review' : saved.prompt.trim() ? 'describe' : 'configure');
-      setAnnouncement('Your previous guest session was restored.');
+      setRecoveryMessage(restored.recoveryMessage);
+      setFlow(restored.flow);
+      setWorkbenchMode(restored.mode);
+      setAnnouncement(restored.announcement);
     } catch (error) {
       fail('boot', error);
       setFlow('boot_failed');
     }
   }, [cacheMockup, consumeSource]);
-
   useEffect(() => {
     void boot();
   }, [boot]);

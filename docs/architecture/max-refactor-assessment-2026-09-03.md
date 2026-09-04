@@ -750,6 +750,29 @@ skips), both frontend contracts, production build/static-route verification, and
 11-viewport browser suite across five products, uploads, references, persisted failure recovery,
 and recoverable checkout.
 
+## Guest-session restoration checkpoint
+
+Completed September 4, 2026:
+
+- Added `studio-session-restoration.ts` to load catalog/session capabilities and reconstruct one
+  validated guest-workbench snapshot before React state is updated.
+- Preserved partial recovery: unavailable references are dropped individually, unavailable primary
+  artwork keeps the product and prompt, invalid product/variant choices return to product selection,
+  and preview failures keep the restored artwork.
+- Kept quote reuse fail-closed by requiring the exact product, variant, design asset, and quantity;
+  kept mockup cache identity tied to placement artwork, mug layout, and orientation.
+- Documented why restoration returns data rather than accepting React setters: contributors can
+  reason about one coherent state graph and cannot accidentally expose a half-restored checkout.
+
+`studio-view-model.ts` moved from 1,208 to 1,047 lines; the restoration service is 254 lines. The
+parent is now only 47 lines above the preferred ceiling. Checkout/pass command ownership is the next
+small cohesive extraction and should bring the central model below 1,000 without fragmenting simple
+product configuration transitions.
+
+This checkpoint passed lint, typecheck, all 93 backend tests, both frontend contracts, production
+build/static-route verification, and the complete 11-viewport browser suite including persisted
+generation failure and recoverable checkout state.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:
