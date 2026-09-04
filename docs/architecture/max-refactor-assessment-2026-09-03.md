@@ -575,3 +575,26 @@ hook rather than another series of tiny pure helpers.
 This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
 skips), both frontend contracts, the explicit fixture smoke, the production dependency audit,
 production build/static-route verification, and the complete 11-viewport browser suite.
+
+## Printful order domain checkpoint
+
+Completed September 4, 2026:
+
+- Added `printful-order.service.ts` for recipient normalization, strict quote-to-provider payload
+  validation, multi-placement artwork mapping, draft creation, external-ID recovery, provider status
+  mapping, and response-body-free failure classification.
+- Preserved the review-first production boundary: the public submit function still requires all
+  live fulfillment gates and refuses to run when `PRINTFUL_AUTO_CONFIRM_ORDERS=true`.
+- Preserved the duplicate-prevention invariant after ambiguous provider failures by looking up the
+  immutable OMS order number again before any retry can create another Printful draft.
+- Re-exported the full existing order API from `printful.service.ts`, so no controller, service, or
+  test import changed during this structural pass.
+
+`printful.service.ts` moved from 943 to 605 lines. The new order domain is 356 lines. Catalog pricing
+and synchronization are now the only substantial responsibilities left in the facade; they should
+move together only after their database/provider boundary is characterized. The remaining larger
+customer-facing target is still `studio-view-model.ts` at 1,570 lines.
+
+This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and three database-only
+skips), both frontend contracts, the explicit fixture smoke, production build/static-route
+verification, and the complete 11-viewport browser suite.
