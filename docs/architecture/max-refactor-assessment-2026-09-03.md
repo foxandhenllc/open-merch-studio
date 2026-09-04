@@ -686,6 +686,24 @@ This checkpoint passed lint, typecheck, all 90 backend tests (87 passed and thre
 skips), both frontend contracts, production build/static-route verification, and the complete
 11-viewport browser suite.
 
+## Launch-readiness policy checkpoint
+
+Completed September 4, 2026:
+
+- Added `launch-readiness.service.ts` as a pure evaluator of operator launch gates and explanatory
+  copy from an immutable settings snapshot.
+- Kept the runtime-store export stable while removing policy text from session and allowance state
+  mutation code.
+- Documented and tested the non-mutating safety boundary: observing configured provider settings
+  cannot enable Checkout, fulfillment, or live generation, and configured providers remain manual
+  gates until their independent review is complete.
+
+`runtime-store.ts` moved from 903 to 857 lines; the policy module is 56 lines. A focused regression
+test increased the backend suite to 91 tests (88 passed and three database-only skips).
+
+This checkpoint passed lint, typecheck, all 91 backend tests, both frontend contracts, production
+build/static-route verification, and the complete 11-viewport browser suite.
+
 ## Studio quote lifecycle checkpoint
 
 Completed September 4, 2026:
