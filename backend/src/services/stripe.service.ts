@@ -16,6 +16,7 @@ type CreateStripeCheckoutParams = {
   customerEmail?: string;
   metadata: Record<string, string | undefined>;
   collectShipping?: boolean;
+  lineItems?: Array<{ name: string; description?: string; amountCents: number }>;
 };
 
 export function checkoutAccessBlocker(customerEmail?: string): string | null {
@@ -55,6 +56,7 @@ function buildCheckoutIdempotencyKey(params: CreateStripeCheckoutParams): string
     currency: params.currency,
     customerEmail: params.customerEmail,
     metadata: params.metadata,
+    lineItems: params.lineItems,
   };
   return crypto.createHash('sha256').update(JSON.stringify(stablePayload)).digest('hex');
 }
@@ -82,22 +84,65 @@ export function buildStripeCheckoutParams(
     billing_address_collection: 'required',
     automatic_tax: { enabled: true },
     shipping_address_collection: params.collectShipping ? { allowed_countries: ['US'] } : undefined,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: params.currency.toLowerCase(),
-          unit_amount: params.amountCents,
-          product_data: {
-            name: params.name,
-            description: params.description,
-          },
+    line_items: (params.lineItems?.length
+      ? params.lineItems
+      : [{ name: params.name, description: params.description, amountCents: params.amountCents }]
+    ).map((item) => ({
+      quantity: 1,
+      price_data: {
+        currency: params.currency.toLowerCase(),
+        unit_amount: item.amountCents,
+        product_data: {
+          name: item.name,
+          description: item.description,
         },
       },
-    ],
+    })),
     metadata,
     payment_intent_data: { metadata },
   };
+}
+
+/**
+ * Presents configured products separately in hosted Checkout while preserving the exact,
+ * server-authoritative pre-tax quote total. Each configured line is extended to quantity one so
+ * order-level shipping, processing estimates, and Studio Pass credits can reconcile to the cent.
+ */
+export function stripeLineItemsForQuote(
+  quote: QuoteBreakdown
+): Array<{ name: string; description: string; amountCents: number }> {
+  const itemLines = quote.items.map((item) => ({
+    name: `${item.quantity} × ${item.title}`,
+    description: `${item.variantName} · ${item.placementCodes.join(' + ')}`.slice(0, 250),
+    amountCents: item.unitRetailCents * item.quantity,
+  }));
+  const merchandiseTotal = itemLines.reduce((total, item) => total + item.amountCents, 0);
+  let adjustment = quote.totalCents - merchandiseTotal;
+  if (adjustment >= 0) {
+    return adjustment
+      ? [
+          ...itemLines,
+          {
+            name: 'Estimated shipping & checkout services',
+            description: 'Final tax is calculated from the shipping address.',
+            amountCents: adjustment,
+          },
+        ]
+      : itemLines;
+  }
+
+  // Stripe Checkout does not accept negative line items. Apply an order-level credit across the
+  // itemized merchandise lines while retaining at least one cent on every displayed product.
+  const creditedLines = itemLines.map((item) => {
+    if (adjustment >= 0) return item;
+    const reduction = Math.min(item.amountCents - 1, Math.abs(adjustment));
+    adjustment += reduction;
+    return { ...item, amountCents: item.amountCents - reduction };
+  });
+  if (adjustment < 0) {
+    throw new Error('The quoted credit exceeds the amount Stripe can allocate across line items.');
+  }
+  return creditedLines;
 }
 
 export async function createStripeCheckoutSession(
@@ -197,6 +242,7 @@ export async function createMerchCheckoutSession(params: {
       .slice(0, 250),
     customerEmail: params.customerEmail,
     collectShipping: true,
+    lineItems: stripeLineItemsForQuote(params.quote),
     metadata: {
       orderId: params.orderId,
       quoteId: params.quote.id ?? undefined,

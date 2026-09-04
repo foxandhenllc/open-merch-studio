@@ -29,9 +29,10 @@ Build in this order:
 2. **Completed September 3, 2026:** add a session-scoped guest cart that holds up to ten configured
    products, preserves distinct artwork/placements, supports per-line quantities, restores after a
    reload, re-quotes the complete cart, and clears only after confirmed fixture or returned payment.
-3. Send itemized Stripe line items while preserving the server-authoritative quote total and current
-   webhook idempotency. The implementation is complete locally and requires the same CI/deployment
-   promotion as the guest cart before live use.
+3. **Completed September 3, 2026:** send itemized Stripe lines while preserving the exact
+   server-authoritative pre-tax quote total and current webhook idempotency. Configured quantities
+   are visible in each product name; shipping/checkout adjustments are separately identified, and
+   Studio Pass credits are allocated without sending a prohibited negative line item.
 4. Add **Buy again** to the protected order page. It should create a new editable cart from immutable
    prior order items, verify retained artwork access, revalidate current catalog availability, and
    generate a new quote. It must never replay an expired quote or charge automatically.

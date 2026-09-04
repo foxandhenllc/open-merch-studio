@@ -6,7 +6,11 @@ import { sampleCatalog } from '../services/catalog-fixtures.js';
 import { stripeRecipient } from '../services/order.service.js';
 import { buildQuoteBreakdown } from '../services/pricing.service.js';
 import { buildPrintfulOrderPayload } from '../services/printful.service.js';
-import { buildStripeCheckoutParams, checkoutAccessBlocker } from '../services/stripe.service.js';
+import {
+  buildStripeCheckoutParams,
+  checkoutAccessBlocker,
+  stripeLineItemsForQuote,
+} from '../services/stripe.service.js';
 
 test('checkout access is closed by default and enforces an exact normalized allowlist', () => {
   const originalMode = env.checkoutAccessMode;
@@ -39,6 +43,51 @@ test('Stripe Checkout is card-only, US-only, and uses automatic tax', () => {
   assert.deepEqual(params.payment_method_types, ['card']);
   assert.deepEqual(params.shipping_address_collection?.allowed_countries, ['US']);
   assert.equal(params.automatic_tax?.enabled, true);
+});
+
+test('Stripe Checkout itemizes configured products without changing the quoted total', () => {
+  const products = [sampleCatalog.products[0], sampleCatalog.products[3]];
+  const quote = buildQuoteBreakdown(products, [
+    {
+      productId: products[0].id,
+      variantId: products[0].variants[0].id,
+      quantity: 2,
+      placementCodes: ['front'],
+      designAssetId: 'design-tee',
+    },
+    {
+      productId: products[1].id,
+      variantId: products[1].variants[0].id,
+      quantity: 1,
+      placementCodes: ['default'],
+      designAssetId: 'design-tote',
+    },
+  ]);
+  const lineItems = stripeLineItemsForQuote(quote);
+  const params = buildStripeCheckoutParams({
+    kind: 'merch_order',
+    amountCents: quote.totalCents,
+    currency: quote.currency,
+    name: 'OMS test order',
+    metadata: { orderId: 'order-cart' },
+    lineItems,
+  });
+  assert.match(lineItems[0].name, /^2 × /);
+  assert.equal(params.line_items?.length, 3);
+  assert.equal(
+    params.line_items?.reduce(
+      (total, item) => total + Number(item.price_data?.unit_amount) * Number(item.quantity),
+      0
+    ),
+    quote.totalCents
+  );
+
+  const credited = { ...quote, totalCents: quote.totalCents - 500, studioPassCreditCents: 500 };
+  assert.equal(
+    stripeLineItemsForQuote(credited).reduce((total, item) => total + item.amountCents, 0),
+    credited.totalCents,
+    'a Studio Pass credit must still reconcile exactly without a negative Stripe line item'
+  );
 });
 
 test('current Stripe collected shipping details map to the Printful recipient', () => {

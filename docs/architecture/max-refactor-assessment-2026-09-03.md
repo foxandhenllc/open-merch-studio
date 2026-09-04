@@ -505,3 +505,19 @@ this local-storage boundary.
 This checkpoint passed lint, typecheck, 87 backend tests (84 passed and three database-only skips),
 both frontend contracts, production build/static-route verification, and the complete 11-viewport
 browser suite plus the two-product cart and no-charge checkout journey.
+
+## Itemized Stripe checkout checkpoint
+
+Completed September 3, 2026:
+
+- Replaced the one-line aggregate Stripe presentation for merchandise with one extended line per
+  configured cart product, including the selected quantity, variant, and print-area codes.
+- Kept the saved OMS quote authoritative by reconciling estimated shipping and checkout services as
+  a separate positive line and allocating Studio Pass credits across merchandise lines.
+- Kept Stripe metadata, order identity, success/cancel returns, automatic tax, US shipping-address
+  collection, card-only payment, and idempotent session creation unchanged.
+- Added an exact-cent contract for multi-product carts and credited orders; Stripe never receives a
+  negative line item.
+
+This checkpoint passed lint, typecheck, 88 backend tests (85 passed and three database-only skips),
+both frontend contracts, production build/static-route verification, and the complete browser suite.
