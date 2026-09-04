@@ -52,25 +52,22 @@ test('admin recovery APIs enforce access, validate filters, and require durable 
     });
     assert.equal(storefrontUnauthorized.status, 401);
 
-    const storefrontWithoutDatabase = await fetch(
-      `${baseUrl}/api/admin/storefronts/bootstrap`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-admin-access': 'test-admin-code',
-        },
-        body: JSON.stringify({
-          organizationName: 'Example Org',
-          organizationSlug: 'example-org',
-          displayName: 'Example Org',
-          collectionTitle: 'Launch Collection',
-          collectionSlug: 'launch',
-          storefrontTitle: 'Example Store',
-          storefrontSlug: 'shop',
-        }),
-      }
-    );
+    const storefrontWithoutDatabase = await fetch(`${baseUrl}/api/admin/storefronts/bootstrap`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-admin-access': 'test-admin-code',
+      },
+      body: JSON.stringify({
+        organizationName: 'Example Org',
+        organizationSlug: 'example-org',
+        displayName: 'Example Org',
+        collectionTitle: 'Launch Collection',
+        collectionSlug: 'launch',
+        storefrontTitle: 'Example Store',
+        storefrontSlug: 'shop',
+      }),
+    });
     assert.equal(storefrontWithoutDatabase.status, 400);
 
     const retryWithoutDatabase = await fetch(
