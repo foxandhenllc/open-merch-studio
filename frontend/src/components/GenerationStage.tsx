@@ -70,7 +70,7 @@ export function GenerationStage({
         <div className="stage-empty-mark" aria-hidden="true">
           01
         </div>
-        <span className="kicker">First run</span>
+        <span className="kicker">GET STARTED</span>
         <h2>Make one thing you’d actually wear.</h2>
         <p>
           Choose a product from the curated catalog. Then describe the artwork you want to make.
