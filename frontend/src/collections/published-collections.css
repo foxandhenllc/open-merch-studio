@@ -1,0 +1,124 @@
+.published-collections {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 32px 48px;
+  color: var(--ink);
+}
+.published-collections-brand {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: baseline;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 24px;
+}
+.published-collections-brand a:first-child {
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+}
+.published-collections a {
+  color: inherit;
+  text-underline-offset: 5px;
+}
+.published-collections-intro {
+  padding: 64px 0 30px;
+  max-width: 820px;
+}
+.published-collections-intro > span {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+}
+.published-collections-intro h1 {
+  font-size: clamp(36px, 5vw, 68px);
+  letter-spacing: -0.045em;
+  line-height: 1.06;
+  font-weight: 600;
+  margin: 20px 0;
+  overflow-wrap: anywhere;
+}
+.published-collections p {
+  line-height: 1.6;
+}
+.published-collection {
+  border-top: 1px solid var(--line);
+  padding: 24px 0 42px;
+}
+.published-collection-description {
+  max-width: 650px;
+  margin-bottom: 32px;
+  white-space: pre-line;
+}
+.published-collection-products {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 48px 32px;
+}
+.published-collection-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+.published-collection figure {
+  margin: 0;
+  padding: 18px;
+  background: #f0efe7;
+  color: #233b30;
+}
+.published-collection figure[data-unavailable]::before {
+  content: 'Preview unavailable';
+  display: block;
+  padding: 60px 10px;
+}
+.published-collection figure img {
+  width: 100%;
+  height: 300px;
+  object-fit: contain;
+  display: block;
+}
+.published-collection figcaption {
+  font-size: 11px;
+  line-height: 1.5;
+  padding-top: 16px;
+}
+.published-collection h3 {
+  font-size: 23px;
+  letter-spacing: -0.025em;
+  margin: 24px 0 8px;
+  overflow-wrap: anywhere;
+}
+.published-collection article > p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.published-collection .published-collection-note {
+  font-size: 12px;
+  opacity: 0.76;
+}
+.published-collections footer {
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .published-collections {
+    padding: 24px 20px;
+  }
+  .published-collections-intro {
+    padding: 40px 0 24px;
+  }
+  .published-collection-products {
+    grid-template-columns: 1fr;
+  }
+  .published-collection figure img {
+    height: 220px;
+  }
+  .published-collections-brand a:first-child {
+    font-size: 20px;
+  }
+}

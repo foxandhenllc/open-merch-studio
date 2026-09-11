@@ -227,10 +227,13 @@ async function ensureCuratedQuoteVariants(
   }
 }
 
-async function readProductsFromDatabase(): Promise<CatalogProductDto[]> {
+async function readProductsFromDatabase(
+  client: Prisma.TransactionClient = prisma,
+  includeCuratedVariants = true
+): Promise<CatalogProductDto[]> {
   if (!env.databaseUrl) return [];
 
-  const products = await prisma.catalogProduct.findMany({
+  const products = await client.catalogProduct.findMany({
     where: {
       isActive: true,
       isSellable: true,
@@ -250,7 +253,14 @@ async function readProductsFromDatabase(): Promise<CatalogProductDto[]> {
     },
     orderBy: [{ category: { title: 'asc' } }, { title: 'asc' }],
   });
-  return products.map(mapProduct);
+  return products.map((product) => {
+    const mapped = mapProduct(product);
+    if (!includeCuratedVariants) {
+      const persistedIds = new Set(product.variants.map((variant) => variant.id));
+      mapped.variants = mapped.variants.filter((variant) => persistedIds.has(variant.id));
+    }
+    return mapped;
+  });
 }
 
 export async function listCategories(): Promise<CatalogCategoryDto[]> {
@@ -288,6 +298,17 @@ export async function listProducts(
         .some((value) => String(value).toLowerCase().includes(q));
     return categoryMatches && queryMatches;
   });
+}
+
+/** Owner configuration must not mistake sample products for this installation's durable catalog. */
+export async function listCollectionCatalog(
+  client: Prisma.TransactionClient = prisma
+): Promise<CatalogProductDto[]> {
+  if (!env.databaseUrl) {
+    if (env.nodeEnv === 'production') throw new Error('Collection catalog is unavailable.');
+    return fixtureProducts();
+  }
+  return readProductsFromDatabase(client, false);
 }
 
 export async function getProductBySlug(slug: string): Promise<CatalogProductDto | null> {

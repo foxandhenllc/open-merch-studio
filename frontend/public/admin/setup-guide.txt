@@ -1,0 +1,71 @@
+OPEN MERCH STUDIO — STORE OWNER INSTALLATION
+
+Each installation runs one merchant's store. Use accounts you own; do not
+reuse another merchant's database, payment account, or provider credentials.
+
+ONE-TIME HOSTING SETUP
+1. Fork the repository and import your fork into your own Vercel team.
+2. Follow DEPLOYMENT.md for Node, database migrations, and private storage.
+   Configure FRONTEND_URL and BACKEND_URL for this installation.
+3. Set a long, randomly generated ADMIN_ACCESS_CODE in Vercel Production.
+   This is the owner access code for /admin. Never commit it.
+4. To enter provider values inside /admin, configure these server-only
+   Production environment values in Vercel's dashboard:
+
+   OMS_SETUP_VERCEL_TOKEN       A token authorized for your own Vercel team
+   OMS_SETUP_VERCEL_PROJECT_ID  The exact prj_... ID of this installation
+   OMS_SETUP_VERCEL_TEAM_ID     The exact team_... ID owning that project
+   OMS_SETUP_DEPLOY_HOOK_URL    Optional deploy hook for this project's production branch
+
+   The hosting bridge is disabled outside Vercel Production. Scope its token
+   to the owning team and grant the minimum available project permissions.
+   Keep these values out of Preview and client/public environment variables.
+   The app verifies the project and team before every write. It does not
+   accept a different project or token through the admin form.
+5. Deploy. Open /admin and sign in with your admin access code.
+
+DAY-TO-DAY ADMINISTRATION
+- Artwork & limits: choose Image 2, Image 2.5 Flare, or Image 2.5 Sunburst.
+  Model and budget changes persist in PostgreSQL and apply to new requests.
+  Existing artwork files are preserved. No paid verification call is made.
+- Connections: open your provider's account, copy the requested credentials,
+  and save them. Blank fields preserve existing values. Secrets are sent
+  only to your store's backend and stored as sensitive hosting variables.
+- Click Redeploy with saved values. The deploy hook builds the configured
+  branch, including its latest commits. A requested build is not proof of
+  completion. After it succeeds, refresh status to confirm activation.
+- If you have no deploy hook, redeploy in your Vercel dashboard instead.
+- Secrets are never displayed after saving. To rotate one, enter a replacement.
+  To remove a credential, use the hosting dashboard.
+- Changing a database or payment account on an operating store requires an
+  intentional migration. Old orders belong to the original data/accounts.
+
+LOCAL DEVELOPMENT / OTHER HOSTS
+Set ADMIN_ACCESS_CODE in your ignored backend .env and run npm run dev.
+Without DATABASE_URL, admin settings are an explicitly labeled local demo:
+they survive page reloads but reset when the server restarts. Production
+never silently falls back to this mode. On other hosts, manage provider
+values using that host's secret manager and restart the service.
+
+BRAND AND LAUNCH
+Store profile lets you edit branding, colors, support details, order/email
+labels, and all five policy/support pages. Save a private draft first, review
+the complete text, and publish the saved profile for the next deployment.
+Changed merchant or policy content requires a new policy version and your
+explicit approval. Policy promises are never rewritten automatically.
+The hosting value OMS_MERCHANT_PROFILE is applied by the root npm run build.
+See docs/architecture/admin-merchant-profile.md for the publication contract.
+The committed config/merchant.config.json and config/policies/ remain the
+initial installation defaults. Domain routing, logo files, country/currency,
+catalog pricing, and first-time policy setup still need installation work.
+Guided provisioning and OAuth account connections remain future milestones.
+The admin supports entering provider credentials, not OAuth.
+
+Credentials do not activate commerce. Configure and verify the server gates,
+your signed webhooks, catalog, merchant identity, and approved policies using
+DEPLOYMENT.md and docs/launch/paid-beta-runbook.md. Keep
+PRINTFUL_AUTO_CONFIRM_ORDERS=false for review-before-production fulfillment.
+
+Never put real credentials in a support ticket, screenshot, URL, or commit.
+The admin access code is held only in memory for the open page. Reloading
+requires signing in again. Rotate ADMIN_ACCESS_CODE to revoke access.

@@ -7,7 +7,9 @@
   "packageManager": "npm@10.9.2",
   "workspaces": [
     "backend",
-    "frontend"
+    "frontend",
+    "packages/merchant-profile",
+    "packages/collection-drafts"
   ],
   "engines": {
     "node": "22.x",
@@ -25,23 +27,25 @@
     "start": "node \"$npm_execpath\" --workspace open-merch-studio-backend run start",
     "lint": "node \"$npm_execpath\" --workspace open-merch-studio-backend run lint && node \"$npm_execpath\" --workspace open-merch-studio-frontend run lint",
     "type-check": "node \"$npm_execpath\" --workspace open-merch-studio-backend run type-check && node \"$npm_execpath\" --workspace open-merch-studio-frontend run type-check",
-    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test && node --test scripts/doctor.test.mjs scripts/merchant-config.test.mjs scripts/policy-content.test.mjs && node --import tsx frontend/scripts/local-fixture-contract.mts && node --import tsx frontend/scripts/studio-selector-contract.mts",
+    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test && node --test scripts/doctor.test.mjs scripts/merchant-config.test.mjs scripts/merchant-profile.test.mjs scripts/policy-content.test.mjs && node --import tsx frontend/scripts/local-fixture-contract.mts && node --import tsx frontend/scripts/studio-selector-contract.mts",
     "doctor": "node scripts/doctor.mjs",
     "config:validate": "node scripts/validate-merchant-config.mjs",
     "config:generate": "node scripts/generate-merchant-config.mjs",
     "config:check": "node scripts/generate-merchant-config.mjs --check",
     "config:rehearse": "node scripts/rehearse-merchant-profile.mjs",
     "pretype-check": "npm run config:check",
-    "prebuild": "npm run config:check",
+    "prebuild": "node scripts/prepare-merchant-build.mjs",
     "audit:production": "node scripts/audit-production-lock.mjs",
-    "test:browser": "node frontend/scripts/responsive-smoke.mjs && node frontend/scripts/policy-profile-smoke.mjs",
+    "test:browser": "node frontend/scripts/responsive-smoke.mjs && node frontend/scripts/policy-profile-smoke.mjs && node frontend/scripts/admin-smoke.mjs",
     "test:owner-db": "node scripts/test-owner-database.mjs",
     "smoke:fixture": "node --import tsx backend/src/tests/fixture-smoke.test.ts",
     "smoke:live-upload": "node scripts/verify-live-upload.mjs",
     "smoke:deployed-upload": "node scripts/verify-deployed-upload-ui.mjs",
     "db:generate": "node \"$npm_execpath\" --workspace open-merch-studio-backend run db:generate",
     "verify:static-routes": "node \"$npm_execpath\" --workspace open-merch-studio-frontend run verify:static-routes",
-    "test:policy-browser": "node frontend/scripts/policy-profile-smoke.mjs"
+    "test:policy-browser": "node frontend/scripts/policy-profile-smoke.mjs",
+    "test:admin-browser": "node frontend/scripts/admin-smoke.mjs",
+    "config:rehearse-admin": "node scripts/rehearse-admin-profile.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

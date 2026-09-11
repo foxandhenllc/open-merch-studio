@@ -137,9 +137,28 @@ await writeFile(
   'utf8'
 );
 
+await mkdir(path.join(distDirectory, 'admin'), { recursive: true });
+await mkdir(path.join(distDirectory, 'collections'), { recursive: true });
+await writeFile(
+  path.join(distDirectory, 'collections/index.html'),
+  renderDocument({
+    title: `Collection previews | ${SITE_NAME}`,
+    description: 'Published artwork and planned merchandise. Ordering is not yet available.',
+  }),
+  'utf8'
+);
+await writeFile(
+  path.join(distDirectory, 'admin/index.html'),
+  renderDocument({
+    title: `Store Admin | ${SITE_NAME}`,
+    description: 'Private store settings and provider connections.',
+  }).replace('content="noindex,follow"', 'content="noindex,nofollow,noarchive"'),
+  'utf8'
+);
+
 await writeFile(
   path.join(distDirectory, 'robots.txt'),
-  `User-agent: *\nAllow: /\n\n# Public open-source routes are indexable; checkout and fulfillment use separate server-side gates.\nSitemap: ${CANONICAL_ORIGIN}/sitemap.xml\n`,
+  `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/admin\n\n# Public open-source routes are indexable; checkout and fulfillment use separate server-side gates.\nSitemap: ${CANONICAL_ORIGIN}/sitemap.xml\n`,
   'utf8'
 );
 

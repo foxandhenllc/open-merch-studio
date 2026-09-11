@@ -1,0 +1,50 @@
+.collection-print-layouts {
+  border-top: 1px solid var(--admin-line);
+  padding: 16px 0 24px;
+  max-width: 760px;
+  overflow-wrap: anywhere;
+}
+.collection-print-layouts fieldset {
+  border: 0;
+  padding: 20px 0 0;
+  margin: 0;
+  min-width: 0;
+}
+.collection-print-layouts legend {
+  font-weight: 600;
+  padding-top: 20px;
+}
+.collection-print-layouts p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.collection-print-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.collection-print-layouts figure {
+  margin: 24px 0 0;
+}
+.collection-print-canvas {
+  width: min(100%, 440px);
+  background-color: #fff;
+  background-image: conic-gradient(#e7e8e3 25%, transparent 0 50%, #e7e8e3 0 75%, transparent 0);
+  background-size: 20px 20px;
+  border: 1px solid var(--admin-line);
+}
+.collection-print-canvas img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.collection-print-layouts figcaption {
+  font-size: 12px;
+  margin-top: 10px;
+}
+@media (max-width: 600px) {
+  .collection-print-inputs {
+    grid-template-columns: 1fr;
+  }
+}

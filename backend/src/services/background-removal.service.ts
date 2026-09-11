@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import sharp from 'sharp';
 import { dataUrlToBuffer, supportsTransparentBackground } from './openai-design-provider.js';
 
 export type PrintPreparation = {
@@ -13,7 +14,21 @@ export async function prepareArtworkForPrint(params: {
   imageUrl: string;
   model: string;
 }): Promise<PrintPreparation> {
+  let transparent = false;
   if (supportsTransparentBackground(params.model)) {
+    const decoded = dataUrlToBuffer(params.imageUrl);
+    if (decoded?.contentType === 'image/png') {
+      try {
+        const input = sharp(decoded.buffer, { limitInputPixels: 40_000_000 });
+        const metadata = await input.metadata();
+        const stats = await input.stats();
+        transparent = Boolean(metadata.hasAlpha && (stats.channels.at(-1)?.min ?? 255) < 255);
+      } catch {
+        transparent = false;
+      }
+    }
+  }
+  if (transparent) {
     return {
       imageUrl: params.imageUrl,
       transparentUrl: params.imageUrl,
@@ -23,13 +38,25 @@ export async function prepareArtworkForPrint(params: {
     };
   }
 
+  // Native-transparent requests do not reserve a remove.bg charge. Do not add an
+  // unbudgeted provider operation when the returned file does not satisfy the contract.
+  if (supportsTransparentBackground(params.model)) {
+    return {
+      imageUrl: params.imageUrl,
+      status: 'required',
+      provider: 'none',
+      message:
+        'The image did not include a verified transparent background. Try again or upload a transparent PNG.',
+    };
+  }
+
   if (!env.removeBgApiKey) {
     return {
       imageUrl: params.imageUrl,
       status: 'required',
       provider: 'none',
       message:
-        'Background removal is not configured. Add REMOVE_BG_API_KEY for a transparent print file.',
+        'A transparent print file has not been verified. Configure background removal or prepare a transparent PNG.',
     };
   }
 

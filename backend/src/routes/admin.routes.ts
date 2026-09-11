@@ -12,6 +12,7 @@ import {
   postCatalogSync,
 } from '../controllers/admin.controller.js';
 import { requireAdminAccess } from '../middleware.js';
+import storeAdminRoutes from '../admin/store-admin.routes.js';
 import {
   postSavedProduct,
   postStorefrontBootstrap,
@@ -21,6 +22,7 @@ import {
 const router = Router();
 
 router.use(requireAdminAccess);
+router.use(storeAdminRoutes);
 router.post('/catalog/sync', postCatalogSync);
 router.get('/settings', getAdminSettings);
 router.patch('/settings', patchAdminSettings);

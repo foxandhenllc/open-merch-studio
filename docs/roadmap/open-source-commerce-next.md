@@ -1,8 +1,9 @@
 # Open-source commerce next
 
 This roadmap covers carts, repeat ordering, reusable distribution, a ChatGPT plugin, and the Fox &
-Hen implementation offer. It follows the current single-item, guest-first, review-before-production
-store without expanding the physical catalog.
+Hen implementation offer. It follows the guest-first, review-before-production store without
+expanding the physical catalog. The current owner-product sequence is maintained in
+[the store-owner roadmap](./store-owner-product.md).
 
 ## 0. Customer communication and shipment state
 
@@ -59,13 +60,17 @@ contributors. Add focused architecture decision records as the cart and notifica
 
 ## 3. A near-environment-only installation
 
-This is realistic, with one important distinction: **secrets belong in `.env`; merchant identity
-does not.** A reusable store should require:
+The September 4 foundation separated typed public identity from provider secrets. The September 10
+admin extension now publishes reviewed identity and policies as a single `OMS_MERCHANT_PROFILE`
+build snapshot, using the committed profile as the default. See the
+[current precedence contract](../architecture/merchant-configuration-rfc.md) and
+[profile publication](../architecture/admin-merchant-profile.md). The foundation and remaining setup
+work are tracked below:
 
 - a typed, committed `config/merchant.config.json` (name, domains, support contacts, currency, regions,
   catalog allowlist, policy URLs, brand colors, and asset paths);
 - deployment-managed environment values for database and provider credentials;
-- `npm run setup` to validate prerequisites, generate Prisma, apply or print migrations, and seed the
+- **Planned:** `npm run setup` to validate prerequisites, generate Prisma, apply or print migrations, and seed the
   curated catalog;
 - **Foundation completed September 4, 2026:** `npm run doctor` reports Node, URL, provider,
   database, and commerce-gate conflicts without printing values. Database reachability and merchant
@@ -83,11 +88,13 @@ does not.** A reusable store should require:
   lifecycle, and phone/desktop browser rehearsal with distinct support, pricing, prefix, policy, SEO,
   and installed-app identity. Its notices remain explicitly synthetic and cannot enable commerce.
   `npm run config:rehearse` repeats this evidence locally and in CI;
-- one documented Vercel template path and equivalent platform-neutral deployment contract;
+- **Planned:** one documented Vercel template path and equivalent platform-neutral deployment contract;
 - fixture mode that works from a clean clone before any provider is enabled.
 
-Brand copy, policy text, logos, and product selection should not become dozens of opaque environment
-variables. The goal is “one public config file plus secret env values,” with no source-code surgery.
+Brand copy and policy text now have an admin editor, private drafts, and explicit publication.
+They remain a validated profile rather than dozens of unrelated environment fields. Logos, domains,
+product selection, initial infrastructure, and account verification still need further owner setup
+work. Normal operations should not require source-code edits.
 
 ### Editable mini-store administration
 
@@ -147,7 +154,7 @@ Official references:
 
 Lead with the delivered business outcome rather than the component list:
 
-> **Your merch store, built around your people—not a template marketplace.** Fox & Hen turns an
+> **Your merch store, built around your people.** Fox & Hen turns an
 > existing brand, community, or campaign into a focused custom-merch shop, then connects creation,
 > payment, printing, shipping, and the website your customers actually visit.
 

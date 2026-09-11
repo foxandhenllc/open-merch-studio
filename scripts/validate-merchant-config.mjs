@@ -4,6 +4,7 @@ import {
   validateMerchantConfig,
 } from "./merchant-config.mjs";
 import { readPolicyContent, validatePolicyContent } from "./policy-content.mjs";
+import { loadInstallationProfile } from "./installation-profile.mjs";
 
 const targets =
   process.argv.length > 2
@@ -28,6 +29,17 @@ for (const target of targets) {
     failed = true;
     console.error(
       `FAIL ${target} - ${error instanceof Error ? error.message : "Unreadable JSON."}`,
+    );
+  }
+}
+if (process.env.OMS_MERCHANT_PROFILE) {
+  try {
+    loadInstallationProfile();
+    console.log("PASS  Deployment merchant profile");
+  } catch {
+    failed = true;
+    console.error(
+      "FAIL  Deployment merchant profile - check the saved profile and its policy approval.",
     );
   }
 }

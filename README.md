@@ -1,14 +1,39 @@
 # Open Merch Studio
 
-Open Merch Studio is an open-source custom merch workbench for curated Printful catalog fulfillment. It supports supplied artwork, reference-led creation, print-file improvement, and optional AI generation across products beyond apparel.
+Build a merch experience around your community.
 
-**Live studio:** [openmerchstudio.com](https://openmerchstudio.com)
+Open Merch Studio is an open-source foundation for creators, community brands, and the people
+building stores for them. Run your own installation, connect your provider accounts, and give your
+audience a branded artwork-to-merch workflow: supplied artwork, reference-led creation, optional AI,
+product previews, checkout, and reviewed Printful fulfillment.
 
-**Created by:** Fox & Hen
-
+**Reference storefront:** [openmerchstudio.com](https://openmerchstudio.com) ·
+**Created by:** [Fox & Hen](https://foxandhenllc.com/merch) ·
 **License:** [MIT](./LICENSE)
 
-The public studio supports product exploration, direct customer-artwork uploads, reference-led and AI-assisted design generation, print preparation, multi-placement previews, live Stripe Checkout, and review-first Printful fulfillment. Paid orders create editable Printful drafts for manual production review; they are not automatically confirmed for production.
+## Build Your Own Store
+
+- **Explore the software:** run the [local fixture demo](#local-setup) without provider accounts.
+  It simulates artwork and commerce without provider charges. The public reference storefront is
+  a separate, deployed merchant experience.
+- **Run your own installation:** follow [deployment setup](./DEPLOYMENT.md), then use `/admin` for
+  branding, policy drafts, image-model selection, AI budgets, and supported provider credentials.
+- **Build with Fox & Hen:** [discuss a store build and launch](https://foxandhenllc.com/merch),
+  with optional ongoing care. Your store can use your own deployment and provider accounts.
+
+The first audience is creators and community brands with an existing following and a distinctive
+merch idea. The reusable product connects their creation workflow to commerce; the storefront is
+the experience their customers use. See the [owner experience brief](./docs/product/owner-experience.md).
+
+**Current setup boundary:** this checkout includes owner controls, but initial hosting, database,
+storage, domain, admin access, and provider verification still need technical setup. Normal owner
+operations are moving into the admin; a complete self-service installation is on the
+[roadmap](./docs/roadmap/store-owner-product.md). A source checkout may contain changes ahead of the
+public deployment. Each installation represents one merchant with its own configuration and accounts.
+
+The commerce implementation includes Stripe Checkout and review-first Printful fulfillment. Paid
+orders create editable Printful drafts for manual production review; they are not automatically
+confirmed for production. A new installation keeps live commerce closed until its launch checks pass.
 
 Open Merch Studio is the public project name. The code, docs, and environment templates avoid private customer data, production credentials, payment artifacts, and organization-specific claims.
 
@@ -48,9 +73,45 @@ The [Fox & Hen “One Clear System” collection](https://openmerchstudio.com/ex
 
 ## Local Setup
 
+Start with the [provider-free walkthrough](./docs/getting-started.md). The copied environment
+template leaves the database and provider credentials empty. For contribution help, known setup
+limits, and version status, see [Support](./SUPPORT.md), [Roadmap](./ROADMAP.md), and
+[Changelog](./CHANGELOG.md).
+The [operating-cost model](./docs/operations/costs.md) separates infrastructure, Image 2.5 usage,
+per-order costs, and owner effort, with dated sources and explicit assumptions.
+
+Store owners can open **`/admin`** to choose the image model, set visitor AI limits,
+and manage provider credentials through the optional Vercel hosting connection.
+Model and budget changes persist in PostgreSQL. Provider values stay in deployment-managed
+storage and take effect after redeployment. See the [store admin contract](./docs/architecture/store-admin-control-plane.md)
+and [owner product roadmap](./docs/roadmap/store-owner-product.md).
+
+**Store profile** adds a visual editor for branding, colors, support details, order/email labels,
+and all five policy pages. Save a private draft, review the exact revision, and publish it for the
+next deployment. Changed merchant identity or policy text requires the owner's explicit approval
+and a new policy version. See the [profile publication contract](./docs/architecture/admin-merchant-profile.md).
+
+**Collections** lets the installation owner save private collection drafts with names, descriptions,
+product/variant/print-area choices, planned artwork options, and target prices. Event, creator-drop,
+community-feature, and everyday-collection guidance can be selected without code changes. Owners
+can upload original artwork, attach a different file to each print area, and reuse private library
+files. Preparation preserves the original and uses no AI or background removal. Owners can review
+intended print sizes, explicitly publish an artwork collection preview, replace its published version,
+and withdraw it. **Check sales readiness** inspects the published artwork/product choices and
+prices, with separate owner actions and remaining production/checkout requirements. Private edits
+stay private until publication. **Prepare print layouts** lets owners enter variant-template
+dimensions and offsets, save each print area, preview a transparent canvas, and download a
+300-PPI PNG while keeping the original intact. See the
+[print-layout contract](./docs/architecture/collection-print-layouts.md) for limits and review requirements.
+These public pages cannot take orders
+yet; binding approved products to checkout remains a V1 gate. See the
+[collection draft contract](./docs/architecture/admin-collection-drafts.md),
+[private artwork contract](./docs/architecture/admin-collection-artwork.md), and
+[review and publication contract](./docs/architecture/admin-collection-publication.md).
+
 ```bash
 nvm use
-npm install
+npm ci
 cp .env.example backend/.env
 cp .env.example frontend/.env
 npm run doctor
@@ -66,6 +127,8 @@ values. A clean clone should report `fixture-ready`; provider presence is not th
 payment or fulfillment authorization.
 
 Public merchant identity lives in [`config/merchant.config.json`](./config/merchant.config.json).
+It is the installation default; an admin-published `OMS_MERCHANT_PROFILE` overrides its editable
+fields at build time. The build generates browser, server, policy, and metadata outputs together.
 After changing it, run `npm run config:generate`, then validate it and the synthetic second profile
 with `npm run config:validate`. Type-checking and builds reject stale generated modules. Secrets and
 live commerce authorization remain environment-managed and are never part of that manifest. See

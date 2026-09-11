@@ -5,7 +5,24 @@ import {
   emailProviderFromEnv,
   frontendUrlFromEnv,
   transactionalEmailSettingsFromEnv,
+  brandedEmailSender,
 } from '../config/env.js';
+
+test('merchant sender names preserve the provider-verified mailbox', () => {
+  assert.equal(
+    brandedEmailSender('Old Store <orders@example.com>', 'New Store'),
+    'New Store <orders@example.com>'
+  );
+  assert.equal(
+    brandedEmailSender('orders@example.com', 'New Store'),
+    'New Store <orders@example.com>'
+  );
+  assert.equal(brandedEmailSender(undefined, 'New Store'), undefined);
+  assert.equal(
+    brandedEmailSender('orders@example.com', 'Community, Inc.'),
+    '"Community, Inc." <orders@example.com>'
+  );
+});
 
 test('production asset URLs use the canonical Vercel host when BACKEND_URL is omitted', () => {
   assert.equal(

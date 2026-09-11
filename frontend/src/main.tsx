@@ -8,14 +8,17 @@ import './styles/focused-workbench.css';
 import './styles/mini-store.css';
 import './styles/example-collection.css';
 import { captureCustomerOrderAccessHandoff } from './order-access';
+import { applyMerchantTheme } from './merchant-theme';
 
 // Email capability fragments must be removed before analytics components can observe the page.
 captureCustomerOrderAccessHandoff();
+applyMerchantTheme(document.documentElement);
 
 const observabilityEnabled =
-  window.location.hostname === 'openmerchstudio.com' ||
-  window.location.hostname === 'www.openmerchstudio.com' ||
-  window.location.hostname.endsWith('.vercel.app');
+  !/^\/admin(?:\/|$)/.test(window.location.pathname) &&
+  (window.location.hostname === 'openmerchstudio.com' ||
+    window.location.hostname === 'www.openmerchstudio.com' ||
+    window.location.hostname.endsWith('.vercel.app'));
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

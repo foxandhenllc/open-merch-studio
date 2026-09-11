@@ -1,6 +1,6 @@
 # Merchant configuration RFC
 
-**Status:** Version 1 configuration contract verified with isolated fixture-profile rehearsal
+**Status:** Version 1 configuration contract; reviewed admin publication added September 10, 2026
 
 **Schema:** `config/merchant.config.json`, version 1
 
@@ -8,10 +8,16 @@
 
 ## Decision
 
-Open Merch Studio will use one committed, versioned JSON manifest for non-secret merchant identity
-and presentation. Provider credentials, database locations, webhook secrets, and live authorization
-remain deployment-managed environment values. Policy prose is a separate committed operator-owned
-JSON document; the manifest pins its path, digest, approval version, and date. It never generates terms.
+Open Merch Studio uses a versioned JSON profile for non-secret merchant identity and presentation.
+The committed manifest and separate operator-owned policy document supply the installation default.
+The manifest pins policy path, digest, approval version, and date; it never generates terms.
+
+The September 10 owner-admin extension allows a reviewed profile to be published as one
+deployment-managed `OMS_MERCHANT_PROFILE` snapshot. The build validates it and generates all public
+and server consumers together. This supersedes the original environment-only-for-secrets rule for
+this one structured value. Provider credentials, database locations, webhook secrets, and live
+authorization remain separate deployment-managed values. See the
+[profile publication contract](./admin-merchant-profile.md) for editable fields and approval rules.
 
 Project attribution is deliberately separate from merchant branding. A fork can call its store
 “Community Gear Lab” while continuing to identify Open Merch Studio, its source, creator, and MIT
@@ -19,17 +25,20 @@ license accurately.
 
 ## Precedence and failure behavior
 
-1. `config/merchant.config.json` is the committed public source of truth.
-2. Deployment-derived host values may describe the current deployment but never replace canonical
-   merchant identity.
-3. Environment values supply secrets and explicit live gates only. They may not silently override
-   brand, operator, policy, or attribution fields.
+1. A valid, explicitly published `OMS_MERCHANT_PROFILE` is the active build profile when present.
+   Malformed, unapproved, or incompatible content fails validation instead of falling back.
+2. Otherwise, `config/merchant.config.json` and its pinned policy document supply the default.
+3. Deployment-derived host values never replace canonical identity. Individual environment values
+   cannot silently replace merchant fields. The reviewed snapshot cannot change fixed fields such
+   as canonical origin, asset paths, currency, policy routes, or project attribution.
 4. Built-in fixture data remains available only when fixture fallbacks are enabled.
 
 `npm run config:generate` validates the active profile and emits immutable typed modules for the
-browser and server. `npm run config:check` proves those committed modules are current; type-checking,
-builds, and the test suite enforce that invariant. `npm run config:validate` validates the reference
-and synthetic profiles, while `npm run doctor` includes the active profile check. Invalid JSON, an
+browser and server. `npm run config:check` proves generated modules match that profile. The root
+build generates modules from a published snapshot when present and checks the committed defaults
+otherwise; type-checking and the test suite also enforce consistency. `npm run config:validate`
+validates the reference and synthetic profiles, while `npm run doctor` includes the active profile
+check. Invalid JSON, an
 unsupported schema version, missing public assets, unsafe URLs, malformed order prefixes, or missing
 launch-critical fields returns a nonzero exit code. Validation reports field paths and fixed
 remediation text, never configured secret values.
@@ -92,7 +101,12 @@ fail closed. Runtime code must not guess a nearest version.
    agree. The synthetic SVG is explicitly a fixture asset, not a tested social-platform preview.
    Every live provider/payment/fulfillment gate is disabled; no provider credentials are inherited.
    CI repeats this command. Real merchant policy approval remains mandatory before live activation.
-6. Only then build owner authentication and editable mini-store administration on top of the
+6. **Completed locally September 10, 2026:** installation-admin brand and policy editing, private
+   drafts, exact revision approval, and reviewed profile publication. `npm run config:rehearse-admin`
+   verifies a clean install and build with a distinct synthetic profile. See the
+   [implementation and verification](./admin-merchant-profile.md). These controls do not enable
+   organization-owner access or imply a production deployment.
+7. Build owner authentication and editable mini-store administration on top of the
    organization boundary. The [owner administration architecture](./mini-store-owner-administration.md)
    now specifies the identity adapter, membership roles, scoped repository/RLS boundary, immutable
    publication revisions, audit records, and prerequisite corrections. Owner mutations remain disabled.

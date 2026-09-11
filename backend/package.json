@@ -35,7 +35,9 @@
     "openai": "^6.9.1",
     "prisma": "^5.20.0",
     "sharp": "0.35.4",
-    "stripe": "^20.0.0"
+    "stripe": "^20.0.0",
+    "@open-merch-studio/merchant-profile": "*",
+    "@open-merch-studio/collection-drafts": "*"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

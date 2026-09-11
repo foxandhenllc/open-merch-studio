@@ -34,11 +34,23 @@ export const emailProviderFromEnv = (value?: string): EmailProvider =>
   value?.trim().toLowerCase() === 'resend' ? 'resend' : 'fixture';
 
 const normalizedOrigin = (value: string): string => value.trim().replace(/\/+$/, '');
+export const brandedEmailSender = (
+  value: string | undefined,
+  senderName: string = merchantConfig.email.senderName
+): string | undefined => {
+  if (!value?.trim()) return undefined;
+  const address = value.trim().match(/^(?:[^<>]*<)?([^<>\s]+@[^<>\s]+\.[^<>\s]+)>?$/)?.[1];
+  if (!address) return value.trim();
+  // The provider-verified mailbox stays deployment-owned; only its public display name is branded.
+  const name = senderName.replace(/[\r\n]/g, '');
+  const displayName = /^[A-Za-z0-9 ]+$/.test(name) ? name : JSON.stringify(name);
+  return `${displayName} <${address}>`;
+};
 
 export const transactionalEmailSettingsFromEnv = (source: NodeJS.ProcessEnv) => ({
   enabled: booleanFromValue(source.TRANSACTIONAL_EMAILS_ENABLED, false),
   provider: emailProviderFromEnv(source.EMAIL_PROVIDER),
-  from: source.EMAIL_FROM?.trim() || undefined,
+  from: brandedEmailSender(source.EMAIL_FROM),
   replyTo: source.EMAIL_REPLY_TO?.trim() || undefined,
   supportEmail: merchantConfig.operator.supportEmail,
   resendApiKey: source.RESEND_API_KEY?.trim() || undefined,
@@ -84,7 +96,7 @@ export const env = {
   openaiOrganizationId:
     process.env.OPENAI_ORG_ID?.trim() || process.env.OPENAI_ORGANIZATION_ID?.trim() || undefined,
   openaiProjectId: process.env.OPENAI_PROJECT_ID?.trim() || undefined,
-  openaiDesignModel: process.env.OPENAI_DESIGN_MODEL || 'gpt-image-2',
+  openaiDesignModel: process.env.OPENAI_DESIGN_MODEL || 'gpt-image-2.5-flare',
   openaiTextModel: process.env.OPENAI_TEXT_MODEL || 'gpt-5-nano',
   removeBgApiKey: process.env.REMOVE_BG_API_KEY,
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,

@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { currentStoreSettings } from '../admin/store-settings.js';
 import { prisma } from '../config/database.js';
 import { HttpError } from '../middleware.js';
 import { classifyOperationalError, logOperationalEvent } from '../utils/operational-logger.js';
@@ -92,7 +93,17 @@ export function runtimeNow(): string {
 }
 
 export function getRuntimeSettings(): AdminSettings {
-  return { ...state.settings };
+  const configured = currentStoreSettings();
+  return {
+    ...state.settings,
+    ...(configured
+      ? {
+          dailyAiBudgetCents: configured.dailyAiBudgetCents,
+          perSessionBudgetCents: configured.perSessionBudgetCents,
+          freeDraftLimit: configured.freeDraftLimit,
+        }
+      : {}),
+  };
 }
 
 export function updateRuntimeSettings(patch: Partial<AdminSettings>): {
@@ -128,7 +139,7 @@ export function createStudioSession(sessionId?: string): StudioSession {
     id: sessionId || createId('sess'),
     status: 'guest',
     freeDraftsUsed: 0,
-    freeDraftLimit: state.settings.freeDraftLimit,
+    freeDraftLimit: getRuntimeSettings().freeDraftLimit,
     createdAt: now,
     updatedAt: now,
   };
@@ -161,7 +172,7 @@ export async function getOrCreateDurableSession(sessionId?: string): Promise<Stu
           id: persisted.id,
           status: persisted.status as StudioSession['status'],
           freeDraftsUsed: persisted.freeDraftsUsed,
-          freeDraftLimit: Math.max(persisted.freeDraftLimit, state.settings.freeDraftLimit),
+          freeDraftLimit: Math.max(persisted.freeDraftLimit, getRuntimeSettings().freeDraftLimit),
           createdAt: persisted.createdAt.toISOString(),
           updatedAt: persisted.updatedAt.toISOString(),
         };
@@ -317,14 +328,14 @@ export async function authorizeDesignAction(
   const allowance = getAllowanceState(session.id);
   const { sessionSpend, dailySpend } = await durableSpendTotals(session.id);
 
-  if (dailySpend + pendingCostCents > state.settings.dailyAiBudgetCents) {
+  if (dailySpend + pendingCostCents > getRuntimeSettings().dailyAiBudgetCents) {
     return {
       allowed: false,
       allowance,
       message: 'Daily design budget is paused. Try again later or contact support.',
     };
   }
-  if (sessionSpend + pendingCostCents > state.settings.perSessionBudgetCents) {
+  if (sessionSpend + pendingCostCents > getRuntimeSettings().perSessionBudgetCents) {
     return {
       allowed: false,
       allowance,
@@ -458,13 +469,13 @@ export async function reserveLiveDesignSpend(
           id: params.sessionId,
           status: 'guest',
           freeDraftsUsed: 0,
-          freeDraftLimit: state.settings.freeDraftLimit,
+          freeDraftLimit: getRuntimeSettings().freeDraftLimit,
         },
       });
-      if (durableSession.freeDraftLimit < state.settings.freeDraftLimit) {
+      if (durableSession.freeDraftLimit < getRuntimeSettings().freeDraftLimit) {
         durableSession = await tx.studioSession.update({
           where: { id: durableSession.id },
-          data: { freeDraftLimit: state.settings.freeDraftLimit },
+          data: { freeDraftLimit: getRuntimeSettings().freeDraftLimit },
         });
       }
 
@@ -484,7 +495,7 @@ export async function reserveLiveDesignSpend(
       const sessionSpend = sessionTotal._sum.estimatedCostCents ?? 0;
       const dailySpend = dailyTotal._sum.estimatedCostCents ?? 0;
 
-      if (dailySpend + estimatedCostCents > state.settings.dailyAiBudgetCents) {
+      if (dailySpend + estimatedCostCents > getRuntimeSettings().dailyAiBudgetCents) {
         return {
           allowed: false as const,
           message: 'Daily design budget is paused. Try again later or contact support.',
@@ -492,7 +503,7 @@ export async function reserveLiveDesignSpend(
           pass: durablePass,
         };
       }
-      if (sessionSpend + estimatedCostCents > state.settings.perSessionBudgetCents) {
+      if (sessionSpend + estimatedCostCents > getRuntimeSettings().perSessionBudgetCents) {
         return {
           allowed: false as const,
           message:

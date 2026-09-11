@@ -1,5 +1,7 @@
 import OpenAI, { toFile } from 'openai';
 import { env } from '../config/env.js';
+import { activeImageModel } from '../admin/store-settings.js';
+import { imageModelCapabilities, imageRequestEstimate } from '../admin/image-models.js';
 
 export type GeneratedDesignImage = {
   provider: 'mock' | 'openai';
@@ -40,11 +42,12 @@ export function canUseLiveOpenAi(): boolean {
 }
 
 export function supportsTransparentBackground(model: string): boolean {
-  return !/^gpt-image-2(?:-|$)/i.test(model);
+  return imageModelCapabilities(model)?.transparent ?? /^gpt-image-1(?:[.-]|$)/.test(model);
 }
 
 export function supportsInputFidelity(model: string): boolean {
-  return !/^gpt-image-2(?:-|$)/i.test(model);
+  // Omit optional fidelity for 2.x; never infer API support from an unknown model name.
+  return imageModelCapabilities(model)?.inputFidelity ?? /^gpt-image-1(?:\.5)?(?:-|$)/.test(model);
 }
 
 function detectTextIntent(prompt: string): boolean {
@@ -69,7 +72,7 @@ export function normalizePromptForPrint(prompt: string): string {
     .trim();
 }
 
-export function buildPrintReadyPrompt(prompt: string, model = env.openaiDesignModel): string {
+export function buildPrintReadyPrompt(prompt: string, model = activeImageModel()): string {
   const cleaned = normalizePromptForPrint(prompt) || prompt;
   const expectsText = detectTextIntent(prompt);
   const textGuidance = expectsText
@@ -118,15 +121,15 @@ export async function generateDesignImage(params: {
     project: env.openaiProjectId,
   });
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
-  const finalPrompt = buildPrintReadyPrompt(params.prompt, env.openaiDesignModel);
+  const finalPrompt = buildPrintReadyPrompt(params.prompt, activeImageModel());
   await assertPromptAllowed(client, finalPrompt);
   const response = await client.images.generate({
-    model: env.openaiDesignModel,
+    model: activeImageModel(),
     prompt: finalPrompt,
     n: 1,
     size: '1024x1024',
     quality,
-    background: supportsTransparentBackground(env.openaiDesignModel) ? 'transparent' : 'auto',
+    background: supportsTransparentBackground(activeImageModel()) ? 'transparent' : 'auto',
     output_format: 'png',
     moderation: 'auto',
     user: params.sessionId,
@@ -143,7 +146,7 @@ export async function generateDesignImage(params: {
     provider: 'openai',
     imageUrl,
     revisedPrompt: image?.revised_prompt ?? finalPrompt,
-    estimatedCostCents: params.qualityTier === 'final' ? 36 : 6,
+    estimatedCostCents: imageRequestEstimate(activeImageModel(), params.qualityTier),
   };
 }
 
@@ -179,7 +182,9 @@ export async function editDesignImage(params: {
   const finalPrompt = [
     ...instruction,
     'Return artwork only, not a product mockup.',
-    'Use a centered, isolated subject, strong silhouette, readable shapes, and a plain background that can be removed cleanly.',
+    supportsTransparentBackground(activeImageModel())
+      ? 'Use a centered, isolated subject, strong silhouette, readable shapes, and a transparent background.'
+      : 'Use a centered, isolated subject, strong silhouette, readable shapes, and a plain background that can be removed cleanly.',
     'Do not add unrequested words, signatures, watermarks, brands, celebrities, or protected characters.',
   ].join(' ');
   await assertPromptAllowed(client, finalPrompt);
@@ -187,15 +192,15 @@ export async function editDesignImage(params: {
     params.images.map((image) => toFile(image.buffer, image.filename, { type: image.contentType }))
   );
   const response = await client.images.edit({
-    model: env.openaiDesignModel,
+    model: activeImageModel(),
     image: uploads,
     prompt: finalPrompt,
     n: 1,
     size: '1024x1024',
     quality: params.qualityTier === 'final' ? 'high' : 'low',
-    background: supportsTransparentBackground(env.openaiDesignModel) ? 'transparent' : 'auto',
+    background: supportsTransparentBackground(activeImageModel()) ? 'transparent' : 'auto',
     output_format: 'png',
-    ...(supportsInputFidelity(env.openaiDesignModel)
+    ...(supportsInputFidelity(activeImageModel())
       ? { input_fidelity: params.mode === 'edit' ? ('high' as const) : ('low' as const) }
       : {}),
     user: params.sessionId,
@@ -206,7 +211,7 @@ export async function editDesignImage(params: {
   return {
     provider: 'openai',
     imageUrl,
-    estimatedCostCents: params.qualityTier === 'final' ? 40 : 14,
+    estimatedCostCents: imageRequestEstimate(activeImageModel(), params.qualityTier, true),
   };
 }
 

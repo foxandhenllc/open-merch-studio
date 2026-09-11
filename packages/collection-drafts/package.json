@@ -1,0 +1,7 @@
+{
+  "name": "@open-merch-studio/collection-drafts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./index.d.ts", "default": "./index.mjs" } }
+}

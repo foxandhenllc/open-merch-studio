@@ -1,7 +1,6 @@
-import { createRequire } from 'node:module';
+import { loadInstallationProfile } from '../../scripts/installation-profile.mjs';
 
-const require = createRequire(import.meta.url);
-const activeMerchantConfig = require('../../config/merchant.config.json');
+const activeMerchantConfig = loadInstallationProfile().config;
 
 const routeOutput = (routePath) => `${routePath.replace(/^\/+|\/+$/g, '')}/index.html`;
 
@@ -77,7 +76,7 @@ export function buildStaticRouteConfig(merchantConfig) {
     webManifest: {
       name: brandName,
       short_name: merchantConfig.brand.shortName,
-      description: merchantConfig.web.description,
+      description: merchantConfig.brand.shortDescription,
       start_url: '/',
       display: 'standalone',
       background_color: merchantConfig.brand.colors.background,

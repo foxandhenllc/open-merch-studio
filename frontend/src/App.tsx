@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { policyRoutes } from './policies';
 import { PolicyPage } from './components/PolicyPage';
 import { OpenSourceAttribution } from './components/OpenSourceAttribution';
@@ -6,6 +7,14 @@ import { WorkbenchStudioApp } from './WorkbenchStudioApp';
 import { MiniStorePage } from './components/MiniStorePage';
 
 const path = () => window.location.pathname.replace(/\/+$/, '') || '/';
+const StoreAdminPage = lazy(() =>
+  import('./admin/StoreAdminPage').then((module) => ({ default: module.StoreAdminPage }))
+);
+const PublishedCollectionsPage = lazy(() =>
+  import('./collections/PublishedCollectionsPage').then((module) => ({
+    default: module.PublishedCollectionsPage,
+  }))
+);
 function NotFoundPage() {
   return (
     <main className="policy-shell">
@@ -47,6 +56,19 @@ function NotFoundPage() {
 
 export default function App() {
   const currentPath = path();
+  const collectionMatch = currentPath.match(/^\/collections(?:\/([a-f0-9-]{36}))?$/);
+  if (collectionMatch)
+    return (
+      <Suspense fallback={<main aria-busy="true">Opening collection…</main>}>
+        <PublishedCollectionsPage id={collectionMatch[1]} />
+      </Suspense>
+    );
+  if (currentPath === '/admin')
+    return (
+      <Suspense fallback={<main aria-busy="true">Loading store admin…</main>}>
+        <StoreAdminPage />
+      </Suspense>
+    );
   const storeMatch = currentPath.match(/^\/stores\/([^/]+)\/([^/]+)$/);
   if (storeMatch) {
     return <MiniStorePage organizationSlug={storeMatch[1]} storefrontSlug={storeMatch[2]} />;

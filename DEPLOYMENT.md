@@ -19,6 +19,12 @@ Open Merch Studio can be deployed as a split frontend/backend app or as separate
 
 Store all provider values in deployment-managed storage. Do not commit provider values or screenshots of provider dashboards.
 
+Owner collection artwork uses the private upload bucket for originals, previews, and prepared
+images. The browser connection policy supports standard `https://*.supabase.co` project URLs so
+forks can connect their own storage without replacing a hardcoded project hostname. Custom storage
+domains require a connection-policy review. See the [owner artwork contract](./docs/architecture/admin-collection-artwork.md)
+for upload limits, private retention, retry/removal behavior, and local verification.
+
 ## Safe Defaults And Live Provider Gates
 
 New installations must keep commerce authorization disabled until their private OPS checklist is complete. Provider capability
@@ -58,7 +64,33 @@ enabled after sender verification, exactly-once fixture coverage, and an externa
 test. Scheduled shipment reconciliation is not yet part of the launch contract. See
 [the current post-payment experience](./docs/architecture/current-post-payment-experience.md).
 
-`gpt-image-2` is the default design model. Because that model does not emit transparent backgrounds, set `REMOVE_BG_API_KEY` to enable the automatic post-generation background-removal stage. Without it, generation and mockups still work, but print readiness shows a warning until a transparent file is prepared.
+New installations default to `gpt-image-2.5-flare`; both Image 2.5 options support transparent
+output without a remove.bg connection. An existing `OPENAI_DESIGN_MODEL` value or saved admin
+selection still takes precedence. The legacy Image 2 adapter remains for existing installations
+during migration; it uses separate background removal. The V1 target supports only the two Image
+2.5 models. See the [V1 release contract](./docs/launch/v1-release-contract.md) for the migration gate.
+
+Owners can choose GPT Image 2.5 Sunburst or Flare in `/admin` without a source edit or
+redeploy. The initial default remains `OPENAI_DESIGN_MODEL` until an owner saves a model.
+Persistent controls use the existing private settings and audit tables. Image 2.5 requests
+use transparent PNGs, and the returned pixels are checked before print readiness is reported.
+
+For provider credential entry from admin, configure `OMS_SETUP_VERCEL_TOKEN`,
+`OMS_SETUP_VERCEL_PROJECT_ID`, and `OMS_SETUP_VERCEL_TEAM_ID` in this installation's Vercel
+Production environment. Add `OMS_SETUP_DEPLOY_HOOK_URL` for its production branch to enable
+the redeploy button. The bridge verifies project/team identity, only runs in Production,
+and never returns stored secrets. It never sets payment authorization or auto-confirm flags.
+See [store administration](./docs/architecture/store-admin-control-plane.md) and the public
+`/admin/setup-guide.txt` installation checklist. Do not copy the hosting bridge into Preview.
+
+The Store profile editor saves a private draft in PostgreSQL. Publishing writes the reviewed
+`OMS_MERCHANT_PROFILE` to the same production project. The normal `npm run build` generates the
+selected profile before compilation, keeping storefront, support, email, checkout assent, and
+static metadata consistent. No repository edit is required for those fields. Keep this value
+deployment-managed; `config/merchant.config.json` remains the repository's default profile.
+Profile changes require a successful redeploy, while artwork-model and budget changes do not.
+See [profile publication](./docs/architecture/admin-merchant-profile.md) for revision checks,
+policy review, failure recovery, and the remaining installation-only settings.
 
 ## Database Migration
 

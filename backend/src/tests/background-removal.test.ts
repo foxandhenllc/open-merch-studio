@@ -13,7 +13,7 @@ test('GPT Image 2 artwork clearly reports when external background removal is no
     });
     assert.equal(result.status, 'required');
     assert.equal(result.provider, 'none');
-    assert.match(result.message, /REMOVE_BG_API_KEY/);
+    assert.match(result.message, /transparent print file/);
   } finally {
     env.removeBgApiKey = original;
   }

@@ -71,7 +71,14 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
   });
 }
 
-export function requireAdminAccess(req: Request, _res: Response, next: NextFunction) {
+const adminFailures = new Map<string, { count: number; until: number }>();
+
+export function requireAdminAccess(req: Request, res: Response, next: NextFunction) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  res.vary('x-admin-access');
+  const address = req.socket.remoteAddress ?? 'unknown';
+  const failed = adminFailures.get(address);
   if (!env.adminAccessCode) {
     next(new HttpError('Admin API is disabled until ADMIN_ACCESS_CODE is configured.', 403));
     return;
@@ -84,9 +91,31 @@ export function requireAdminAccess(req: Request, _res: Response, next: NextFunct
     expectedBytes.length !== providedBytes.length ||
     !timingSafeEqual(expectedBytes, providedBytes)
   ) {
+    // A shared proxy address must not let failed guesses lock out an authenticated owner.
+    if (failed && failed.until > Date.now() && failed.count >= 20) {
+      res.setHeader('Retry-After', String(Math.ceil((failed.until - Date.now()) / 1000)));
+      next(
+        new HttpError(
+          'Too many sign-in attempts. Try again in a minute.',
+          429,
+          'admin_rate_limited'
+        )
+      );
+      return;
+    }
+    if (adminFailures.size > 10000) {
+      for (const [key, entry] of adminFailures)
+        if (entry.until <= Date.now()) adminFailures.delete(key);
+      if (adminFailures.size > 10000) adminFailures.delete(adminFailures.keys().next().value!);
+    }
+    adminFailures.set(address, {
+      count: failed && failed.until > Date.now() ? failed.count + 1 : 1,
+      until: failed && failed.until > Date.now() ? failed.until : Date.now() + 60000,
+    });
     next(new HttpError('Admin access is required.', 401));
     return;
   }
 
+  adminFailures.delete(address);
   next();
 }

@@ -2,11 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import dotenv from "dotenv";
 import { diagnoseConfiguration } from "./doctor-core.mjs";
-import {
-  readMerchantConfig,
-  validateMerchantConfig,
-} from "./merchant-config.mjs";
-import { readPolicyContent, validatePolicyContent } from "./policy-content.mjs";
+import { loadInstallationProfile } from "./installation-profile.mjs";
 
 const source = { ...process.env };
 for (const file of [".env", "backend/.env", "frontend/.env"]) {
@@ -18,12 +14,8 @@ for (const file of [".env", "backend/.env", "frontend/.env"]) {
 const result = diagnoseConfiguration(source);
 let merchantErrors;
 try {
-  const merchant = readMerchantConfig("config/merchant.config.json");
-  merchantErrors = validateMerchantConfig(merchant, { checkAssets: true });
-  if (!merchantErrors.length)
-    merchantErrors.push(
-      ...validatePolicyContent(readPolicyContent(merchant), merchant),
-    );
+  loadInstallationProfile(source);
+  merchantErrors = [];
 } catch {
   merchantErrors = ["Merchant or policy document is unreadable."];
 }

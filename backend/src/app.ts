@@ -9,11 +9,13 @@ import designRoutes from './routes/design.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import commerceRoutes from './routes/commerce.routes.js';
 import storefrontRoutes from './routes/storefront.routes.js';
+import collectionPublicRoutes from './routes/collection-public.routes.js';
 import { createOwnerRouter } from './routes/owner.routes.js';
 import { getCatalogHealth } from './controllers/catalog.controller.js';
 import { postStripeWebhook } from './controllers/commerce.controller.js';
 import { postPrintfulWebhook } from './controllers/printful-webhook.controller.js';
 import { redactRequestUrl } from './utils/operational-logger.js';
+import { requestStoreSettings } from './admin/request-settings.js';
 
 morgan.token('safe-url', (req) => {
   const url = (req as typeof req & { originalUrl?: string }).originalUrl || req.url || '';
@@ -58,9 +60,11 @@ export function createApp() {
 
   app.get('/', getCatalogHealth);
   app.get('/api/health', getCatalogHealth);
+  app.use(/^\/api\/design\/(?:sessions|drafts)(?:\/|$)/, requestStoreSettings);
   app.use('/api/catalog', catalogRoutes);
   app.use('/api/design', designRoutes);
   app.use('/api/storefronts', storefrontRoutes);
+  app.use('/api/collections', collectionPublicRoutes);
   app.use('/api/owner', createOwnerRouter());
   app.use('/api', commerceRoutes);
   app.use('/api/admin', adminRoutes);

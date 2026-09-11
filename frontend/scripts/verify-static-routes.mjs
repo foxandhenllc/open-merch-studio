@@ -85,6 +85,11 @@ assert.doesNotMatch(robots, /^Disallow:\s*\/$/m);
 assert.ok(robots.includes(`Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`));
 
 const sitemap = await readFile(path.join(distDirectory, 'sitemap.xml'), 'utf8');
+const adminHtml = await readFile(path.join(distDirectory, 'admin/index.html'), 'utf8');
+assert.match(adminHtml, /name="robots" content="noindex,nofollow,noarchive"/);
+assert.doesNotMatch(adminHtml, /rel="canonical"/);
+assert.doesNotMatch(sitemap, /\/admin/);
+assert.match(robots, /^Disallow: \/admin$/m);
 const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
 assert.deepEqual(
   sitemapUrls,

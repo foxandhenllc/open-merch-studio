@@ -1,3 +1,5 @@
+import { activeImageModel } from '../admin/store-settings.js';
+import { imageRequestEstimate } from '../admin/image-models.js';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
@@ -62,17 +64,21 @@ const blockedTerms = ['nike', 'disney', 'marvel', 'pokemon', 'supreme'];
 const estimatedBackgroundRemovalCostCents = () =>
   canUseLiveOpenAi() &&
   Boolean(env.removeBgApiKey) &&
-  !supportsTransparentBackground(env.openaiDesignModel)
+  !supportsTransparentBackground(activeImageModel())
     ? Math.max(0, env.removeBgEstimatedCostCents)
     : 0;
 
 const estimatedGenerationCostCents = (qualityTier: 'rough' | 'final') =>
   canUseLiveOpenAi()
-    ? (qualityTier === 'final' ? 36 : 6) + estimatedBackgroundRemovalCostCents()
+    ? imageRequestEstimate(activeImageModel(), qualityTier) + estimatedBackgroundRemovalCostCents()
     : 1;
 
 const estimatedRevisionCostCents = () =>
-  canUseLiveOpenAi() ? 12 + estimatedBackgroundRemovalCostCents() : 1;
+  canUseLiveOpenAi()
+    ? (/^gpt-image-2\.5-/.test(activeImageModel())
+        ? imageRequestEstimate(activeImageModel(), 'rough', true)
+        : 12) + estimatedBackgroundRemovalCostCents()
+    : 1;
 
 export function evaluatePolicy(prompt: string): DesignDraft['policy'] {
   const lowered = prompt.toLowerCase();
@@ -503,7 +509,7 @@ export async function createDesignDraft(
         }
       : await prepareArtworkForPrint({
           imageUrl: generated.imageUrl,
-          model: env.openaiDesignModel,
+          model: activeImageModel(),
         });
   const baseReadiness = buildReadiness(context.placementCodes ?? []);
   const preparationReady = ['transparent', 'removed'].includes(printPreparation.status);

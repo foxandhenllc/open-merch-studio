@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { chromium } from 'playwright';
+import { loadInstallationProfile } from '../../scripts/installation-profile.mjs';
 
-const merchant = JSON.parse(readFileSync('config/merchant.config.json', 'utf8'));
-const policy = JSON.parse(readFileSync(resolve('config', merchant.policies.contentFile), 'utf8'));
+const { config: merchant, policy } = loadInstallationProfile();
 const reservation = createServer();
 await new Promise((done) => reservation.listen(0, '127.0.0.1', done));
 const port = reservation.address().port;
@@ -118,6 +118,14 @@ try {
     }
     await page.goto(origin);
     await page.getByRole('heading', { name: 'Choose a product' }).waitFor();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.style.getPropertyValue('--accent')),
+      merchant.brand.colors.accent
+    );
+    assert.equal(
+      await page.evaluate(() => document.documentElement.style.getPropertyValue('--paper')),
+      merchant.brand.colors.background
+    );
     assert.match(await page.locator('body').innerText(), new RegExp(merchant.brand.displayName));
     await page
       .getByRole('button', { name: /Heavyweight Cotton Tee/ })
