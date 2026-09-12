@@ -19,7 +19,7 @@ test(
     const keyPrefix = 'installation-artwork-v1:';
     const draftKey = 'installation-collection-drafts-v1';
     const publicationKey = 'installation-collection-publications-v1';
-    const imports = `import assert from 'node:assert/strict'; import { randomUUID } from 'node:crypto'; import { service, original, storageWrites } from './backend/src/tests/fixtures/collection-artwork-storage.ts'; import { readCollectionDrafts, saveCollectionDrafts } from './backend/src/admin/collection-drafts.service.ts'; import { prisma } from './backend/src/config/database.ts'; import { collectionArtwork } from './backend/src/admin/collection-artwork.service.ts'; import { prepareCollectionReview, publishCollection, withdrawCollection, publicCollections, publicationStatus, publicCollectionArtwork } from './backend/src/admin/collection-publications.service.ts'; import { collectionSalesReadiness } from './backend/src/admin/collection-sales-readiness.ts'; import { getCollectionPrintLayouts, saveCollectionPrintLayouts, exportCollectionPrintLayout } from './backend/src/admin/collection-print-layouts.ts'; collectionArtwork.binary = service.binary;`;
+    const imports = `import assert from 'node:assert/strict'; import { randomUUID } from 'node:crypto'; import { service, original, storageWrites } from './backend/src/tests/fixtures/collection-artwork-storage.ts'; import { readCollectionDrafts, saveCollectionDrafts } from './backend/src/admin/collection-drafts.service.ts'; import { prisma } from './backend/src/config/database.ts'; import { collectionArtwork } from './backend/src/admin/collection-artwork.service.ts'; import { prepareCollectionReview, publishCollection, withdrawCollection, publicCollections, publicationStatus, publicCollectionArtwork } from './backend/src/admin/collection-publications.service.ts'; import { collectionSalesReadiness } from './backend/src/admin/collection-sales-readiness.ts'; import { getCollectionPrintLayouts, saveCollectionPrintLayouts, exportCollectionPrintLayout } from './backend/src/admin/collection-print-layouts.ts'; import { prepareCollectionPurchase } from './backend/src/admin/collection-purchase-preparation.ts'; collectionArtwork.binary = service.binary;`;
     const run = (code: string, extra: Record<string, string> = {}) =>
       spawnSync(
         process.execPath,
@@ -87,6 +87,12 @@ test(
       success(
         run(
           `const c = (await publicCollections())[0]; const layouts = await getCollectionPrintLayouts(c.id, c.version); assert.equal(layouts.revision, 1); const area = layouts.areas[0]; assert.ok((await exportCollectionPrintLayout(c.id, c.version, 1, area.itemId, area.placementCode, true)).length); await prisma.$disconnect();`
+        )
+      );
+      // A new process prepares the published price and exact file from restored private storage.
+      success(
+        run(
+          `const c = (await publicCollections())[0]; const layouts = await getCollectionPrintLayouts(c.id, c.version); const prepared = await prepareCollectionPurchase({ collectionId: c.id, version: c.version, layoutRevision: layouts.revision, items: [{ itemId: layouts.areas[0].itemId, quantity: 2 }] }); assert.equal(prepared.merchandiseSubtotalCents, 6000); assert.equal(prepared.lines[0].unitPriceCents, 3000); assert.equal(prepared.files.length, 1); assert.ok(prepared.files[0].bytes.length); assert.match(prepared.files[0].sha256, /^[a-f0-9]{64}$/); assert.equal(prepared.orderingAvailable, false); assert.equal((await collectionSalesReadiness(c.id, c.version)).checks.find(check => check.id === 'layouts').status, 'pass'); await prisma.$disconnect();`
         )
       );
       const denied = run(

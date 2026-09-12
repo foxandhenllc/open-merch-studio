@@ -75,6 +75,7 @@ export async function verifyCollectionPublication({ page, context, origin, viewp
     .getByText('Published artwork and product choices · Checked', { exact: true })
     .waitFor();
   await panel.getByText('Owner product prices · Checked', { exact: true }).waitFor();
+  await panel.getByText('Saved print layouts · Owner action', { exact: true }).waitFor();
   await panel.getByText('Collection checkout · In development', { exact: true }).waitFor();
   if (output)
     await panel

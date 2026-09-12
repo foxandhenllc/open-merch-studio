@@ -68,7 +68,7 @@ export async function reviewCollectionSnapshot(
       400,
       'invalid_print_widths'
     );
-  const catalog = await listCollectionCatalog(tx);
+  const catalog = structuredClone(await listCollectionCatalog(tx));
   const issues: string[] = [];
   const areas: CollectionReview['areas'] = [];
   const products: CollectionReview['products'] = [];
@@ -187,5 +187,5 @@ export async function reviewCollectionSnapshot(
     products,
     areas,
   };
-  return { collection, review };
+  return { collection, review, catalog };
 }

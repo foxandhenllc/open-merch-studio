@@ -1,4 +1,5 @@
 import type { CollectionSalesReadiness } from '@open-merch-studio/collection-drafts';
+import { collectionLayoutIssues } from './collection-print-layout-checks.js';
 import { HttpError } from '../middleware.js';
 import { withCollectionLock } from './collection-lock.js';
 import { readPublications } from './collection-publications.repository.js';
@@ -51,6 +52,7 @@ export function collectionSalesReadiness(
           Number.isSafeInteger(item.targetPriceCents) && Number(item.targetPriceCents) > 0,
       }));
       const priced = products.length > 0 && products.every((product) => product.priceSpecified);
+      const layoutIssues = collectionLayoutIssues(entry);
       return {
         collectionId: id,
         version: entry.version,
@@ -75,6 +77,16 @@ export function collectionSalesReadiness(
             message: priced
               ? 'Every published product has an owner-specified price. Shipping and tax are separate.'
               : 'Set a positive target price for each listed product in its draft, then review and republish.',
+          },
+          {
+            id: 'layouts',
+            label: 'Saved print layouts',
+            status: sourcesMatch && !layoutIssues.length ? 'pass' : 'action_required',
+            message: !sourcesMatch
+              ? 'Review and republish the changed artwork or catalog before using saved layouts.'
+              : layoutIssues.length
+                ? layoutIssues.join(' ')
+                : 'Every published print area has a confirmed layout that fits its saved template. Inspect the exported files before production; source bytes are verified when rendering.',
           },
           {
             id: 'production',

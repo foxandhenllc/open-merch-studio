@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type {
   CollectionPrintLayout,
@@ -12,10 +11,8 @@ import {
   type Publication,
 } from './collection-publications.repository.js';
 import { publicationOperation } from './collection-publications.service.js';
-import { reviewCollectionSnapshot } from './collection-review.js';
-import { collectionArtwork } from './collection-artwork.service.js';
-import { readArtworkRecord } from './collection-artwork.repository.js';
-import { layoutPixels, renderCollectionPrint } from './collection-print-render.js';
+import { layoutPixels } from './collection-print-render.js';
+import { assertPublicationCurrent, renderVerifiedPrint } from './collection-print-source.js';
 
 async function selected(id: string, version: unknown, tx?: Prisma.TransactionClient) {
   const state = await readPublications(tx);
@@ -29,25 +26,6 @@ async function selected(id: string, version: unknown, tx?: Prisma.TransactionCli
       'publication_conflict'
     );
   return { state, entry };
-}
-async function current(entry: Publication, tx?: Prisma.TransactionClient) {
-  const widths = entry.review.areas.map(({ itemId, placementCode, widthInches }) => ({
-    itemId,
-    placementCode,
-    widthInches,
-  }));
-  const { review } = await reviewCollectionSnapshot(
-    entry.collection,
-    entry.draftRevision,
-    widths,
-    tx
-  );
-  if (!review.ready || review.digest !== entry.review.digest)
-    throw new HttpError(
-      'The approved artwork or catalog changed. Review and republish before preparing print layouts.',
-      409,
-      'collection_review_stale'
-    );
 }
 const snapshot = (entry: Publication): CollectionPrintLayouts => ({
   version: entry.version,
@@ -112,7 +90,7 @@ export const saveCollectionPrintLayouts = (
           throw new HttpError('Select a published print area.', 400, 'invalid_print_layout');
         layoutPixels(layout, area);
       }
-      await current(entry, tx);
+      await assertPublicationCurrent(entry, tx);
       entry.printLayouts = {
         revision: (entry.printLayouts?.revision ?? 0) + 1,
         layouts,
@@ -144,7 +122,7 @@ export const exportCollectionPrintLayout = (
           409,
           'print_layout_conflict'
         );
-      await current(entry, tx);
+      await assertPublicationCurrent(entry, tx);
       const layout = entry.printLayouts.layouts.find(
         (layout) => layout.itemId === itemId && layout.placementCode === code
       );
@@ -153,19 +131,8 @@ export const exportCollectionPrintLayout = (
       );
       if (!layout || !area)
         throw new HttpError('Save a layout for this area first.', 404, 'print_layout_missing');
-      const asset = await readArtworkRecord(area.assetId, tx);
-      const original = (await collectionArtwork.binary(area.assetId, 'original')).buffer;
-      if (
-        !asset?.checksum ||
-        createHash('sha256').update(original).digest('hex') !== asset.checksum
-      )
-        throw new HttpError(
-          'The original file could not be verified. Restore its matching bytes before exporting.',
-          409,
-          'print_original_mismatch'
-        );
-      const rendered = await renderCollectionPrint(original, layout, area, preview);
-      await current(entry, tx);
+      const { bytes: rendered } = await renderVerifiedPrint(layout, area, preview, tx);
+      await assertPublicationCurrent(entry, tx);
       return rendered;
     })
   );

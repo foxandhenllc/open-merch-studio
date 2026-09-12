@@ -69,3 +69,11 @@ or deployment. Node 22.12.0 / npm 10.9.2 were used. No live provider calls or pu
 
 Production placement, immutable purchased artwork, owner-price enforcement in quotes, and collection
 checkout remain unfinished. This check identifies those requirements; it does not implement them.
+
+## September 12 update
+
+Readiness now includes **Saved print layouts**: every area must have exactly one confirmed layout
+whose geometry fits. Missing or invalid areas are named for the owner. A changed source/catalog
+review prevents a passing layout result. This check reads metadata only; original-byte verification
+happens when rendering. See [purchase preparation](./collection-purchase-preparation.md) for the
+server-only owner-price and print-file preparation contract. Ordering remains unavailable.
