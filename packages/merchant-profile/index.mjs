@@ -73,7 +73,18 @@ const luminance = (hex) =>
 const contrast = (a, b) =>
   (Math.max(luminance(a), luminance(b)) + 0.05) /
   (Math.min(luminance(a), luminance(b)) + 0.05);
-export const profileDigest = (value) => policyDigest(value);
+// PostgreSQL JSONB may reorder object keys. Arrays and every text character remain significant.
+const stable = (value) =>
+  Array.isArray(value)
+    ? value.map(stable)
+    : object(value)
+      ? Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map((key) => [key, stable(value[key])]),
+        )
+      : value;
+export const profileDigest = (value) => policyDigest(stable(value));
 
 export function profileDraft(config, policy) {
   return {
@@ -205,7 +216,7 @@ export function validateProfileDraft(input, baseConfig) {
 
 export function needsPolicyReview(draft, activeConfig, activePolicy) {
   const candidate = compose(draft, activeConfig, activePolicy.purpose).policy;
-  return policyDigest(candidate) !== policyDigest(activePolicy);
+  return profileDigest(candidate) !== profileDigest(activePolicy);
 }
 
 export function prepareProfilePublication(

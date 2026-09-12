@@ -1,3 +1,4 @@
+import { privateUploadPrintUrl } from './private-upload-print.js';
 import { reconcileImageUsage } from './image-usage-reconciliation.js';
 import { activeImageModel } from '../admin/store-settings.js';
 import { imageRequestEstimate } from '../admin/image-models.js';
@@ -172,7 +173,7 @@ function buildReadiness(placementCodes: string[]): DesignDraft['readiness'] {
 async function getArtworkForProvider(designAssetId?: string): Promise<DesignArtwork | null> {
   if (!designAssetId) return null;
   const draft = getDraft(designAssetId);
-  if (draft?.id && draft.imageUrl) {
+  if (draft?.id && draft.imageUrl && !(env.databaseUrl && draft.sourceType === 'uploaded')) {
     const imageUrl = resolveDesignAssetProviderUrl({
       assetId: draft.id,
       storedUrl: draft.imageUrl,
@@ -189,7 +190,8 @@ async function getArtworkForProvider(designAssetId?: string): Promise<DesignArtw
 
   if (!env.databaseUrl) return null;
   const asset = await prisma.designAsset.findUnique({ where: { id: designAssetId } });
-  const storedUrl = asset?.transparentUrl ?? asset?.imageUrl;
+  const storedUrl =
+    asset && ((await privateUploadPrintUrl(asset)) ?? asset.transparentUrl ?? asset.imageUrl);
   if (!asset || !storedUrl) return null;
   const imageUrl = resolveDesignAssetProviderUrl({
     assetId: asset.id,
@@ -727,7 +729,9 @@ export async function getDesignDraftById(
   sessionId?: string
 ): Promise<DesignDraft | null> {
   const runtimeDraft = getDraft(draftId);
-  if (runtimeDraft) {
+  if (runtimeDraft?.sessionId && sessionId && runtimeDraft.sessionId !== sessionId) return null;
+  if (runtimeDraft?.sourceType === 'uploaded' && !sessionId) return null;
+  if (runtimeDraft && !(env.databaseUrl && runtimeDraft.sourceType === 'uploaded')) {
     const allowance = sessionId
       ? getAllowanceState((await getOrCreateDurableSession(sessionId)).id)
       : runtimeDraft.allowance;
@@ -738,6 +742,8 @@ export async function getDesignDraftById(
   try {
     const asset = await prisma.designAsset.findUnique({ where: { id: draftId } });
     if (!asset || asset.generationStatus !== 'complete') return null;
+    if (asset.sourceType === 'uploaded' && (!sessionId || asset.studioSessionId !== sessionId))
+      return null;
     if (asset.studioSessionId && sessionId && asset.studioSessionId !== sessionId) return null;
     const displayImageUrl = asset.imageUrl
       ? asset.imageUrl.startsWith('data:')

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   profileDraft,
+  profileDigest,
   prepareProfilePublication,
   parsePublishedProfile,
   validateProfileDraft,
@@ -165,4 +166,31 @@ test("prepared brand assets round trip through the build and legacy drafts gain 
       /HTTPS store address/,
     );
   }
+});
+
+test("profile review survives JSONB object ordering while preserving text and section order", () => {
+  const draft = profileDraft(base, policy);
+  const reverse = (value) =>
+    Array.isArray(value)
+      ? value.map(reverse)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value)
+              .reverse()
+              .map(([key, child]) => [key, reverse(child)]),
+          )
+        : value;
+  assert.equal(profileDigest(reverse(draft)), profileDigest(draft));
+  assert.doesNotThrow(() =>
+    prepareProfilePublication(reverse(draft), base, policy, false),
+  );
+  const changed = structuredClone(draft);
+  changed.fields["brand.displayName"] += " changed";
+  assert.notEqual(profileDigest(changed), profileDigest(draft));
+  const reordered = structuredClone(draft);
+  const page = Object.values(reordered.pages).find(
+    (page) => page.sections.length > 1,
+  );
+  page.sections.reverse();
+  assert.notEqual(profileDigest(reordered), profileDigest(draft));
 });

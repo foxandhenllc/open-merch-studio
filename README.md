@@ -16,6 +16,8 @@ product previews, checkout, and reviewed Printful fulfillment.
 - **Explore the software:** run the [local fixture demo](#local-setup) without provider accounts.
   It simulates artwork and commerce without provider charges. The public reference storefront is
   a separate, deployed merchant experience.
+- **Test the owner experience:** use the [persistent owner rehearsal](./docs/launch/owner-acceptance-walkthrough.md)
+  for branding, collections, simulated orders and an isolated backup restore.
 - **Run your own installation:** follow [deployment setup](./DEPLOYMENT.md), then use `/admin` for
   branding, policy drafts, image-model selection, AI budgets, and supported provider credentials.
 - **Build with Fox & Hen:** [discuss a store build and launch](https://foxandhenllc.com/merch),
@@ -92,7 +94,7 @@ next deployment. Changed merchant identity or policy text requires the owner's e
 and a new policy version. See the [profile publication contract](./docs/architecture/admin-merchant-profile.md).
 
 **Collections** lets the installation owner save private collection drafts with names, descriptions,
-product/variant/print-area choices, planned artwork options, and target prices. Event, creator-drop,
+product/variant/print-area choices, enforced customer artwork options, and target prices. Event, creator-drop,
 community-feature, and everyday-collection guidance can be selected without code changes. Owners
 can upload original artwork, attach a different file to each print area, and reuse private library
 files. Preparation preserves the original and uses no AI or background removal. Owners can review
@@ -104,7 +106,8 @@ dimensions and offsets, save each print area, preview a transparent canvas, and 
 300-PPI PNG while keeping the original intact. See the
 [print-layout contract](./docs/architecture/collection-print-layouts.md) for limits and review requirements.
 **Enable collection ordering** separately approves the published prices and completed layouts.
-Customers can select quantities, review an estimate, accept policies, and check out under the
+Customers can select quantities, supply the owner-allowed artwork, review exact saved print previews,
+accept policies, and check out under the
 installation's commerce settings. Durable quotes keep private verified print copies and checkout
 retries reuse one order. Physical sample and live lifecycle evidence remain V1 gates. See the
 [collection draft contract](./docs/architecture/admin-collection-drafts.md),
@@ -113,7 +116,7 @@ retries reuse one order. Physical sample and live lifecycle evidence remain V1 g
 [review and publication contract](./docs/architecture/admin-collection-publication.md).
 
 **Orders & review** gives the owner a private order list, exact saved-print downloads, review notes,
-and explicitly confirmed draft retries when eligible. Review notes do not change payment or
+complete-history search and filters, and explicitly confirmed draft retries when eligible. Review notes do not change payment or
 production status. Its maintenance control can clear expired, unattached print preparations while
 retaining every order-linked copy. Read the [collection owner runbook](./docs/launch/collection-owner-runbook.md).
 

@@ -1,3 +1,4 @@
+import { isPrivateUploadPrint } from './private-upload-print.js';
 import type { Prisma } from '@prisma/client';
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
@@ -34,6 +35,8 @@ const persistedDesignState = (asset: {
   purpose: string;
   transparentUrl: string | null;
   imageUrl: string | null;
+  sourceType: string;
+  printStoragePath: string | null;
   generationStatus: string;
   policyStatus: string;
   readinessStatus: string;
@@ -42,6 +45,7 @@ const persistedDesignState = (asset: {
   id: asset.id,
   purpose: asset.purpose,
   imageUrl: asset.transparentUrl ?? asset.imageUrl,
+  privatePrintAvailable: isPrivateUploadPrint(asset),
   generationStatus: asset.generationStatus,
   policyStatus: asset.policyStatus,
   readinessStatus: asset.readinessStatus,
@@ -61,6 +65,8 @@ async function assertReusableArtwork(quote: QuoteBreakdown): Promise<void> {
             purpose: true,
             transparentUrl: true,
             imageUrl: true,
+            sourceType: true,
+            printStoragePath: true,
             generationStatus: true,
             policyStatus: true,
             readinessStatus: true,

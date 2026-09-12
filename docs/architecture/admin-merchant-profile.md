@@ -100,3 +100,12 @@ provide interaction feedback without decorative motion.
 
 Prepared image privacy, retention, validation, and legacy-draft compatibility are documented in
 [owner-brand-assets.md](owner-brand-assets.md).
+
+## Durable review identity
+
+Profile review digests sort object keys recursively while preserving array order and every text
+character. PostgreSQL JSONB key ordering cannot invalidate the digest returned by a successful save.
+Policy approval pins retain their existing encoding; review comparison ignores object ordering only.
+The database contract saves and publishes the returned digest through separate transactions and
+checks rollback on a failed audit. An older draft with a stale base digest must be reviewed and saved
+again; its content is retained.

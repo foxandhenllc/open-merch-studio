@@ -74,7 +74,7 @@ for (const route of STATIC_ROUTES) {
 }
 
 const notFoundHtml = await readFile(path.join(distDirectory, NOT_FOUND_ROUTE.output), 'utf8');
-assert.ok(notFoundHtml.includes(`<title>${NOT_FOUND_ROUTE.title}</title>`));
+assert.ok(notFoundHtml.includes(`<title>${escapeHtml(NOT_FOUND_ROUTE.title)}</title>`));
 assert.doesNotMatch(notFoundHtml, /rel="canonical"/i);
 assert.doesNotMatch(notFoundHtml, /property="og:url"/i);
 assert.match(notFoundHtml, /<meta\s+name="robots"\s+content="[^"]*noindex[^"]*"\s*\/>/i);
@@ -101,11 +101,18 @@ const manifest = JSON.parse(
 );
 assert.deepEqual(manifest, WEB_MANIFEST, 'installed app identity must match the selected merchant');
 assert.ok(
-  manifest.icons?.some((icon) => icon.src === ICON_PATH && icon.type === 'image/svg+xml'),
+  manifest.icons?.some(
+    (icon) =>
+      icon.src === ICON_PATH &&
+      icon.type === (ICON_PATH.endsWith('.png') ? 'image/png' : 'image/svg+xml')
+  ),
   'the web app manifest must expose the OMS icon'
 );
-await access(path.join(distDirectory, ICON_PATH.replace(/^\//, '')));
-await access(path.join(distDirectory, DEFAULT_SOCIAL_IMAGE.replace(/^\//, '')));
+// Managed brand copies are served by the backend after reviewed profile activation.
+for (const assetPath of [ICON_PATH, DEFAULT_SOCIAL_IMAGE]) {
+  if (/^\/api\/brand-assets\/[a-f0-9]{64}\.png$/.test(assetPath)) continue;
+  await access(path.join(distDirectory, assetPath.replace(/^\//, '')));
+}
 
 const vercelConfig = JSON.parse(
   await readFile(path.join(repositoryDirectory, 'vercel.json'), 'utf8')

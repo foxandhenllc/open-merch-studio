@@ -78,21 +78,6 @@ export async function uploadPrivateAsset(params: {
   if (error) throw error;
 }
 
-export async function uploadPublicPrintAsset(params: {
-  path: string;
-  buffer: Buffer;
-  contentType?: string;
-}): Promise<string> {
-  const bucket = storageClient().storage.from(env.supabaseStorageBucket);
-  const { error } = await bucket.upload(params.path, params.buffer, {
-    contentType: params.contentType ?? 'image/png',
-    cacheControl: '31536000',
-    upsert: false,
-  });
-  if (error) throw error;
-  return bucket.getPublicUrl(params.path).data.publicUrl;
-}
-
 export async function createPrivatePreviewUrl(path: string): Promise<string> {
   const { data, error } = await storageClient()
     .storage.from(env.supabaseUploadBucket)
@@ -105,7 +90,7 @@ export async function removeStoredAssets(params: {
   privatePaths?: string[];
   publicPaths?: string[];
 }): Promise<void> {
-  const removals: Promise<unknown>[] = [];
+  const removals: PromiseLike<{ error: unknown }>[] = [];
   if (params.privatePaths?.length) {
     removals.push(
       storageClient().storage.from(env.supabaseUploadBucket).remove(params.privatePaths)
@@ -116,5 +101,7 @@ export async function removeStoredAssets(params: {
       storageClient().storage.from(env.supabaseStorageBucket).remove(params.publicPaths)
     );
   }
-  await Promise.all(removals);
+  const results = await Promise.all(removals);
+  if (results.some((result) => result.error))
+    throw new Error('Private artwork cleanup could not be confirmed.');
 }

@@ -6,6 +6,7 @@ export type CheckoutDesignState = {
   id: string;
   purpose?: string;
   imageUrl?: string | null;
+  privatePrintAvailable?: boolean;
   generationStatus: string;
   policyStatus: string;
   readinessStatus: string;
@@ -19,7 +20,8 @@ export function checkoutDesignIssue(design: CheckoutDesignState | undefined): st
   if (design.purpose === 'reference') {
     return 'Reference images must be turned into print artwork first.';
   }
-  if (!design.imageUrl) return 'Selected artwork is missing a generated or uploaded image.';
+  if (!design.imageUrl && !design.privatePrintAvailable)
+    return 'Selected artwork is missing a generated or uploaded image.';
   if (design.generationStatus !== 'complete') {
     return 'Selected artwork has not completed generation successfully.';
   }

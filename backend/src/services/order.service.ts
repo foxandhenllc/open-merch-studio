@@ -1,3 +1,4 @@
+import { isPrivateUploadPrint } from './private-upload-print.js';
 import { collectionOrderId, withCollectionCheckoutLock } from '../collections/checkout-lock.js';
 import { collectionPurchases } from '../collections/purchase.service.js';
 import { env } from '../config/env.js';
@@ -128,6 +129,7 @@ async function loadDesignForCheckout(
       id: asset.id,
       purpose: asset.purpose,
       imageUrl: asset.transparentUrl ?? asset.imageUrl,
+      privatePrintAvailable: isPrivateUploadPrint(asset),
       generationStatus: asset.generationStatus,
       policyStatus: asset.policyStatus,
       readinessStatus: asset.readinessStatus,
@@ -188,6 +190,7 @@ async function verifyDurableCheckoutState(
         (asset) =>
           !asset.transparentUrl &&
           !asset.imageUrl &&
+          !isPrivateUploadPrint(asset) &&
           !(quote.collection && asset.sourceType === 'collection' && asset.printStoragePath)
       )
     ) {

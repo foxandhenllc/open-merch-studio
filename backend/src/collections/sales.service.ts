@@ -1,3 +1,4 @@
+import { ownerRehearsalEnabled } from '../config/owner-rehearsal.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
 import { withCollectionLock } from '../admin/collection-lock.js';
@@ -12,7 +13,10 @@ import { collectionLayoutIssues } from '../admin/collection-print-layout-checks.
 export const collectionSalesEnabled = (entry: Publication) =>
   Boolean(entry.sales && entry.sales.layoutRevision === entry.printLayouts?.revision);
 export function collectionCommerceMode(): 'fixture' | 'live' | 'paused' {
-  if (!env.databaseUrl && env.nodeEnv !== 'production' && !env.enableLiveStripe)
+  if (
+    ownerRehearsalEnabled() ||
+    (!env.databaseUrl && env.nodeEnv !== 'production' && !env.enableLiveStripe)
+  )
     return env.checkoutEnabled ? 'fixture' : 'paused';
   return env.databaseUrl &&
     env.enableLiveStripe &&

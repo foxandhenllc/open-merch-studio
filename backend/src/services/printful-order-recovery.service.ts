@@ -1,3 +1,4 @@
+import { isPrivateUploadPrint, privateUploadPrintUrl } from './private-upload-print.js';
 import { collectionPurchases } from '../collections/purchase.service.js';
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
@@ -35,20 +36,32 @@ export async function resolvePrintfulArtworkUrls(
     try {
       const assets = await prisma.designAsset.findMany({
         where: { id: { in: assetIds } },
-        select: { id: true, transparentUrl: true, imageUrl: true },
+        select: {
+          id: true,
+          transparentUrl: true,
+          imageUrl: true,
+          sourceType: true,
+          printStoragePath: true,
+        },
       });
       const resolved = Object.fromEntries(
-        assets.flatMap((asset) => {
-          const storedUrl = asset.transparentUrl ?? asset.imageUrl;
-          const url = storedUrl
-            ? resolveDesignAssetProviderUrl({
-                assetId: asset.id,
-                storedUrl,
-                backendUrl: env.backendUrl,
-              })
-            : null;
-          return url ? [[asset.id, url]] : [];
-        })
+        (
+          await Promise.all(
+            assets.map(async (asset) => {
+              const storedUrl = asset.transparentUrl ?? asset.imageUrl;
+              const url = isPrivateUploadPrint(asset)
+                ? await privateUploadPrintUrl(asset)
+                : storedUrl
+                  ? resolveDesignAssetProviderUrl({
+                      assetId: asset.id,
+                      storedUrl,
+                      backendUrl: env.backendUrl,
+                    })
+                  : null;
+              return url ? [[asset.id, url]] : [];
+            })
+          )
+        ).flat()
       );
       return Object.keys(resolved).length === assetIds.length ? resolved : null;
     } catch {

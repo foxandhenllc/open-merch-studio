@@ -24,7 +24,12 @@ the later client-style example projects.
 
 ## What customers see
 
-Customers choose quantities from the approved collection, review the owner's prices plus estimated
+Customers choose quantities and supply artwork only through the published Customer artwork option.
+Fixed artwork stays fixed; upload preserves the original; generation/reference create a new design
+within the owner's product and print layout. Customers review every saved print preview before
+checkout. See the [personalization contract](../architecture/collection-personalization.md).
+
+Customers review the owner's prices plus estimated
 shipping, enter a receipt address, and accept the current policies before checkout. Tax is determined
 at secure checkout. Estimates expire after 30 minutes. Selection changes require a fresh estimate;
 retrying an unchanged request recovers the same quote. Their order page requires the access retained
@@ -65,7 +70,8 @@ that note and clears the review flag. It does not refund, ship, or approve produ
 When eligible, **Retry draft preparation** offers an explicit confirmation. Check the provider for
 an existing draft first. Refresh after an uncertain result rather than creating another order.
 Production is still confirmed in Printful. Fixture mode labels reviews as simulated and never offers
-provider retries; fixture notes reset when the backend restarts.
+provider retries; ordinary in-memory fixture notes reset when the backend restarts. The persistent owner lab uses a
+local database, so its simulated order notes survive a restart.
 
 ## Responsibility after handoff
 

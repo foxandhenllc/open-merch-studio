@@ -49,7 +49,21 @@ precedence. Choose Flare or Sunburst deliberately in each existing store and ver
 model, costs, and print-output behavior before removing the legacy configuration. No automatic paid
 test is part of switching the model. Existing artwork keeps its saved files.
 
-V1's remaining migration work is to remove legacy Image 2/background-removal controls and code only
-after durable settings and environment migration have a tested, actionable failure/recovery path.
+Legacy Image 2 settings now migrate to Flare with durable audit coverage. Image 2 and background-removal
+controls and calls are retired; no cleanup of historical original artwork is implied.
 Transparent output remains subject to actual pixel validation; imported artwork is never silently
 regenerated to make it transparent.
+
+## Owner acceptance recovery rehearsal
+
+`npm run owner:lab` creates an isolated PostgreSQL cluster and private filesystem storage, without
+copying application credentials. Its guide can pause the local store, capture a paired database/files
+backup, validate file hashes, and restore into a new database plus file copy on the same local origin.
+The previous copy remains intact. See the [owner walkthrough](../launch/owner-acceptance-walkthrough.md).
+This is a repeatable local rehearsal; validate your cloud provider's backup procedure separately.
+
+New general-workbench uploads keep normalized print copies in private storage and resolve fresh
+signed URLs when provider access is needed. No expiring signed link is persisted as the print's
+identity. Historical public derivatives are neither deleted nor reclassified by this change; plan any
+legacy cleanup separately after verifying order references. Cleanup failures preserve database
+metadata for retry. Collection print copies retain their existing checksum-based private contract.

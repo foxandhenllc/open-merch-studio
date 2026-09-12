@@ -27,7 +27,7 @@
     "start": "node \"$npm_execpath\" --workspace open-merch-studio-backend run start",
     "lint": "node \"$npm_execpath\" --workspace open-merch-studio-backend run lint && node \"$npm_execpath\" --workspace open-merch-studio-frontend run lint",
     "type-check": "node \"$npm_execpath\" --workspace open-merch-studio-backend run type-check && node \"$npm_execpath\" --workspace open-merch-studio-frontend run type-check",
-    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test && node --test scripts/doctor.test.mjs scripts/merchant-config.test.mjs scripts/merchant-profile.test.mjs scripts/policy-content.test.mjs && node --import tsx frontend/scripts/local-fixture-contract.mts && node --import tsx frontend/scripts/studio-selector-contract.mts",
+    "test": "node \"$npm_execpath\" --workspace open-merch-studio-backend run test && node --test scripts/doctor.test.mjs scripts/merchant-config.test.mjs scripts/merchant-profile.test.mjs scripts/policy-content.test.mjs scripts/owner-lab/storage.test.mjs && node --import tsx frontend/scripts/local-fixture-contract.mts && node --import tsx frontend/scripts/studio-selector-contract.mts",
     "doctor": "node scripts/doctor.mjs",
     "config:validate": "node scripts/validate-merchant-config.mjs",
     "config:generate": "node scripts/generate-merchant-config.mjs",
@@ -45,7 +45,8 @@
     "verify:static-routes": "node \"$npm_execpath\" --workspace open-merch-studio-frontend run verify:static-routes",
     "test:policy-browser": "node frontend/scripts/policy-profile-smoke.mjs",
     "test:admin-browser": "node frontend/scripts/admin-smoke.mjs",
-    "config:rehearse-admin": "node scripts/rehearse-admin-profile.mjs"
+    "config:rehearse-admin": "node scripts/rehearse-admin-profile.mjs",
+    "owner:lab": "node scripts/owner-lab/run.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

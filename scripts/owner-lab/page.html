@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Open Merch Studio · Owner rehearsal</title>
+    <style>
+      :root {
+        font: 16px/1.6 system-ui;
+        color: #20372e;
+        background: #f7f3e8;
+      }
+      body {
+        max-width: 1050px;
+        margin: auto;
+        padding: 30px 20px;
+      }
+      h1 {
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        line-height: 1.1;
+        max-width: 750px;
+      }
+      h2 {
+        line-height: 1.25;
+      }
+      a {
+        color: inherit;
+      }
+      nav {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 18px;
+      }
+      article,
+      section {
+        border: 1px solid #c9d1c7;
+        border-radius: 12px;
+        padding: 22px;
+        margin: 22px 0;
+        background: #fffdf8;
+      }
+      button,
+      input {
+        font: inherit;
+        padding: 10px;
+        border: 1px solid #526d60;
+        border-radius: 6px;
+      }
+      button {
+        background: #294c3c;
+        color: white;
+        cursor: pointer;
+        margin: 5px 5px 5px 0;
+      }
+      input {
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      small {
+        display: block;
+      }
+      #status {
+        white-space: pre-wrap;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <p>OPEN MERCH STUDIO / LOCAL OWNER REHEARSAL</p>
+    <h1>Make the store yours. Then run a small merch drop.</h1>
+    <p>
+      This installation saves your changes in a local database and private
+      files. AI images, payments, provider connections and hosting are
+      simulated. It cannot charge a card, place a production order or send
+      email. Use sample customer details and artwork here.
+    </p>
+    <nav>
+      <a href="/admin/">Open store admin →</a
+      ><a href="/collections/">Visit collections →</a
+      ><a href="/">Open the workbench →</a>
+    </nav>
+    <section>
+      <h2>Start as a store owner</h2>
+      <ol>
+        <li>
+          Use the access code in
+          <code>artifacts/private/owner-lab/ACCESS.md</code> to open admin.
+        </li>
+        <li>
+          In Installation, choose a persona. Follow the tasks and save your
+          progress.
+        </li>
+        <li>
+          In Store profile, change the brand, contact details and policies.
+          Upload an example image, prepare a logo/share image, save and review,
+          then publish. Choose Connections → Redeploy with saved values. The lab
+          rebuilds locally; wait for it to return and refresh.
+        </li>
+        <li>
+          Create a collection, attach artwork, review products and prices,
+          publish, then review the print layouts and enable simulated ordering.
+        </li>
+        <li>
+          Visit the collection as a customer. Review the saved print, complete
+          simulated checkout, then inspect the order in admin.
+        </li>
+      </ol>
+      <p>
+        Connection forms accept only dummy values starting with
+        <code>lab-</code>. Do not enter real account keys. Production-hosting
+        wording inside admin describes the real deployment workflow; in this
+        rehearsal it only changes local files.
+      </p>
+    </section>
+    <div class="grid">
+      <article>
+        <h2>Creator / community</h2>
+        <p>
+          Build a limited community drop from a channel emblem. Allow a
+          generated variation on one product while keeping the product, price
+          and print area fixed.
+        </p>
+        <a href="/lab/samples/community.png" download
+          >Download community artwork</a
+        ><small
+          >Clip ingestion and Twitch/YouTube accounts belong in a later client
+          fork.</small
+        >
+      </article>
+      <article>
+        <h2>Independent artist</h2>
+        <p>
+          Upload finished art unchanged. Publish a small show collection and
+          link your artist website from the profile. Pause the collection after
+          the event.
+        </p>
+        <a href="/lab/samples/artist.png" download>Download example artwork</a
+        ><small
+          >Digital subscriptions and in-person production are outside this base
+          release.</small
+        >
+      </article>
+      <article>
+        <h2>Community coffee shop</h2>
+        <p>
+          Prepare a monthly feature from supplied artwork. Try customer upload
+          on one item, review the exact saved print and keep production under
+          owner review.
+        </p>
+        <a href="/lab/samples/coffee.png" download>Download coffee artwork</a
+        ><small
+          >Photo competitions, voting and roll-label production need scoped
+          extensions.</small
+        >
+      </article>
+      <article>
+        <h2>Specialty local business</h2>
+        <p>
+          Configure the store, offer a simple fixed-artwork collection and hand
+          operating tasks to the named owner. Try a backup restore after
+          completing an order.
+        </p>
+        <a href="/lab/samples/local.png" download>Download local artwork</a
+        ><small
+          >Fox & Hen: free 30-minute consultation; Launch, Signature and Managed
+          build options.</small
+        >
+      </article>
+    </div>
+    <section>
+      <h2>Resume and recover</h2>
+      <p>
+        A backup pauses this local store briefly and pairs the database with its
+        private files. Restore creates a separate copy and switches this lab to
+        it; the previous database and files remain intact. This proves local
+        recovery, not cloud disaster recovery.
+      </p>
+      <label
+        >Admin access code <input id="code" type="password" autocomplete="off"
+      /></label>
+      <p>
+        <button data-action="backup">Create backup</button
+        ><button data-action="restore">
+          Restore latest backup to a separate copy</button
+        ><button data-action="status">Refresh lab status</button>
+        <button data-action="rebuild">Retry local rebuild</button>
+      </p>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+    <script src="/lab/page.js"></script>
+  </body>
+</html>

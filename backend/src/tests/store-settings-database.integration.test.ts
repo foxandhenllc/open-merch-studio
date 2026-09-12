@@ -120,7 +120,7 @@ test(
     assert.equal(url.pathname, '/oms_store_admin_test');
     const db = new PrismaClient({ datasources: { db: { url: testUrl } }, log: [] });
     const key = 'merchant-profile-draft-v1';
-    const imports = `import { readMerchantProfile, saveMerchantProfile } from './backend/src/admin/merchant-profile.service.ts'; import { prisma } from './backend/src/config/database.ts';`;
+    const imports = `import { readMerchantProfile, saveMerchantProfile, publishMerchantProfile } from './backend/src/admin/merchant-profile.service.ts'; import { prisma } from './backend/src/config/database.ts';`;
     const run = (code: string) =>
       spawnSync(
         process.execPath,
@@ -142,7 +142,7 @@ test(
       await db.adminSetting.deleteMany({ where: { key } });
       await db.auditLog.deleteMany({ where: { target: key } });
       const write = run(
-        `const before = await readMerchantProfile(); before.draft.fields['brand.colors.accent'] = '#315542'; await saveMerchantProfile(before.draft, before.revision, before.activeDigest); await prisma.$disconnect();`
+        `const before = await readMerchantProfile(); before.draft.fields['brand.colors.accent'] = '#315542'; const saved = await saveMerchantProfile(before.draft, before.revision, before.activeDigest); const receipt = await publishMerchantProfile(saved.revision, saved.digest, false, { saveProfile: async () => ({ savedKeys: ['OMS_MERCHANT_PROFILE'], pending: true }) }); if (receipt.draftDigest !== saved.digest) process.exitCode = 1; await prisma.$disconnect();`
       );
       assert.equal(write.status, 0, write.stderr);
       const read = run(
@@ -161,7 +161,7 @@ test(
       assert.equal(rejected.status, 0, rejected.stderr);
       const row = await db.adminSetting.findUniqueOrThrow({ where: { key } });
       assert.equal((row.value as { revision: number }).revision, 1);
-      assert.equal(await db.auditLog.count({ where: { target: key } }), 1);
+      assert.equal(await db.auditLog.count({ where: { target: key } }), 2);
     } finally {
       await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS reject_test_profile_audit ON audit_logs');
       await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS reject_test_profile_audit()');

@@ -1,3 +1,4 @@
+import { isPrivateUploadPrint } from './private-upload-print.js';
 import {
   rememberFixtureOriginal,
   forgetFixtureOriginal,
@@ -12,12 +13,12 @@ import type { AssetUploadAuthorization, DesignDraft } from '../types/catalog.js'
 import { dataUrlToBuffer } from './openai-design-provider.js';
 import {
   assetStorageConfigured,
+  assertUploadBucketPrivate,
   createPrivatePreviewUrl,
   createPrivateUploadUrl,
   downloadPrivateAsset,
   removeStoredAssets,
   uploadPrivateAsset,
-  uploadPublicPrintAsset,
 } from './asset-storage.service.js';
 import {
   getAllowanceState,
@@ -73,6 +74,8 @@ export async function authorizeArtworkUpload(params: {
   purpose: 'print' | 'reference' | 'collection';
 }): Promise<AssetUploadAuthorization> {
   assertUploadMetadata(params);
+  if (params.sessionId && !/^[A-Za-z0-9_-]{1,100}$/.test(params.sessionId))
+    throw new HttpError('Invalid artwork session.', 400, 'invalid_session');
   const session = await getOrCreateDurableSession(params.sessionId);
   const assetId = randomUUID();
 
@@ -102,6 +105,7 @@ export async function authorizeArtworkUpload(params: {
     );
   }
 
+  await assertUploadBucketPrivate();
   const originalStoragePath = `${session.id}/${assetId}/original.${extensionForMime[params.contentType]}`;
   await prisma.designAsset.create({
     data: {
@@ -154,12 +158,19 @@ async function removeUploadRecords(assets: StoredUpload[]): Promise<number> {
   if (!assets.length) return 0;
   await removeStoredAssets({
     privatePaths: assets.flatMap((asset) =>
-      [asset.originalStoragePath, asset.previewStoragePath].filter((path): path is string =>
-        Boolean(path)
-      )
+      [
+        asset.originalStoragePath,
+        asset.previewStoragePath,
+        ...(isPrivateUploadPrint({ ...asset, sourceType: 'uploaded' })
+          ? [asset.printStoragePath]
+          : []),
+      ].filter((path): path is string => Boolean(path))
     ),
     publicPaths: assets.flatMap((asset) =>
-      [asset.printStoragePath].filter((path): path is string => Boolean(path))
+      (isPrivateUploadPrint({ ...asset, sourceType: 'uploaded' })
+        ? []
+        : [asset.printStoragePath]
+      ).filter((path): path is string => Boolean(path))
     ),
   });
   const assetIds = assets.map((asset) => asset.id);
@@ -338,6 +349,8 @@ export async function completeArtworkUpload(params: {
       'artwork_rights_required'
     );
   }
+  if (params.sessionId && !/^[A-Za-z0-9_-]{1,100}$/.test(params.sessionId))
+    throw new HttpError('Invalid artwork session.', 400, 'invalid_session');
   const session = await getOrCreateDurableSession(params.sessionId);
   const stored = assetStorageConfigured()
     ? await prisma.designAsset.findUnique({ where: { id: params.assetId } })
@@ -389,7 +402,8 @@ export async function completeArtworkUpload(params: {
     : 'A color-managed PNG was prepared and the original background was preserved.';
 
   const previewStoragePath = `${session.id}/${params.assetId}/preview.webp`;
-  const printStoragePath = purpose === 'print' ? `uploads/${params.assetId}/print.png` : null;
+  const printStoragePath =
+    purpose === 'print' ? `private-uploads/${params.assetId}/print.png` : null;
   let imageUrl = `data:image/webp;base64,${preview.toString('base64')}`;
   if (assetStorageConfigured()) {
     await uploadPrivateAsset({
@@ -399,7 +413,11 @@ export async function completeArtworkUpload(params: {
     });
     imageUrl = await createPrivatePreviewUrl(previewStoragePath);
     if (printStoragePath) {
-      imageUrl = await uploadPublicPrintAsset({ path: printStoragePath, buffer: printBuffer });
+      await uploadPrivateAsset({
+        path: printStoragePath,
+        buffer: printBuffer,
+        contentType: 'image/png',
+      });
     }
   }
 
@@ -452,8 +470,8 @@ export async function completeArtworkUpload(params: {
       await prisma.designAsset.update({
         where: { id: stored.id },
         data: {
-          imageUrl: printStoragePath ? imageUrl : null,
-          transparentUrl: printStoragePath && hasAlpha ? imageUrl : null,
+          imageUrl: null,
+          transparentUrl: null,
           previewStoragePath,
           printStoragePath,
           byteSize: original.byteLength,
@@ -471,8 +489,7 @@ export async function completeArtworkUpload(params: {
       });
     } catch (error) {
       await removeStoredAssets({
-        privatePaths: [previewStoragePath],
-        publicPaths: printStoragePath ? [printStoragePath] : [],
+        privatePaths: [previewStoragePath, ...(printStoragePath ? [printStoragePath] : [])],
       }).catch(() => undefined);
       throw error;
     }
