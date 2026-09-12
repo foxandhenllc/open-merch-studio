@@ -58,8 +58,8 @@ export async function validateQuoteForCheckout(
   for (const item of quote.items) {
     const product = products.find((candidate) => candidate.id === item.productId);
     const variant = product?.variants.find((candidate) => candidate.id === item.variantId);
-    if (!product) issues.push(`Product ${item.productId} is no longer sellable.`);
-    if (!variant) issues.push(`Variant ${item.variantId} is no longer available.`);
+    if (!product?.isSellable) issues.push(`Product ${item.productId} is no longer sellable.`);
+    if (!variant?.isAvailable) issues.push(`Variant ${item.variantId} is no longer available.`);
     if (requireProviderMetadata && !item.printfulVariantId) {
       issues.push(`Provider variant metadata is missing for ${item.title}.`);
     }

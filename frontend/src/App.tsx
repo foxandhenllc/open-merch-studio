@@ -15,6 +15,9 @@ const PublishedCollectionsPage = lazy(() =>
     default: module.PublishedCollectionsPage,
   }))
 );
+const CustomerOrderPage = lazy(() =>
+  import('./orders/CustomerOrderPage').then((module) => ({ default: module.CustomerOrderPage }))
+);
 function NotFoundPage() {
   return (
     <main className="policy-shell">
@@ -56,6 +59,13 @@ function NotFoundPage() {
 
 export default function App() {
   const currentPath = path();
+  const orderMatch = currentPath.match(/^\/order\/([A-Za-z0-9_-]{1,100})$/);
+  if (orderMatch)
+    return (
+      <Suspense fallback={<main aria-busy="true">Opening order…</main>}>
+        <CustomerOrderPage orderId={orderMatch[1]} />
+      </Suspense>
+    );
   const collectionMatch = currentPath.match(/^\/collections(?:\/([a-f0-9-]{36}))?$/);
   if (collectionMatch)
     return (

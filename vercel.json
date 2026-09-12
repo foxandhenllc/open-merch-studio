@@ -11,6 +11,19 @@
   },
   "headers": [
     {
+      "source": "/order/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
+    {
       "source": "/admin(.*)",
       "headers": [
         {
@@ -59,6 +72,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/order/:id",
+      "destination": "/index.html"
+    },
     {
       "source": "/collections/:path*",
       "destination": "/collections/index.html"

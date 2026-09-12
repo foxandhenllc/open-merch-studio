@@ -89,7 +89,7 @@ export async function verifyPrintLayouts({ page, panel, publication, viewport, o
   await region.getByRole('status').filter({ hasText: 'Print layout saved' }).waitFor();
   await check.click();
   await panel.getByText('Saved print layouts · Checked', { exact: true }).waitFor();
-  await panel.getByText('Collection checkout · In development', { exact: true }).waitFor();
+  await panel.getByText('Collection checkout · Owner action', { exact: true }).waitFor();
   if (output)
     await panel
       .locator('.collection-sales-readiness')

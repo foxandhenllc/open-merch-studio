@@ -73,6 +73,9 @@ globalThis.fetch = async (input, init) => {
   return Response.json({ envs: savedVariables });
 };
 const { createApp } = await import('../../backend/dist/app.js');
+const { sampleCatalog } = await import('../../backend/dist/services/catalog-fixtures.js');
+for (const product of sampleCatalog.products)
+  for (const [index, variant] of product.variants.entries()) variant.printfulVariantId = 12345 + index;
 const { setOperationalSink } = await import('../../backend/dist/utils/operational-logger.js');
 setOperationalSink(() => undefined);
 const api = createApp();
@@ -92,6 +95,7 @@ staticApp.use(express.static(dist));
 staticApp.get('/collections/:id', (_req, res) =>
   res.sendFile(path.join(dist, 'collections/index.html'))
 );
+staticApp.get('/order/:id', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 const server = createServer((req, res) =>
   req.url.startsWith('/api/') ? api(req, res) : staticApp(req, res)
 );

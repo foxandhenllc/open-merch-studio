@@ -60,8 +60,10 @@ export function CollectionSalesReadiness({
         <div role="status">
           <h4>Sales readiness · version {result.version}</h4>
           <p>
-            Ordering is not available yet. This check covers the published version, including any
-            prices saved there.
+            {result.orderingAvailable
+              ? 'Collection ordering is enabled under your store checkout settings.'
+              : 'Collection ordering is paused. Resolve the actions below before opening checkout.'}{' '}
+            This check covers the published version and its saved prices.
           </p>
           <ul>
             {result.checks.map((check) => (

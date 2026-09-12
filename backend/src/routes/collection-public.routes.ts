@@ -1,5 +1,7 @@
+import { collectionPurchases } from '../collections/purchase.service.js';
+import { collectionCommerceMode } from '../collections/sales.service.js';
 import { Router } from 'express';
-import { asyncHandler } from '../middleware.js';
+import { asyncHandler, HttpError } from '../middleware.js';
 import {
   publicCollections,
   publicCollection,
@@ -35,6 +37,32 @@ router.get(
     res.setHeader('Content-Type', file.contentType);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(file.buffer);
+  })
+);
+router.post(
+  '/:id/quotes',
+  asyncHandler(async (req, res) => {
+    const body = req.body;
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).sort().join() !== 'items,layoutRevision,requestId,sessionId,version'
+    )
+      throw new HttpError('Invalid collection quote request.', 400);
+    if (collectionCommerceMode() === 'paused')
+      throw new HttpError('Ordering is currently paused.', 403, 'checkout_paused');
+    const data = await collectionPurchases.create({
+      sessionId: body.sessionId,
+      requestId: body.requestId,
+      selection: {
+        collectionId: req.params.id,
+        version: body.version,
+        layoutRevision: body.layoutRevision,
+        items: body.items,
+      },
+    });
+    res.status(201).json({ success: true, data });
   })
 );
 export default router;

@@ -122,3 +122,101 @@
     font-size: 20px;
   }
 }
+
+.collection-purchase {
+  border-top: 1px solid var(--border, #d7dfda);
+  padding-top: 2rem;
+  margin-top: 2rem;
+  max-width: 46rem;
+}
+.collection-purchase fieldset {
+  border: 0;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+.collection-purchase legend {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.collection-purchase-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+.collection-purchase-line small {
+  display: block;
+  margin-top: 0.35rem;
+  color: #52625c;
+}
+.collection-purchase-line input {
+  width: 5rem;
+}
+.collection-purchase input {
+  padding: 0.75rem;
+  border: 1px solid #82958b;
+  background: white;
+  border-radius: 0.2rem;
+  font: inherit;
+  color: inherit;
+}
+.collection-purchase button {
+  background: var(--brand-primary, #214d3c);
+  color: white;
+  border: 0;
+  padding: 0.85rem 1.2rem;
+  font: inherit;
+  cursor: pointer;
+}
+.collection-purchase button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.collection-purchase :focus-visible {
+  outline: 3px solid #759681;
+  outline-offset: 3px;
+}
+.collection-fixture-notice {
+  padding: 0.8rem 0;
+  font-weight: 600;
+}
+.collection-order-summary {
+  margin-top: 1.5rem;
+}
+.collection-order-summary > p:not(.collection-purchase-note) {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.collection-order-summary > label {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.3rem 0;
+}
+.collection-order-summary .collection-purchase-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.collection-purchase-consent input {
+  padding: 0;
+  margin-top: 0.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  flex-shrink: 0;
+}
+.collection-purchase-note {
+  line-height: 1.6;
+  color: #52625c;
+}
+@media (max-width: 600px) {
+  .collection-purchase button {
+    width: 100%;
+  }
+  .collection-order-summary > label > input:not([type="checkbox"]) {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

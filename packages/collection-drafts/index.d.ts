@@ -30,6 +30,8 @@ export type CollectionReview = {
   >;
 };
 export type CollectionPublicationSummary = {
+  salesEnabled?: boolean;
+  layoutRevision?: number;
   id: string;
   title: string;
   version: number;
@@ -43,7 +45,8 @@ export type CollectionPublicationState = {
 };
 export type PublicCollection = CollectionPublicationSummary & {
   description: string;
-  orderingAvailable: false;
+  orderingAvailable: boolean;
+  commerceMode?: "fixture" | "live" | "paused";
   products: Array<{
     id: string;
     title: string;
@@ -136,7 +139,7 @@ export type CollectionSalesReadiness = {
   collectionId: string;
   version: number;
   checkedAt: string;
-  orderingAvailable: false;
+  orderingAvailable: boolean;
   products: Array<{
     id: string;
     title: string;

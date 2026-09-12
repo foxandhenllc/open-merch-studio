@@ -106,7 +106,8 @@ dimensions and offsets, save each print area, preview a transparent canvas, and 
 These public pages cannot take orders
 yet; binding approved products to checkout remains a V1 gate. See the
 [collection draft contract](./docs/architecture/admin-collection-drafts.md),
-[private artwork contract](./docs/architecture/admin-collection-artwork.md), and
+[private artwork contract](./docs/architecture/admin-collection-artwork.md),
+[collection commerce contract](./docs/architecture/collection-commerce.md), and
 [review and publication contract](./docs/architecture/admin-collection-publication.md).
 
 ```bash

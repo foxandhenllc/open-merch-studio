@@ -1,3 +1,4 @@
+import { setCollectionSales } from '../collections/sales.service.js';
 import { Router } from 'express';
 import { asyncHandler, HttpError } from '../middleware.js';
 import {
@@ -117,6 +118,13 @@ router.get(
       `${req.params.kind === 'export' ? 'attachment' : 'inline'}; filename="print-layout.png"`
     );
     res.send(bytes);
+  })
+);
+router.post(
+  '/:id/sales',
+  asyncHandler(async (req, res) => {
+    strictBody(req.body, ['version', 'layoutRevision', 'enabled', 'reviewed']);
+    res.json({ success: true, data: await setCollectionSales(req.params.id, req.body) });
   })
 );
 export default router;

@@ -1,3 +1,4 @@
+import { collectionPurchases } from '../collections/purchase.service.js';
 import { env } from '../config/env.js';
 import { prisma } from '../config/database.js';
 import type { AdminOrderDetail, OrderSummary } from '../types/catalog.js';
@@ -17,6 +18,7 @@ import { stripeRecipient } from './stripe-order-repository.service.js';
 export async function resolvePrintfulArtworkUrls(
   order: OrderSummary
 ): Promise<Record<string, string> | null> {
+  if (order.quote?.collection) return collectionPurchases.providerFiles(order.quote);
   const assetIds = Array.from(
     new Set(
       (order.quote?.items ?? [])

@@ -15,7 +15,7 @@ captureCustomerOrderAccessHandoff();
 applyMerchantTheme(document.documentElement);
 
 const observabilityEnabled =
-  !/^\/admin(?:\/|$)/.test(window.location.pathname) &&
+  !/^\/(?:admin|order)(?:\/|$)/.test(window.location.pathname) &&
   (window.location.hostname === 'openmerchstudio.com' ||
     window.location.hostname === 'www.openmerchstudio.com' ||
     window.location.hostname.endsWith('.vercel.app'));

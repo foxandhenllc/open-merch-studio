@@ -1,0 +1,21 @@
+.customer-order-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px clamp(20px, 5vw, 60px);
+}
+.customer-order-page > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.customer-order-page > h1 {
+  margin: 40px 0 24px;
+}
+.customer-order-page .order-confirmation {
+  max-width: 100%;
+}
+.customer-order-page > footer {
+  margin-top: 48px;
+}

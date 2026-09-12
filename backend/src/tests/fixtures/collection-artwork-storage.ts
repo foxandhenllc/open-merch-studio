@@ -37,6 +37,7 @@ export const storage: PrivateArtworkStorage = {
   },
   write: async (path, bytes) => {
     storageWrites += 1;
+    await mkdir(join(pathFor(path), '..'), { recursive: true });
     await writeFile(pathFor(path), bytes);
   },
   removeFolder: (path) => rm(pathFor(path), { force: true, recursive: true }),

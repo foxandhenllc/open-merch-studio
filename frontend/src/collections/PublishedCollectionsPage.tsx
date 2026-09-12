@@ -1,3 +1,4 @@
+import { CollectionPurchaseForm } from './CollectionPurchaseForm';
 import { useEffect, useState } from 'react';
 import type { PublicCollection } from '@open-merch-studio/collection-drafts';
 import { merchantConfig } from '../generated/merchant-config';
@@ -39,10 +40,16 @@ export function PublishedCollectionsPage({ id }: { id?: string }) {
         <a href="/collections">Collections</a>
       </header>
       <div className="published-collections-intro">
-        <span>Collection preview</span>
+        <span>
+          {collections?.some((item) => item.orderingAvailable)
+            ? 'Our collection'
+            : 'Collection preview'}
+        </span>
         <h1>{id ? (collections?.[0]?.title ?? 'Collection') : 'Our collections'}</h1>
         <p>
-          Explore the artwork and planned pieces. Ordering is not available from these pages yet.
+          {collections?.some((item) => item.orderingAvailable)
+            ? 'Explore the artwork, choose your pieces, and review your order below.'
+            : 'Explore the artwork and planned pieces. Ordering is not available from these pages yet.'}
         </p>
       </div>
       {error && (
@@ -93,19 +100,26 @@ export function PublishedCollectionsPage({ id }: { id?: string }) {
                 </p>
                 {product.plannedPriceCents !== null && (
                   <p className="published-collection-price">
-                    Planned product price{' '}
+                    {collection.orderingAvailable ? 'Product price ' : 'Planned product price '}
                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
                       product.plannedPriceCents / 100
                     )}
                   </p>
                 )}
                 <p className="published-collection-note">
-                  Artwork preview. Product appearance, shipping, tax, and final price will be
-                  confirmed when ordering opens.
+                  {collection.orderingAvailable
+                    ? 'Artwork preview for the listed product and variant. Review shipping and tax before payment.'
+                    : 'Artwork preview. Product appearance, shipping, tax, and final price will be confirmed when ordering opens.'}
                 </p>
               </article>
             ))}
           </div>
+          {collection.orderingAvailable && (
+            <CollectionPurchaseForm
+              key={`${collection.id}:${collection.version}:${collection.layoutRevision}`}
+              collection={collection}
+            />
+          )}
         </section>
       ))}
       <footer>

@@ -1,0 +1,86 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+
+export async function verifyCollectionPurchase({ page, guest, panel, publication, viewport, output }) {
+  const { env } = await import('../../backend/dist/config/env.js');
+  const { getRuntimeSettings, updateRuntimeSettings } = await import('../../backend/dist/services/runtime-store.js');
+  const previousRuntime = getRuntimeSettings().checkoutEnabled;
+  const previous = env.checkoutEnabled;
+  env.checkoutEnabled = true;
+  updateRuntimeSettings({ checkoutEnabled: true });
+  try {
+    const control = panel.locator('.collection-ordering-control');
+    assert.equal(await control.getByRole('button', { name: 'Enable collection ordering' }).isDisabled(), true);
+    await control.getByRole('checkbox').check();
+    const activation = page.waitForResponse(res => res.url().endsWith('/sales') && res.request().method() === 'POST');
+    await control.getByRole('button', { name: 'Enable collection ordering' }).click();
+    const enabled = await activation;
+    assert.equal(enabled.status(), 200);
+    assert.deepEqual(enabled.request().postDataJSON(), { version: publication.version, layoutRevision: 2, enabled: true, reviewed: true });
+    await control.getByRole('status').filter({ hasText: 'fixture mode' }).waitFor();
+    await guest.reload({ waitUntil: 'domcontentloaded' });
+    const purchase = guest.getByRole('region', { name: `Order from ${publication.title}` });
+    await purchase.getByText(/No payment or shipment is created/).waitFor();
+    const quantity = purchase.getByRole('spinbutton');
+    await quantity.fill('2');
+    await guest.reload({ waitUntil: 'domcontentloaded' });
+    assert.equal(await quantity.inputValue(), '2');
+    const review = async () => {
+      const pending = guest.waitForResponse(res => res.url().endsWith('/quotes') && res.request().method() === 'POST');
+      await purchase.getByRole('button', { name: 'Review order', exact: true }).click();
+      const response = await pending;
+      assert.equal(response.status(), 201, JSON.stringify(await response.json()));
+      await purchase.getByRole('heading', { name: 'Your order estimate' }).waitFor();
+      return { sent: response.request().postDataJSON(), quote: (await response.json()).data };
+    };
+    const first = await review();
+    assert.equal(first.sent.version, publication.version);
+    assert.equal(first.sent.layoutRevision, 2);
+    assert.equal(first.sent.items[0].quantity, 2);
+    assert.equal(first.quote.items[0].unitRetailCents, 2995);
+    assert.ok(!/purchase.png|sourceChecksum|namespace/.test(JSON.stringify(first.quote)));
+    await guest.reload({ waitUntil: 'domcontentloaded' });
+    const retry = await review();
+    assert.equal(retry.sent.requestId, first.sent.requestId);
+    assert.equal(retry.quote.id, first.quote.id);
+    await quantity.fill('1');
+    assert.equal(await purchase.getByRole('heading', { name: 'Your order estimate' }).count(), 0);
+    const revised = await review();
+    assert.notEqual(revised.quote.id, first.quote.id);
+    await purchase.getByLabel('Email for your receipt').fill('fixture@example.test');
+    await purchase.getByRole('checkbox').check();
+    if (output) await guest.screenshot({ path: path.join(output, `collection-checkout-${viewport.width}.png`), fullPage: true });
+    const sizes = await guest.evaluate(() => [document.documentElement.clientWidth, document.documentElement.scrollWidth]);
+    assert.ok(sizes[1] <= sizes[0] + 1);
+    let checkoutBody, checkoutRequest;
+    await guest.route('**/api/checkout/sessions', async route => {
+      checkoutRequest = route.request().postDataJSON();
+      const upstream = await route.fetch();
+      checkoutBody = await upstream.json();
+      await route.fulfill({ response: upstream });
+    });
+    const checkoutResponse = guest.waitForResponse(res => res.url().endsWith('/checkout/sessions'));
+    await purchase.getByRole('button', { name: 'Complete simulated checkout' }).click();
+    const response = await checkoutResponse;
+    assert.equal(response.status(), 201, JSON.stringify(checkoutBody));
+    const checkout = checkoutBody.data;
+    assert.equal(checkout.mode, 'fixture');
+    assert.ok(checkout.orderAccess);
+    await guest.waitForURL(`**/order/${checkout.orderId}`);
+    await guest.getByText('Artist edition tee', { exact: true }).waitFor();
+    await guest.reload({ waitUntil: 'domcontentloaded' });
+    await guest.getByText('Artist edition tee', { exact: true }).waitFor();
+    await guest.getByRole('link', { name: 'View collection', exact: true }).waitFor();
+    const orderSize = await guest.evaluate(() => [document.documentElement.clientWidth, document.documentElement.scrollWidth]);
+    assert.ok(orderSize[1] <= orderSize[0] + 1, 'Order page must fit the viewport');
+    assert.equal((await guest.request.get(`/api/orders/${checkout.orderId}`)).status(), 404);
+    const repeat = await guest.request.post('/api/checkout/sessions', { data: checkoutRequest });
+    assert.equal((await repeat.json()).data.orderId, checkout.orderId);
+    await control.getByRole('button', { name: 'Pause collection ordering' }).click();
+    await control.getByRole('status').filter({ hasText: 'ordering paused' }).waitFor();
+    const blocked = await guest.request.post('/api/checkout/sessions', { data: checkoutRequest });
+    assert.equal((await blocked.json()).data.status, 'blocked');
+    await guest.goto(publication.url, { waitUntil: 'domcontentloaded' });
+    await guest.getByText(/Ordering is not available/).waitFor();
+  } finally { env.checkoutEnabled = previous; updateRuntimeSettings({ checkoutEnabled: previousRuntime }); }
+}

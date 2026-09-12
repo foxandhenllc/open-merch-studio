@@ -144,16 +144,26 @@ export function OrderTimeline({
       <div className="order-repeat">
         <div>
           <strong>Want another?</strong>
-          <p>Start a fresh cart with these products and artwork, then review current pricing.</p>
+          <p>
+            {order.collectionUrl
+              ? 'Revisit the collection to review its current products and prices.'
+              : 'Start a fresh cart with these products and artwork, then review current pricing.'}
+          </p>
         </div>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={onBuyAgain}
-          disabled={reorderBusy}
-        >
-          {reorderBusy ? 'Preparing cart…' : 'Buy again'}
-        </button>
+        {order.collectionUrl ? (
+          <a className="button button--secondary" href={order.collectionUrl}>
+            View collection
+          </a>
+        ) : (
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={onBuyAgain}
+            disabled={reorderBusy}
+          >
+            {reorderBusy ? 'Preparing cart…' : 'Buy again'}
+          </button>
+        )}
       </div>
       <ErrorNote error={reorderError} onRetry={onBuyAgain} />
       <p className="order-support-copy">

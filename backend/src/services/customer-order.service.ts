@@ -127,6 +127,9 @@ export function toCustomerOrderConfirmation(
   const status = customerStatus(order.status);
   const message = customerMessage(status);
   return {
+    collectionUrl: order.quote?.collection
+      ? `/collections/${encodeURIComponent(order.quote.collection.id)}`
+      : undefined,
     orderNumber: order.orderNumber,
     status,
     message,

@@ -10,6 +10,7 @@ import { env } from '../config/env.js';
 
 export const publicationsKey = 'installation-collection-publications-v1';
 export type Publication = CollectionPublicationSummary & {
+  sales?: { layoutRevision: number; revision: number; enabledAt: string };
   printLayouts?: {
     revision: number;
     layouts: CollectionPrintLayout[];

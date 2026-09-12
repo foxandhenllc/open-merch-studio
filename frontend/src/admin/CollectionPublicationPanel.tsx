@@ -1,3 +1,4 @@
+import { CollectionOrderingControl } from './CollectionOrderingControl';
 import { useEffect, useState } from 'react';
 import type {
   CollectionDraft,
@@ -297,6 +298,7 @@ export function CollectionPublicationPanel({
               )}
             </div>
             <CollectionSalesReadiness publication={entry} request={request} />
+            <CollectionOrderingControl publication={entry} request={request} changed={refresh} />
             <CollectionPrintLayouts
               publication={entry}
               request={request}

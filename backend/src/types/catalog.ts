@@ -74,6 +74,7 @@ export type MoneyLine = {
 };
 
 export type QuoteBreakdown = {
+  collection?: { id: string; version: number; layoutRevision: number };
   id?: string | null;
   currency: string;
   productCostCents: number;
@@ -107,7 +108,7 @@ export type QuoteBreakdown = {
     designAssetId?: string;
     designFeeCents?: number;
     placementCostCents: number;
-    pricingSource: 'printful-live' | 'catalog-snapshot';
+    pricingSource: 'printful-live' | 'catalog-snapshot' | 'owner-published';
     unitCostCents: number;
     unitRetailCents: number;
   }>;
@@ -316,6 +317,7 @@ export type CustomerOrderStatus =
   | 'refunded';
 
 export type CustomerOrderConfirmation = {
+  collectionUrl?: string;
   orderNumber: string;
   status: CustomerOrderStatus;
   message: string;

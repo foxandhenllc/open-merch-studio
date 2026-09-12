@@ -1,3 +1,4 @@
+import { collectionSalesEnabled, collectionCommerceMode } from '../collections/sales.service.js';
 import type { CollectionSalesReadiness } from '@open-merch-studio/collection-drafts';
 import { collectionLayoutIssues } from './collection-print-layout-checks.js';
 import { HttpError } from '../middleware.js';
@@ -57,7 +58,11 @@ export function collectionSalesReadiness(
         collectionId: id,
         version: entry.version,
         checkedAt: new Date().toISOString(),
-        orderingAvailable: false,
+        orderingAvailable:
+          sourcesMatch &&
+          !layoutIssues.length &&
+          collectionSalesEnabled(entry) &&
+          collectionCommerceMode() !== 'paused',
         products,
         checks: [
           {
@@ -93,15 +98,23 @@ export function collectionSalesReadiness(
             label: 'Production placement',
             status: 'not_available',
             message: entry.printLayouts?.layouts.length
-              ? `Manual print layouts saved for ${entry.printLayouts.layouts.length} of ${entry.review.areas.length} areas. Preview and export them below. Automatic order placement is still being built.`
-              : 'Prepare manual print layouts below. Automatic supplier-template lookup and order placement are still being built.',
+              ? `Manual print layouts saved for ${entry.printLayouts.layouts.length} of ${entry.review.areas.length} areas. Preview and export them below. Print files are copied privately for checkout; check the physical template and sample before production.`
+              : 'Prepare manual print layouts below. Supplier templates and physical samples still require owner review.',
           },
           {
             id: 'checkout',
             label: 'Collection checkout',
-            status: 'not_available',
-            message:
-              'Still being built: preserve approved artwork and owner prices through quotes, payment, and reviewed fulfillment.',
+            status:
+              collectionSalesEnabled(entry) && sourcesMatch && collectionCommerceMode() !== 'paused'
+                ? 'pass'
+                : 'action_required',
+            message: !collectionSalesEnabled(entry)
+              ? 'Review the prices and saved layouts, then enable collection ordering below.'
+              : collectionCommerceMode() === 'paused'
+                ? 'This collection is approved for ordering. Store checkout is paused in installation settings.'
+                : collectionCommerceMode() === 'fixture'
+                  ? 'Fixture checkout uses the published prices and private print copies. No real payment or shipment is created.'
+                  : 'Checkout uses published prices and private print copies. Paid orders enter manual production review.',
           },
         ],
       };

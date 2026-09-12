@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { verifyCollectionPurchase } from './collection-purchase-contract.mjs';
 import { verifyPrintLayouts } from './admin-print-layouts-contract.mjs';
 
 export async function verifyCollectionPublication({ page, context, origin, viewport, output }) {
@@ -76,7 +77,7 @@ export async function verifyCollectionPublication({ page, context, origin, viewp
     .waitFor();
   await panel.getByText('Owner product prices · Checked', { exact: true }).waitFor();
   await panel.getByText('Saved print layouts · Owner action', { exact: true }).waitFor();
-  await panel.getByText('Collection checkout · In development', { exact: true }).waitFor();
+  await panel.getByText('Collection checkout · Owner action', { exact: true }).waitFor();
   if (output)
     await panel
       .locator('.collection-sales-readiness')
@@ -114,6 +115,7 @@ export async function verifyCollectionPublication({ page, context, origin, viewp
       path: path.join(output, `published-collection-${viewport.width}.png`),
       fullPage: true,
     });
+  await verifyCollectionPurchase({ page, guest, panel, publication, viewport, output });
   await page
     .getByLabel('Collection name', { exact: true })
     .fill(`${publication.title} new edition`);

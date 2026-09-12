@@ -194,6 +194,8 @@ export function prepareCollectionPurchase(value: unknown) {
         publicationVersion: entry.version,
         layoutRevision: entry.printLayouts.revision,
         reviewDigest: entry.review.digest,
+        salesRevision:
+          entry.sales?.layoutRevision === entry.printLayouts.revision ? entry.sales.revision : null,
         currency: 'USD' as const,
         merchandiseSubtotalCents: lines.reduce((sum, line) => sum + line.lineTotalCents, 0),
         lines,

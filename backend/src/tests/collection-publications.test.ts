@@ -175,7 +175,7 @@ test('reviewed previews are versioned, independently published, revocable, and n
     assert.equal(inspection.orderingAvailable, false);
     assert.deepEqual(
       inspection.checks.map((check) => check.status),
-      ['pass', 'pass', 'action_required', 'not_available', 'not_available']
+      ['pass', 'pass', 'action_required', 'not_available', 'action_required']
     );
     const fixtureProduct = sampleCatalog.products.find((item) => item.id === product.id)!;
     const fixtureVariant = fixtureProduct.variants.find(

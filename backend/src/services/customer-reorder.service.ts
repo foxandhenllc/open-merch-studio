@@ -102,6 +102,8 @@ export async function createCustomerReorderDraft(
   const quote = order.quote;
   if (!quote?.items.length) unavailable('The original order has no reusable product lines.');
 
+  if (quote.collection)
+    unavailable('Revisit the published collection to review current products and prices.');
   const products = await listProducts();
   for (const item of quote.items) {
     const product = products.find((candidate) => candidate.id === item.productId);

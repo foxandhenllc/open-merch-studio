@@ -1,3 +1,4 @@
+import { collectionSalesEnabled, collectionCommerceMode } from '../collections/sales.service.js';
 import type {
   CollectionPublicationState,
   PublicCollection,
@@ -28,7 +29,18 @@ export async function publicationOperation<T>(operation: () => Promise<T>) {
     );
   }
 }
-const summary = ({ id, title, version, draftRevision, publishedAt, url }: Publication) => ({
+const summary = ({
+  id,
+  title,
+  version,
+  draftRevision,
+  publishedAt,
+  url,
+  sales,
+  printLayouts,
+}: Publication) => ({
+  salesEnabled: Boolean(sales && sales.layoutRevision === printLayouts?.revision),
+  layoutRevision: printLayouts?.revision ?? 0,
   id,
   title,
   version,
@@ -152,7 +164,8 @@ export const withdrawCollection = (id: string, expectedRevision: unknown) =>
 const publicRecord = (entry: Publication): PublicCollection => ({
   ...summary(entry),
   description: entry.collection.description,
-  orderingAvailable: false,
+  orderingAvailable: collectionSalesEnabled(entry) && collectionCommerceMode() !== 'paused',
+  commerceMode: collectionCommerceMode(),
   products: entry.collection.items.map((item) => ({
     id: item.id,
     title: item.title,

@@ -69,6 +69,10 @@ function estimateFlags(
 }
 
 function mapPersistedQuote(quote: PersistedQuote): QuoteBreakdown {
+  const collection = (
+    quote.items[0]?.options as { collectionPurchase?: { quote?: QuoteBreakdown } } | null
+  )?.collectionPurchase;
+  if (collection?.quote) return structuredClone(collection.quote);
   return {
     id: quote.id,
     currency: quote.currency,

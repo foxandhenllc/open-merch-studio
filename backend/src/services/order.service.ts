@@ -1,3 +1,5 @@
+import { collectionOrderId, withCollectionCheckoutLock } from '../collections/checkout-lock.js';
+import { collectionPurchases } from '../collections/purchase.service.js';
 import { env } from '../config/env.js';
 import { getProductBySlug } from './catalog.service.js';
 import {
@@ -170,13 +172,24 @@ async function verifyDurableCheckoutState(
       prisma.quote.findUnique({ where: { id: quote.id }, select: { id: true } }),
       prisma.designAsset.findMany({
         where: { id: { in: designAssetIds } },
-        select: { id: true, transparentUrl: true, imageUrl: true },
+        select: {
+          id: true,
+          transparentUrl: true,
+          imageUrl: true,
+          printStoragePath: true,
+          sourceType: true,
+        },
       }),
     ]);
     if (!savedQuote) return 'The saved quote could not be retrieved from PostgreSQL.';
     if (
       designs.length !== designAssetIds.length ||
-      designs.some((asset) => !asset.transparentUrl && !asset.imageUrl)
+      designs.some(
+        (asset) =>
+          !asset.transparentUrl &&
+          !asset.imageUrl &&
+          !(quote.collection && asset.sourceType === 'collection' && asset.printStoragePath)
+      )
     ) {
       return 'The checkout artwork is not durably stored and retrievable.';
     }
@@ -195,8 +208,17 @@ async function paymentCompletionResult(
 }
 
 export async function createCheckoutSession(input: CheckoutInput): Promise<CheckoutSession> {
-  const settings = getRuntimeSettings();
   const quote = await getQuoteById(input.quoteId);
+  return quote?.collection && quote.id
+    ? withCollectionCheckoutLock(quote.id, () => createCheckoutSessionForQuote(input, quote))
+    : createCheckoutSessionForQuote(input, quote);
+}
+
+async function createCheckoutSessionForQuote(
+  input: CheckoutInput,
+  quote: QuoteBreakdown | undefined
+): Promise<CheckoutSession> {
+  const settings = getRuntimeSettings();
   if (!quote) {
     return {
       id: runtimeId('checkout'),
@@ -221,9 +243,14 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     quoteIssues.push('Checkout requires generated or uploaded artwork.');
   }
 
-  for (const designAssetId of requiredDesignIds) {
-    const issue = checkoutDesignIssue(await loadDesignForCheckout(designAssetId));
+  if (quote.collection) {
+    const issue = await collectionPurchases.validate(quote, input.sessionId);
     if (issue) quoteIssues.push(issue);
+  } else {
+    for (const designAssetId of requiredDesignIds) {
+      const issue = checkoutDesignIssue(await loadDesignForCheckout(designAssetId));
+      if (issue) quoteIssues.push(issue);
+    }
   }
   if (settings.liveStripeEnabled && !quoteIssues.length) {
     const durableIssue = await verifyDurableCheckoutState(quote, requiredDesignIds);
@@ -242,8 +269,44 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     };
   }
 
-  const order: OrderSummary = {
-    id: runtimeId('order'),
+  const fixedOrderId = quote.collection && quote.id ? collectionOrderId(quote.id) : undefined;
+  const previousOrder = fixedOrderId ? await loadOrder(fixedOrderId) : undefined;
+  if (previousOrder?.stripeSessionId) {
+    const session = await retrieveStripeCheckoutSession(previousOrder.stripeSessionId);
+    return {
+      id: runtimeId('checkout'),
+      mode: 'stripe',
+      quoteId: quote.id,
+      orderId: previousOrder.id,
+      status: session && session.status !== 'expired' ? 'open' : 'blocked',
+      checkoutUrl:
+        session?.status === 'open'
+          ? session.url
+          : session?.status === 'complete'
+            ? `${env.frontendUrl}?checkout=success&session_id=${encodeURIComponent(session.id)}`
+            : null,
+      message:
+        session?.status === 'expired'
+          ? 'Checkout expired. Request a new estimate.'
+          : !session
+            ? 'Your existing checkout could not be recovered. Please retry; do not start another payment.'
+            : 'Continue your existing checkout.',
+    };
+  }
+  if (previousOrder && previousOrder.status !== 'checkout_pending') {
+    return {
+      id: runtimeId('checkout'),
+      mode: settings.liveStripeEnabled ? 'stripe' : 'fixture',
+      status: 'paid',
+      checkoutUrl: null,
+      quoteId: quote.id,
+      orderId: previousOrder.id,
+      message: 'This order already exists. View its current status.',
+    };
+  }
+  // Preserve the original email and quote when recovering an uncertain Stripe creation.
+  const order: OrderSummary = previousOrder ?? {
+    id: fixedOrderId ?? runtimeId('order'),
     orderNumber: orderNumber(),
     status: 'checkout_pending',
     customerEmail: input.email,
@@ -270,8 +333,8 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     ],
     createdAt: runtimeNow(),
   };
-  saveOrder(order);
-  const persisted = await persistOrder(order);
+  if (!previousOrder) saveOrder(order);
+  const persisted = previousOrder ? true : await persistOrder(order);
   if (settings.liveStripeEnabled && !persisted) {
     return {
       id: runtimeId('checkout'),
@@ -295,7 +358,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
     const session = await createMerchCheckoutSession({
       orderId: order.id,
       quote,
-      customerEmail: input.email,
+      customerEmail: order.customerEmail,
     });
     saveOrder({ ...order, stripeSessionId: session.id });
     if (!(await persistOrder({ ...order, stripeSessionId: session.id }, session.id))) {
@@ -311,6 +374,24 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Check
       orderId: order.id,
       message: 'Stripe Checkout session created. Complete payment securely with Stripe.',
     };
+  }
+
+  if (quote.collection && !settings.liveStripeEnabled) {
+    const simulated = {
+      ...order,
+      status: 'paid' as const,
+      paidAt: runtimeNow(),
+      timeline: [
+        ...order.timeline,
+        {
+          at: runtimeNow(),
+          status: 'paid' as const,
+          note: 'Fixture payment simulated. No charge was created.',
+        },
+      ],
+    };
+    saveOrder(simulated);
+    await persistOrder(simulated);
   }
 
   return {
