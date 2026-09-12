@@ -75,6 +75,10 @@ Fox & Hen's optional care or managed package covers only the agreed operating/te
 provider manufacturing and shipment outcomes remain with the fulfillment provider. Define the
 operator and backup in the launch handoff before opening live checkout.
 
-Technical recovery must preserve both PostgreSQL and private storage. Collection-copy cleanup is not
-automated yet: retain copies while an order may need fulfillment or support, and do not include them
-in ordinary upload cleanup. See [the collection commerce contract](../architecture/collection-commerce.md).
+Technical recovery must preserve both PostgreSQL and private storage. In **Orders & review → Keep
+private storage tidy**, select **Review expired preparations** to inspect abandoned copies at least
+seven days past estimate expiry. Review another batch when offered. **Clear eligible preparations**
+asks for confirmation and checks eligibility again. All order-linked files and original artwork are
+retained. If cleanup cannot finish, check storage, review again, and retry; do not delete its database
+records manually. This is an owner action, not a scheduled job. See the
+[retention contract](../architecture/collection-retention.md).

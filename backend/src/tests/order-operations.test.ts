@@ -93,6 +93,28 @@ test('owner operations protect sensitive fields and persist simulated reviews wi
     const list = ((await (await fetch(base, { headers })).json()) as { data: OperationOrder[] })
       .data;
     assert.equal(list.find((order: { id: string }) => order.id === id)?.reviewStatus, 'resolved');
+    const retentionUrl = base.replace('order-operations', 'preparation-retention');
+    assert.equal((await fetch(retentionUrl, { method: 'POST' })).status, 401);
+    for (const body of [
+      {},
+      { clear: true, namespace: 'foreign' },
+      { clear: 'true' },
+      { clear: true, cursor: 3 },
+    ])
+      assert.equal(
+        (await fetch(retentionUrl, { method: 'POST', headers, body: JSON.stringify(body) })).status,
+        400
+      );
+    const retention = await fetch(retentionUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ clear: false }),
+    });
+    assert.equal(retention.status, 200);
+    assert.equal(
+      ((await retention.json()) as { data: { available: boolean } }).data.available,
+      false
+    );
     assert.equal((await post('retry', { confirmed: false })).status, 400);
     assert.equal((await post('retry', { confirmed: true })).status, 409);
     assert.equal(getOrder(id)?.stripeSessionId, 'cs_private_bearer');

@@ -12,8 +12,10 @@ The [owner roadmap](./docs/roadmap/store-owner-product.md) carries implementatio
 - Complete brand, logo, collection, product, margin, and personalization controls in admin.
 - Guide one supported installation path, verify account connections, and explain recovery.
 - Standardize on Image 2.5 Flare and Sunburst, with usage-based cost evidence and a documented
-  transition away from the legacy Image 2/background-removal path.
-- Give owners an understandable review-first order workflow.
+  transition away from the legacy Image 2/background-removal path. Local migration, usage accounting,
+  and provider retirement are implemented; live quality and invoice calibration remain.
+- Verify the implemented owner order-review and private-print maintenance workflow with a real sample
+  and an independent operator.
 - Demonstrate a second installation, an upgrade, a restore, and a nontechnical owner handoff.
 
 ## Build examples from the stable release

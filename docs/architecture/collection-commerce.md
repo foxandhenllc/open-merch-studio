@@ -47,8 +47,10 @@ order pages return a link to the current collection instead of rebuilding a gene
 
 Keep collection print copies and their manifests while any order may require fulfillment, refund,
 recovery, or support. Existing uploaded-artwork cleanup deliberately excludes them. Abandoned staged
-copies are discoverable by `sourceType=collection`, `purpose=collection-print`, and pending status;
-automated expiry/cleanup is not implemented yet. Do not bulk-delete them with upload cleanup.
+and completed copies can now be reviewed and cleared from the owner's order workspace after a
+seven-day post-expiry grace period. Order references are protected and interrupted removal leaves a
+retryable tombstone. This is owner-invoked, not scheduled. Do not bulk-delete them with upload cleanup.
+See [the retention contract](./collection-retention.md).
 
 Manual templates must be checked against the provider's current variant. This increment does not
 prove physical print quality, actual shipping/tax accuracy, Stripe/Printful account access, or a live

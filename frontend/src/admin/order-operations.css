@@ -132,3 +132,9 @@
   background: #edf2e9;
   border-color: var(--admin-accent);
 }
+
+.operation-retention {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid var(--admin-line);
+}

@@ -1,3 +1,4 @@
+import { PreparationRetention } from './PreparationRetention';
 import { useEffect, useState } from 'react';
 import type { AdminBinaryRequest, AdminRequest } from './admin.types';
 import type { OperationDetail, OperationOrder } from './OrderOperations.types';
@@ -316,6 +317,7 @@ export function OrderOperations({
           )}
         </section>
       )}
+      <PreparationRetention request={request} />
     </section>
   );
 }

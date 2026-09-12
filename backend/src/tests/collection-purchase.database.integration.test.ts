@@ -35,10 +35,14 @@ test(
     import { saveCollectionPrintLayouts } from './backend/src/admin/collection-print-layouts.ts';
     import { setCollectionSales } from './backend/src/collections/sales.service.ts';
     import { createCollectionPurchaseService } from './backend/src/collections/purchase.service.ts';
+    import { createPreparationRetentionService } from './backend/src/collections/retention.service.ts';
+    import { readPurchase, stagePurchase, completePurchase } from './backend/src/collections/purchase.repository.ts';
+    import { withCollectionLock } from './backend/src/admin/collection-lock.ts';
     import { operationDetail, recordOperationReview } from './backend/src/admin/order-operations.service.ts';
     import { getQuoteById } from './backend/src/services/order-repository.service.ts';
     import { getDesignAssetImage } from './backend/src/services/design.service.ts';
     collectionArtwork.binary = service.binary;
+    const retention = createPreparationRetentionService(() => storage, () => Date.now() + 8 * 86400000);
     const purchases = createCollectionPurchaseService(() => ({ ...storage, providerUrl: async path => { await storage.read(path); return 'https://storage.example.test/private-fixture'; } }));`;
     const run = (code: string) => {
       const result = spawnSync(
@@ -168,6 +172,45 @@ test(
         }),
         2
       );
+      const abandoned = await db.quote.findFirstOrThrow({
+        where: {
+          id: { not: quote.id },
+          items: { some: { designAsset: { studioSessionId: sessionId } } },
+        },
+      });
+      run(
+        `const preview = await retention.run(); assert.equal(preview.eligible, 1); assert.equal(preview.cleared, 0); assert.equal((await createPreparationRetentionService(() => ({ ...storage, namespace: 'wrong' }), () => Date.now() + 8 * 86400000).run()).eligible, 0); const m = await readPurchase('${abandoned.id}'); assert.ok(await storage.read(m.files[0].path)); await prisma.$disconnect();`
+      );
+      for (const status of ['PENDING_PAYMENT', 'REFUNDED', 'CANCELLED'] as const) {
+        await db.order.update({ where: { id: orderId }, data: { status } });
+        run(`assert.equal((await retention.run()).eligible, 1); await prisma.$disconnect();`);
+      }
+      await db.order.update({ where: { id: orderId }, data: { status: 'PAID' } });
+      await db.$executeRawUnsafe(
+        `CREATE FUNCTION reject_cleanup_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'collection_preparation_cleanup_claimed' THEN RAISE EXCEPTION 'fixture audit failure'; END IF; RETURN NEW; END $$`
+      );
+      await db.$executeRawUnsafe(
+        'CREATE TRIGGER reject_cleanup_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION reject_cleanup_audit()'
+      );
+      run(
+        `await assert.rejects(() => retention.run({ clear: true })); const m = await readPurchase('${abandoned.id}'); assert.ok(await storage.read(m.files[0].path)); assert.equal((await prisma.designAsset.findUnique({ where: { id: m.files[0].assetId } })).generationStatus, 'complete'); await prisma.$disconnect();`
+      );
+      await db.$executeRawUnsafe('DROP TRIGGER reject_cleanup_audit ON audit_logs');
+      await db.$executeRawUnsafe('DROP FUNCTION reject_cleanup_audit()');
+      // Simulate successful deletion with a lost response. The tombstone survives a new process.
+      run(
+        `const uncertain = createPreparationRetentionService(() => ({ ...storage, removeFolder: async path => { await storage.removeFolder(path); throw new Error('lost private response'); } }), () => Date.now() + 8 * 86400000); const result = await uncertain.run({ clear: true }); assert.equal(result.failed, 1); assert.equal(result.cleared, 0); const m = await readPurchase('${abandoned.id}'); assert.equal((await prisma.designAsset.findUnique({ where: { id: m.files[0].assetId } })).generationStatus, 'retiring'); const protectedManifest = await readPurchase('${quote.id}'); assert.ok(await storage.read(protectedManifest.files[0].path)); await prisma.$disconnect();`
+      );
+      run(
+        `assert.equal((await retention.run({ clear: true })).cleared, 1); assert.equal((await retention.run({ clear: true })).cleared, 0); const m = await readPurchase('${abandoned.id}'); assert.equal((await prisma.designAsset.findUnique({ where: { id: m.files[0].assetId } })).generationStatus, 'retired'); await assert.rejects(() => withCollectionLock(tx => stagePurchase(m, tx)), error => error.errorCode === 'collection_preparation_retired'); await assert.rejects(() => withCollectionLock(tx => completePurchase(m, tx)), error => error.errorCode === 'collection_preparation_retired'); await prisma.$disconnect();`
+      );
+      // A failed preparation has no Quote row, but its durable staged manifest still makes it discoverable.
+      const stagedId = run(
+        `const source = await readPurchase('${quote.id}'); const id = randomUUID(), asset = randomUUID(); const m = JSON.parse(JSON.stringify(source).replaceAll(source.quoteId, id).replaceAll(source.files[0].assetId, asset)); await withCollectionLock(tx => stagePurchase(m, tx)); await storage.write(m.files[0].path, await storage.read(source.files[0].path), 'image/png'); console.log(id); await prisma.$disconnect();`
+      );
+      run(
+        `assert.equal(await readPurchase('${stagedId}'), null); assert.equal((await retention.run()).eligible, 1); assert.equal((await retention.run({ clear: true })).cleared, 1); const d = await operationDetail('${orderId}'); assert.equal(d.summary.status, 'paid'); assert.ok(await purchases.operatorPrint(await getQuoteById('${quote.id}'), d.prints[0].assetId)); await prisma.$disconnect();`
+      );
       await db.catalogVariant.update({
         where: { id: variantId },
         data: { name: 'Changed catalog label' },
@@ -176,6 +219,8 @@ test(
         `const quote = await getQuoteById('${quote.id}'); assert.equal(quote.items[0].variantName, 'Fixture variant'); assert.equal(quote.items[0].title, 'Artist edition'); assert.ok(await purchases.validate(quote, '${sessionId}')); const s = await publicationStatus(); await withdrawCollection('${selection.collectionId}', s.revision); const d = await readCollectionDrafts(); await saveCollectionDrafts([], d.revision); await service.remove('${assetId}'); assert.ok(await purchases.providerFiles(quote)); await prisma.$disconnect();`
       );
     } finally {
+      await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS reject_cleanup_audit ON audit_logs');
+      await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS reject_cleanup_audit()');
       await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS reject_review_audit ON audit_logs');
       await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS reject_review_audit()');
       await db.order.deleteMany({ where: { id: orderId } });

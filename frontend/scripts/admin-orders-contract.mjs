@@ -69,14 +69,98 @@ export async function verifyOrderOperations({ page, viewport, output }) {
       exact: true,
     })
     .waitFor();
+  await verifyPreparationRetention(page, panel);
   const sizes = await page.evaluate(() => [
     document.documentElement.clientWidth,
     document.documentElement.scrollWidth,
   ]);
   assert.ok(sizes[1] <= sizes[0] + 1, 'Order operations must fit the viewport');
+  await page.evaluate(() => window.scrollTo(0, 0));
   if (output)
     await page.screenshot({
       path: path.join(output, `order-operations-${viewport.width}.png`),
       fullPage: true,
     });
+}
+
+async function verifyPreparationRetention(page, panel) {
+  const maintenance = panel.getByRole('region', { name: 'Private storage maintenance' });
+  await maintenance
+    .getByRole('button', { name: 'Review expired preparations', exact: true })
+    .click();
+  await maintenance
+    .getByText('Fixture mode has no durable storage to clean.', { exact: false })
+    .waitFor();
+  const calls = [];
+  let clearedOnce = false;
+  await page.route('**/api/admin/preparation-retention', async (route) => {
+    const input = route.request().postDataJSON();
+    calls.push(input);
+    const wasCleared = clearedOnce;
+    if (input.clear) clearedOnce = true;
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          available: true,
+          graceDays: 7,
+          scanned: 3,
+          eligible: wasCleared ? 1 : 2,
+          fileCount: 3,
+          bytes: 2097152,
+          cleared: input.clear ? 1 : 0,
+          failed: input.clear && !wasCleared ? 1 : 0,
+        },
+      }),
+    });
+  });
+  try {
+    await maintenance
+      .getByRole('button', { name: 'Review expired preparations', exact: true })
+      .click();
+    await maintenance.getByText(/2 eligible preparations in this batch/).waitFor();
+    await maintenance
+      .getByRole('button', { name: 'Clear eligible preparations', exact: true })
+      .click();
+    assert.equal(calls.length, 1, 'Opening confirmation must not delete anything');
+    await maintenance.getByRole('button', { name: 'Keep files', exact: true }).click();
+    assert.equal(calls.length, 1);
+    await maintenance
+      .getByRole('button', { name: 'Clear eligible preparations', exact: true })
+      .click();
+    await maintenance
+      .getByRole('button', { name: 'Confirm clearing expired files', exact: true })
+      .click();
+    await maintenance.getByRole('status').filter({ hasText: '1 could not finish' }).waitFor();
+    assert.deepEqual(calls.at(-1), { clear: true });
+    await maintenance
+      .getByRole('button', { name: 'Review expired preparations', exact: true })
+      .click();
+    await maintenance.getByText(/1 eligible preparation in this batch/).waitFor();
+    await maintenance
+      .getByRole('button', { name: 'Clear eligible preparations', exact: true })
+      .click();
+    await maintenance
+      .getByRole('button', { name: 'Confirm clearing expired files', exact: true })
+      .click();
+    await maintenance
+      .getByRole('status')
+      .filter({ hasText: 'Order files and original artwork are retained.' })
+      .waitFor();
+    assert.equal(
+      await maintenance
+        .getByRole('button', { name: 'Clear eligible preparations', exact: true })
+        .count(),
+      0
+    );
+  } finally {
+    await page.unroute('**/api/admin/preparation-retention');
+  }
+  await maintenance
+    .getByRole('button', { name: 'Review expired preparations', exact: true })
+    .click();
+  await maintenance
+    .getByText('Fixture mode has no durable storage to clean.', { exact: false })
+    .waitFor();
 }

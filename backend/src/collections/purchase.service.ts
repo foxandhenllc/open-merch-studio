@@ -1,3 +1,4 @@
+import { withCollectionCheckoutLock } from './checkout-lock.js';
 import { reserveCollectionPreparation } from './purchase-limits.js';
 import { purchaseJson } from './purchase.fingerprint.js';
 import { createHash } from 'node:crypto';
@@ -75,161 +76,167 @@ export function createCollectionPurchaseService(storageFor = purchaseStorage) {
       const quoteId = idFor(`collection-quote:${input.sessionId}:${input.requestId}`);
       const storage = storageFor();
       if (!storage) throw unavailable();
-      try {
-        await storage.assertPrivate();
-        const existing = await readPurchase(quoteId);
-        if (existing) {
-          if (existing.sessionId !== input.sessionId || existing.requestHash !== requestHash)
+      return withCollectionCheckoutLock(quoteId, async () => {
+        try {
+          await storage.assertPrivate();
+          const existing = await readPurchase(quoteId);
+          if (existing) {
+            if (existing.sessionId !== input.sessionId || existing.requestHash !== requestHash)
+              throw new HttpError(
+                'Use a fresh request for a changed selection.',
+                409,
+                'collection_request_conflict'
+              );
+            if (Date.now() >= Date.parse(existing.quote.expiresAt))
+              throw new HttpError(
+                'This quote expired. Start a fresh purchase request.',
+                409,
+                'collection_quote_expired'
+              );
+            await withCollectionLock((tx) => assertPurchaseCurrent(existing, tx));
+            await checkFiles(existing, storage);
+            return structuredClone(existing.quote);
+          }
+          await reserveCollectionPreparation(input.sessionId);
+          const prepared = await prepareCollectionPurchase(selection);
+          if (!prepared.salesRevision)
             throw new HttpError(
-              'Use a fresh request for a changed selection.',
+              'Ordering is paused for this collection.',
               409,
-              'collection_request_conflict'
+              'collection_sales_paused'
             );
-          if (Date.now() >= Date.parse(existing.quote.expiresAt))
-            throw new HttpError(
-              'This quote expired. Start a fresh purchase request.',
-              409,
-              'collection_quote_expired'
+          const files = prepared.files.map((file) => {
+            const assetId = idFor(
+              `collection-print:${quoteId}:${file.itemId}:${file.placementCode}`
             );
-          await withCollectionLock((tx) => assertPurchaseCurrent(existing, tx));
-          await checkFiles(existing, storage);
-          return structuredClone(existing.quote);
-        }
-        await reserveCollectionPreparation(input.sessionId);
-        const prepared = await prepareCollectionPurchase(selection);
-        if (!prepared.salesRevision)
-          throw new HttpError(
-            'Ordering is paused for this collection.',
-            409,
-            'collection_sales_paused'
+            return {
+              assetId,
+              itemId: file.itemId,
+              placementCode: file.placementCode,
+              path: `owner-artwork/${assetId}/purchase.png`,
+              sha256: file.sha256,
+              sourceChecksum: file.sourceChecksum,
+              width: file.width,
+              height: file.height,
+              byteSize: file.bytes.length,
+            };
+          });
+          const items: QuoteBreakdown['items'] = prepared.lines.map((line) => {
+            const placements = line.placements.map((placement) => ({
+              ...placement,
+              designAssetId: files.find(
+                (file) => file.itemId === line.itemId && file.placementCode === placement.code
+              )!.assetId,
+              additionalCostCents: 0,
+            }));
+            return {
+              productId: line.productId,
+              variantId: line.variantId,
+              printfulVariantId: line.printfulVariantId,
+              title: line.title,
+              variantName: line.variantName,
+              quantity: line.quantity,
+              placementCodes: placements.map((placement) => placement.code),
+              placementTechniques: Object.fromEntries(
+                placements.map((placement) => [placement.code, placement.technique])
+              ),
+              placements,
+              designAssetId: placements[0].designAssetId,
+              designFeeCents: 0,
+              placementCostCents: 0,
+              pricingSource: 'owner-published',
+              unitCostCents: 0,
+              unitRetailCents: line.unitPriceCents,
+            };
+          });
+          const shipping = estimateShippingCents(
+            items.reduce((sum, item) => sum + item.quantity, 0)
           );
-        const files = prepared.files.map((file) => {
-          const assetId = idFor(`collection-print:${quoteId}:${file.itemId}:${file.placementCode}`);
-          return {
-            assetId,
-            itemId: file.itemId,
-            placementCode: file.placementCode,
-            path: `owner-artwork/${assetId}/purchase.png`,
-            sha256: file.sha256,
-            sourceChecksum: file.sourceChecksum,
-            width: file.width,
-            height: file.height,
-            byteSize: file.bytes.length,
-          };
-        });
-        const items: QuoteBreakdown['items'] = prepared.lines.map((line) => {
-          const placements = line.placements.map((placement) => ({
-            ...placement,
-            designAssetId: files.find(
-              (file) => file.itemId === line.itemId && file.placementCode === placement.code
-            )!.assetId,
-            additionalCostCents: 0,
-          }));
-          return {
-            productId: line.productId,
-            variantId: line.variantId,
-            printfulVariantId: line.printfulVariantId,
-            title: line.title,
-            variantName: line.variantName,
-            quantity: line.quantity,
-            placementCodes: placements.map((placement) => placement.code),
-            placementTechniques: Object.fromEntries(
-              placements.map((placement) => [placement.code, placement.technique])
-            ),
-            placements,
-            designAssetId: placements[0].designAssetId,
-            designFeeCents: 0,
+          const total = prepared.merchandiseSubtotalCents + shipping;
+          const quote: QuoteBreakdown = {
+            id: quoteId,
+            currency: 'USD',
+            productCostCents: 0,
             placementCostCents: 0,
-            pricingSource: 'owner-published',
-            unitCostCents: 0,
-            unitRetailCents: line.unitPriceCents,
+            shippingEstimateCents: shipping,
+            taxEstimateCents: 0,
+            aiDesignFeeCents: 0,
+            paymentFeeCents: 0,
+            targetMarginCents: 0,
+            studioPassCreditCents: 0,
+            subtotalBeforeCreditsCents: total,
+            totalCents: total,
+            estimateFlags: { shipping: true, tax: true, paymentFee: false },
+            costLines: [
+              {
+                code: 'collection-products',
+                label: 'Collection products',
+                amountCents: prepared.merchandiseSubtotalCents,
+                kind: 'cost',
+              },
+              {
+                code: 'shipping-estimate',
+                label: 'Estimated shipping',
+                amountCents: shipping,
+                kind: 'estimate',
+              },
+            ],
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            items,
+            collection: {
+              id: prepared.collectionId,
+              version: prepared.publicationVersion,
+              layoutRevision: prepared.layoutRevision,
+            },
           };
-        });
-        const shipping = estimateShippingCents(items.reduce((sum, item) => sum + item.quantity, 0));
-        const total = prepared.merchandiseSubtotalCents + shipping;
-        const quote: QuoteBreakdown = {
-          id: quoteId,
-          currency: 'USD',
-          productCostCents: 0,
-          placementCostCents: 0,
-          shippingEstimateCents: shipping,
-          taxEstimateCents: 0,
-          aiDesignFeeCents: 0,
-          paymentFeeCents: 0,
-          targetMarginCents: 0,
-          studioPassCreditCents: 0,
-          subtotalBeforeCreditsCents: total,
-          totalCents: total,
-          estimateFlags: { shipping: true, tax: true, paymentFee: false },
-          costLines: [
-            {
-              code: 'collection-products',
-              label: 'Collection products',
-              amountCents: prepared.merchandiseSubtotalCents,
-              kind: 'cost',
+          const manifest: PurchaseManifest = {
+            schemaVersion: 1,
+            quoteId,
+            sessionId: input.sessionId,
+            requestHash,
+            namespace: storage.namespace,
+            origin: {
+              collectionId: prepared.collectionId,
+              version: prepared.publicationVersion,
+              layoutRevision: prepared.layoutRevision,
+              reviewDigest: prepared.reviewDigest,
+              salesRevision: prepared.salesRevision,
             },
-            {
-              code: 'shipping-estimate',
-              label: 'Estimated shipping',
-              amountCents: shipping,
-              kind: 'estimate',
-            },
-          ],
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          items,
-          collection: {
-            id: prepared.collectionId,
-            version: prepared.publicationVersion,
-            layoutRevision: prepared.layoutRevision,
-          },
-        };
-        const manifest: PurchaseManifest = {
-          schemaVersion: 1,
-          quoteId,
-          sessionId: input.sessionId,
-          requestHash,
-          namespace: storage.namespace,
-          origin: {
-            collectionId: prepared.collectionId,
-            version: prepared.publicationVersion,
-            layoutRevision: prepared.layoutRevision,
-            reviewDigest: prepared.reviewDigest,
-            salesRevision: prepared.salesRevision,
-          },
-          files,
-          quote,
-        };
-        await getOrCreateDurableSession(input.sessionId);
-        await withCollectionLock(async (tx) => {
-          await assertPurchaseCurrent(manifest, tx);
-          await stagePurchase(manifest, tx);
-        });
-        // Object creation is immutable. An uncertain/duplicate upload is accepted only after byte verification.
-        for (const [index, file] of files.entries()) {
-          let matches = false;
-          try {
-            matches = hash(await storage.read(file.path)) === file.sha256;
-          } catch {
-            /* A not-yet-created object is expected. */
-          }
-          if (!matches) {
+            files,
+            quote,
+          };
+          await getOrCreateDurableSession(input.sessionId);
+          await withCollectionLock(async (tx) => {
+            await assertPurchaseCurrent(manifest, tx);
+            await stagePurchase(manifest, tx);
+          });
+          // Object creation is immutable. An uncertain/duplicate upload is accepted only after byte verification.
+          for (const [index, file] of files.entries()) {
+            let matches = false;
             try {
-              await storage.write(file.path, prepared.files[index].bytes, 'image/png');
+              matches = hash(await storage.read(file.path)) === file.sha256;
             } catch {
-              /* Read back to distinguish a completed retry from a failed write. */
+              /* A not-yet-created object is expected. */
             }
-            if (hash(await storage.read(file.path)) !== file.sha256) throw unavailable();
+            if (!matches) {
+              try {
+                await storage.write(file.path, prepared.files[index].bytes, 'image/png');
+              } catch {
+                /* Read back to distinguish a completed retry from a failed write. */
+              }
+              if (hash(await storage.read(file.path)) !== file.sha256) throw unavailable();
+            }
           }
+          await checkFiles(manifest, storage);
+          return await withCollectionLock(async (tx) => {
+            await assertPurchaseCurrent(manifest, tx);
+            return completePurchase(manifest, tx);
+          });
+        } catch (error) {
+          if (error instanceof HttpError) throw error;
+          throw unavailable();
         }
-        await checkFiles(manifest, storage);
-        return await withCollectionLock(async (tx) => {
-          await assertPurchaseCurrent(manifest, tx);
-          return completePurchase(manifest, tx);
-        });
-      } catch (error) {
-        if (error instanceof HttpError) throw error;
-        throw unavailable();
-      }
+      });
     },
     async validate(quote: QuoteBreakdown, sessionId?: string): Promise<string | null> {
       if (!quote.collection) return null;

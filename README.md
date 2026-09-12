@@ -103,12 +103,19 @@ stay private until publication. **Prepare print layouts** lets owners enter vari
 dimensions and offsets, save each print area, preview a transparent canvas, and download a
 300-PPI PNG while keeping the original intact. See the
 [print-layout contract](./docs/architecture/collection-print-layouts.md) for limits and review requirements.
-These public pages cannot take orders
-yet; binding approved products to checkout remains a V1 gate. See the
+**Enable collection ordering** separately approves the published prices and completed layouts.
+Customers can select quantities, review an estimate, accept policies, and check out under the
+installation's commerce settings. Durable quotes keep private verified print copies and checkout
+retries reuse one order. Physical sample and live lifecycle evidence remain V1 gates. See the
 [collection draft contract](./docs/architecture/admin-collection-drafts.md),
 [private artwork contract](./docs/architecture/admin-collection-artwork.md),
 [collection commerce contract](./docs/architecture/collection-commerce.md), and
 [review and publication contract](./docs/architecture/admin-collection-publication.md).
+
+**Orders & review** gives the owner a private order list, exact saved-print downloads, review notes,
+and explicitly confirmed draft retries when eligible. Review notes do not change payment or
+production status. Its maintenance control can clear expired, unattached print preparations while
+retaining every order-linked copy. Read the [collection owner runbook](./docs/launch/collection-owner-runbook.md).
 
 ```bash
 nvm use

@@ -45,6 +45,12 @@ export async function stagePurchase(manifest: PurchaseManifest, tx?: Prisma.Tran
   for (const file of manifest.files) {
     const found = await tx.designAsset.findUnique({ where: { id: file.assetId } });
     if (found) {
+      if (['retiring', 'retired'].includes(found.generationStatus))
+        throw new HttpError(
+          'This preparation expired. Start a fresh purchase request.',
+          410,
+          'collection_preparation_retired'
+        );
       if (found.sourceType !== 'collection' || found.purpose !== 'collection-print')
         throw mismatch();
       sameRequest(found.policyReport as unknown as PurchaseManifest, manifest);
@@ -74,6 +80,20 @@ export async function stagePurchase(manifest: PurchaseManifest, tx?: Prisma.Tran
   }
 }
 export async function completePurchase(manifest: PurchaseManifest, tx?: Prisma.TransactionClient) {
+  if (
+    tx &&
+    (await tx.designAsset.count({
+      where: {
+        id: { in: manifest.files.map((file) => file.assetId) },
+        generationStatus: { in: ['retiring', 'retired'] },
+      },
+    }))
+  )
+    throw new HttpError(
+      'This preparation expired. Start a fresh purchase request.',
+      410,
+      'collection_preparation_retired'
+    );
   const existing = await readPurchase(manifest.quoteId, tx);
   if (existing) {
     sameRequest(existing, manifest);
@@ -124,7 +144,11 @@ export async function completePurchase(manifest: PurchaseManifest, tx?: Prisma.T
   });
   await tx.designAsset.updateMany({
     where: { id: { in: manifest.files.map((file) => file.assetId) }, sourceType: 'collection' },
-    data: { generationStatus: 'complete', readinessStatus: 'pass' },
+    data: {
+      generationStatus: 'complete',
+      readinessStatus: 'pass',
+      policyReport: JSON.parse(JSON.stringify(manifest)) as Prisma.InputJsonValue,
+    },
   });
   await tx.auditLog.create({
     data: {

@@ -1,3 +1,4 @@
+import { preparationRetention } from '../collections/retention.service.js';
 import orderOperationsRoutes from './order-operations.routes.js';
 import { Router } from 'express';
 import { asyncHandler, HttpError } from '../middleware.js';
@@ -18,6 +19,21 @@ import {
 
 const router = Router();
 router.use('/order-operations', orderOperationsRoutes);
+router.post(
+  '/preparation-retention',
+  asyncHandler(async (req, res) => {
+    if (
+      !req.body ||
+      Array.isArray(req.body) ||
+      typeof req.body.clear !== 'boolean' ||
+      Object.keys(req.body).some((key) => !['clear', 'cursor'].includes(key)) ||
+      (req.body.cursor !== undefined && typeof req.body.cursor !== 'string')
+    )
+      throw new HttpError('Invalid preparation cleanup request.', 400);
+    res.json({ success: true, data: await preparationRetention.run(req.body) });
+  })
+);
+
 router.use('/collection-publications', collectionPublicationRoutes);
 router.use('/collection-artwork', collectionArtworkRoutes);
 router.get(

@@ -24,7 +24,7 @@ Entries describe source changes. They do not imply a release tag or production d
 - Intended print-size and resolution review, explicit template/content/public-display confirmation,
   and versioned collection preview publication at `/collections`. Saved private edits leave the
   public version intact. Replacing or withdrawing a preview revokes its old thumbnail routes, and
-  published references protect library files from removal. These pages do not accept orders yet.
+  published references protect library files from removal. Ordering is separately enabled after price and print-layout approval.
 - Published collections now include a protected sales-readiness check for source/catalog drift and
   missing owner prices. It checks the published snapshot independently of private edits, rejects
   stale versions, and distinguishes owner actions from the remaining production and checkout work.
@@ -32,14 +32,26 @@ Entries describe source changes. They do not imply a release tag or production d
   revisioned saves, private canvas previews, and transparent 300-PPI PNG export. Server checks reject
   clipping, oversized canvases, stale layouts, and mismatched original bytes. Original files stay
   unchanged; layouts survive restart and are discarded when the collection is replaced or withdrawn.
-  Automatic provider-template lookup and connecting prepared files to orders remain unfinished.
+  Automatic provider-template lookup remains unfinished; manual templates must be checked against the current provider variant.
 - Sales readiness now identifies each missing or invalid saved print layout, including an unsaved
   back print. A server-only purchase-preparation contract resolves published owner prices and
   supplier variants, verifies original bytes, and prepares separate print files with checksums.
-  It rejects altered inputs, stale versions, and oversized batches. This is in-memory groundwork;
-  durable collection quotes, purchased files, and checkout remain unfinished.
-- New installation defaults use Image 2.5 Flare. Existing configured model selections are preserved;
-  legacy Image 2 removal is a remaining V1 migration gate.
+  It rejects altered inputs, stale versions, and oversized batches.
+- Published, explicitly enabled collections now create durable owner-priced quotes and immutable
+  private print copies. Quantity selection, estimate review, policy acceptance, checkout, and a
+  protected order page work in the fixture rehearsal. Checkout retries reuse one order/session;
+  fulfillment verifies the copied files even after source withdrawal.
+- Owners can list/review orders, privately download exact saved collection prints, acknowledge or
+  resolve an issue with a note, and explicitly retry eligible draft preparation. Notes preserve
+  payment and production facts. Fixture reviews cannot contact a provider.
+- Owners can preview and clear abandoned print preparations after a seven-day post-expiry grace
+  period. All order-linked copies are retained; deletion tombstones support retry after interruption.
+  This is manual maintenance, not a scheduled job.
+- Flare and Sunburst are the active image-model choices. Legacy Image 2 settings migrate to Flare
+  while retaining owner budgets and historical artwork. remove.bg calls and setup controls are
+  retired; uploads retain the original and generated transparent output is validated.
+- Redacted image-token usage now reconciles provisional AI spend transactionally. Missing/uncertain
+  usage retains its reservation. Estimates are not provider invoice totals or a hard billing cap.
 
 ### Independent adoption
 
