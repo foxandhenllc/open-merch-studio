@@ -97,3 +97,8 @@ sample and the payment/refund/fulfillment/email lifecycle. Calibrate the selecte
 quality and invoices. Rehearse the chosen cloud backup procedure as well as this local paired restore.
 Complete release review, then bump versions and tag V1.0.0. Public persona forks and marketing claims
 should point to the verified release and actual evidence.
+
+## Review from a different computer
+
+Use the [private remote owner preview](remote-owner-preview.md) to access the persistent lab through
+an HTTPS URL with the existing access code. The Mac must remain online; live providers stay disabled.

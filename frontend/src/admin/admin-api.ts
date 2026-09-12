@@ -8,7 +8,7 @@ export async function adminRequest<T>(
   const response = await fetch(`/api/admin${path}`, {
     method,
     cache: 'no-store',
-    credentials: 'omit',
+    credentials: 'same-origin',
     headers: {
       'x-admin-access': accessCode,
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -31,7 +31,7 @@ export async function adminRequest<T>(
 export async function adminBinaryRequest(accessCode: string, path: string): Promise<Blob> {
   const response = await fetch(`/api/admin${path}`, {
     cache: 'no-store',
-    credentials: 'omit',
+    credentials: 'same-origin',
     headers: { 'x-admin-access': accessCode },
   });
   if (!response.ok || !response.headers.get('content-type')?.startsWith('image/'))

@@ -87,7 +87,7 @@ export function CollectionArtworkSlot({
         // The upload URL is short-lived and held only in memory. Never send the admin header to storage.
         const response = await fetch(pending.value.signedUrl!, {
           method: 'PUT',
-          credentials: 'omit',
+          credentials: 'same-origin',
           headers: { 'Content-Type': file.type },
           body: file,
         });
