@@ -1,3 +1,4 @@
+import orderOperationsRoutes from './order-operations.routes.js';
 import { Router } from 'express';
 import { asyncHandler, HttpError } from '../middleware.js';
 import { env } from '../config/env.js';
@@ -16,6 +17,7 @@ import {
 } from './merchant-profile.service.js';
 
 const router = Router();
+router.use('/order-operations', orderOperationsRoutes);
 router.use('/collection-publications', collectionPublicationRoutes);
 router.use('/collection-artwork', collectionArtworkRoutes);
 router.get(

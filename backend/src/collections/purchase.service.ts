@@ -250,6 +250,26 @@ export function createCollectionPurchaseService(storageFor = purchaseStorage) {
         return 'The collection or its prepared files changed. Request a fresh quote before checkout.';
       }
     },
+    async operatorPrint(quote: QuoteBreakdown, assetId: string): Promise<Buffer | null> {
+      try {
+        const manifest = quote.id && (await readPurchase(quote.id));
+        const storage = storageFor();
+        if (
+          !manifest ||
+          !storage ||
+          manifest.namespace !== storage.namespace ||
+          purchaseJson(manifest.quote) !== purchaseJson(quote)
+        )
+          return null;
+        const file = manifest.files.find((file) => file.assetId === assetId);
+        if (!file) return null;
+        await storage.assertPrivate();
+        const bytes = await storage.read(file.path);
+        return hash(bytes) === file.sha256 ? bytes : null;
+      } catch {
+        return null;
+      }
+    },
     async providerFiles(quote: QuoteBreakdown): Promise<Record<string, string> | null> {
       try {
         const manifest = quote.id && (await readPurchase(quote.id));

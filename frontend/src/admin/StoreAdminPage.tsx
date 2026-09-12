@@ -1,3 +1,4 @@
+import { OrderOperations } from './OrderOperations';
 import { useCallback, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { merchantConfig } from '../generated/merchant-config';
@@ -16,6 +17,7 @@ const sections: Array<{ id: AdminSection; label: string; number: string }> = [
   { id: 'connections', label: 'Connections', number: '04' },
   { id: 'artwork', label: 'Artwork & limits', number: '05' },
   { id: 'installation', label: 'Installation', number: '06' },
+  { id: 'orders', label: 'Orders & review', number: '07' },
 ];
 
 export function StoreAdminPage() {
@@ -336,6 +338,9 @@ export function StoreAdminPage() {
                 commerce need their own verification.
               </p>
             </>
+          )}
+          {section === 'orders' && (
+            <OrderOperations request={profileRequest} readFile={artworkRequest} />
           )}
           {section === 'artwork' && (
             <>

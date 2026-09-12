@@ -1,0 +1,134 @@
+.operation-toolbar,
+.operation-actions,
+.operation-prints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+.operation-toolbar {
+  justify-content: space-between;
+  margin: 24px 0;
+}
+.operation-toolbar label,
+.operation-note {
+  display: grid;
+  gap: 8px;
+}
+.operation-toolbar select,
+.operation-note textarea {
+  padding: 12px;
+  font: inherit;
+  border: 1px solid var(--admin-line);
+  background: var(--admin-paper);
+  color: inherit;
+}
+.operation-list {
+  border-top: 1px solid var(--admin-line);
+}
+.order-operations .operation-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto;
+  text-align: left;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--admin-line);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+.operation-row small {
+  display: block;
+  margin-top: 6px;
+  color: var(--admin-muted);
+}
+.order-operations .operation-row.selected {
+  box-shadow: inset 3px 0 var(--admin-accent);
+  padding-left: 16px;
+}
+.operation-detail {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--admin-line);
+}
+.operation-detail h3 {
+  margin-top: 28px;
+}
+.operation-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.operation-facts dd {
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+.operation-note textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.operation-actions {
+  margin-top: 16px;
+}
+.operation-history p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.operation-history li {
+  margin: 16px 0;
+}
+.operation-retry {
+  margin-top: 32px;
+}
+.order-operations button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .order-operations .operation-row {
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+  }
+  .operation-row > span:first-child {
+    grid-column: 1 / -1;
+  }
+  .operation-toolbar {
+    align-items: stretch;
+  }
+  .operation-toolbar label {
+    flex: 1;
+  }
+  .operation-actions button,
+  .operation-prints button {
+    width: 100%;
+  }
+}
+
+.operation-note textarea:focus-visible {
+  outline: 3px solid #73ae95;
+  outline-offset: 3px;
+}
+.operation-toolbar button,
+.operation-actions button,
+.operation-prints button,
+.operation-retry > button {
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid var(--admin-line);
+  border-radius: 4px;
+  background: var(--admin-paper);
+  color: var(--admin-ink);
+  font-weight: 600;
+}
+.operation-toolbar button:hover:not(:disabled),
+.operation-actions button:hover:not(:disabled),
+.operation-prints button:hover:not(:disabled),
+.operation-retry > button:hover:not(:disabled) {
+  background: #edf2e9;
+  border-color: var(--admin-accent);
+}

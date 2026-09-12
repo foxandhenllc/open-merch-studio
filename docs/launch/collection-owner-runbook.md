@@ -52,6 +52,21 @@ quality. Do not advertise a real purchase or shipment from fixture screenshots.
 - **Customer lost browser access:** use the existing verified order-link/support workflow. Never ask
   the customer to share a provider token or copy a private artwork URL into a support ticket.
 
+## Review an order
+
+Open **Store admin → Orders & review** and select **Needs attention** to inspect unresolved orders.
+Choose an order, download every saved collection print, and compare it with the provider template
+and editable draft. The order's saved copy remains available after a collection changes or withdraws.
+
+Use **Acknowledge review** to record that someone has picked it up. Add a note naming the issue and
+next responsible person; omit private customer/account information. **Mark issue resolved** records
+that note and clears the review flag. It does not refund, ship, or approve production.
+
+When eligible, **Retry draft preparation** offers an explicit confirmation. Check the provider for
+an existing draft first. Refresh after an uncertain result rather than creating another order.
+Production is still confirmed in Printful. Fixture mode labels reviews as simulated and never offers
+provider retries; fixture notes reset when the backend restarts.
+
 ## Responsibility after handoff
 
 The merchant handles artwork rights, pricing, customer questions, policy decisions, cancellations,

@@ -209,8 +209,11 @@ test('collection quotes keep private print copies and owner prices through retri
     objects.set(filePath, Buffer.from('wrong bytes'));
     assert.ok(await service.validate(recovered, input.sessionId));
     assert.equal(await service.providerFiles(recovered), null);
+    assert.equal(await service.operatorPrint(recovered, manifest.files[0].assetId), null);
     objects.set(filePath, bytes);
     assert.ok(await service.providerFiles(recovered));
+    assert.deepEqual(await service.operatorPrint(recovered, manifest.files[0].assetId), bytes);
+    assert.equal(await service.operatorPrint(recovered, assetId), null);
     const changedStorage = createCollectionPurchaseService(() => ({
       ...storage,
       namespace: 'different-bucket',
@@ -266,6 +269,7 @@ test('collection quotes keep private print copies and owner prices through retri
       'Previously purchased copies survive source removal'
     );
     assert.deepEqual(await getQuoteById(q.id), q);
+    assert.deepEqual(await service.operatorPrint(recovered, manifest.files[0].assetId), bytes);
   } finally {
     variant.printfulVariantId = oldSupplierId;
     Object.assign(env, previous);

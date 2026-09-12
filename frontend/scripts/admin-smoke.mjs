@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import express from 'express';
 import { chromium } from 'playwright';
+import { verifyOrderOperations } from './admin-orders-contract.mjs';
 import { verifyProfileEditor } from './admin-profile-contract.mjs';
 import { verifyCollectionEditor } from './admin-collections-contract.mjs';
 
@@ -231,6 +232,7 @@ try {
       savedVariables: () => savedVariables,
     });
     await verifyCollectionEditor({ page, context, origin, viewport, output, signIn });
+    await verifyOrderOperations({ page, viewport, output });
     const stored = await page.evaluate(() =>
       JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } })
     );

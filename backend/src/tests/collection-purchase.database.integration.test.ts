@@ -19,6 +19,7 @@ test(
     const db = new PrismaClient({ datasources: { db: { url: testUrl } }, log: [] });
     const productId = randomUUID(),
       variantId = randomUUID(),
+      orderId = randomUUID(),
       sessionId = randomUUID();
     const keys = [
       'installation-collection-drafts-v1',
@@ -34,6 +35,7 @@ test(
     import { saveCollectionPrintLayouts } from './backend/src/admin/collection-print-layouts.ts';
     import { setCollectionSales } from './backend/src/collections/sales.service.ts';
     import { createCollectionPurchaseService } from './backend/src/collections/purchase.service.ts';
+    import { operationDetail, recordOperationReview } from './backend/src/admin/order-operations.service.ts';
     import { getQuoteById } from './backend/src/services/order-repository.service.ts';
     import { getDesignAssetImage } from './backend/src/services/design.service.ts';
     collectionArtwork.binary = service.binary;
@@ -97,6 +99,42 @@ test(
       run(
         `const quote = await getQuoteById('${quote.id}'); assert.deepEqual(quote, ${JSON.stringify(quote)}); assert.deepEqual(await purchases.create(${JSON.stringify(input)}), quote); assert.equal(await purchases.validate(quote, '${sessionId}'), null); assert.ok(await purchases.providerFiles(quote)); for (const item of quote.items) assert.equal(await getDesignAssetImage(item.designAssetId), null); await prisma.$disconnect();`
       );
+      await db.order.create({
+        data: {
+          id: orderId,
+          orderNumber: `OMS-${orderId}`,
+          quoteId: quote.id,
+          status: 'PAID',
+          totalCents: quote.totalCents,
+          paidAt: new Date(),
+          email: 'private-fixture@example.test',
+          stripeSessionId: 'cs_private_fixture',
+          recipient: { address: 'private-fixture-address' },
+        },
+      });
+      run(
+        `const d = await recordOperationReview('${orderId}', 'acknowledged', 'Prints reviewed.'); assert.equal(d.summary.status, 'paid'); assert.equal(d.retryAvailable, false); assert.equal(d.prints.length, 1); assert.ok(await purchases.operatorPrint(await getQuoteById('${quote.id}'), d.prints[0].assetId)); await prisma.$disconnect();`
+      );
+      run(
+        `const d = await operationDetail('${orderId}'); assert.equal(d.summary.reviewStatus, 'acknowledged'); assert.equal(d.reviews[0].note, 'Prints reviewed.'); assert.ok(!/cs_private_fixture|private-fixture-address|private-fixture@example/.test(JSON.stringify(d))); await prisma.$disconnect();`
+      );
+      await db.$executeRawUnsafe(
+        `CREATE FUNCTION reject_review_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'order.review_resolved' THEN RAISE EXCEPTION 'fixture audit failure'; END IF; RETURN NEW; END $$`
+      );
+      await db.$executeRawUnsafe(
+        'CREATE TRIGGER reject_review_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION reject_review_audit()'
+      );
+      run(
+        `await assert.rejects(() => recordOperationReview('${orderId}', 'resolved', 'Checked.')); assert.equal((await operationDetail('${orderId}')).summary.reviewStatus, 'acknowledged'); await prisma.$disconnect();`
+      );
+      await db.$executeRawUnsafe('DROP TRIGGER reject_review_audit ON audit_logs');
+      await db.$executeRawUnsafe('DROP FUNCTION reject_review_audit()');
+      run(
+        `await recordOperationReview('${orderId}', 'resolved', 'Ready for owner production review.'); await prisma.$disconnect();`
+      );
+      run(
+        `const d = await operationDetail('${orderId}'); assert.equal(d.summary.reviewStatus, 'resolved'); assert.equal(d.summary.status, 'paid'); assert.equal(d.reviews.length, 2); await prisma.$disconnect();`
+      );
       const retry = { ...input, requestId: randomUUID() };
       await db.$executeRawUnsafe(
         `CREATE FUNCTION reject_purchase_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'collection_quote_prepared' THEN RAISE EXCEPTION 'fixture audit failure'; END IF; RETURN NEW; END $$`
@@ -138,6 +176,10 @@ test(
         `const quote = await getQuoteById('${quote.id}'); assert.equal(quote.items[0].variantName, 'Fixture variant'); assert.equal(quote.items[0].title, 'Artist edition'); assert.ok(await purchases.validate(quote, '${sessionId}')); const s = await publicationStatus(); await withdrawCollection('${selection.collectionId}', s.revision); const d = await readCollectionDrafts(); await saveCollectionDrafts([], d.revision); await service.remove('${assetId}'); assert.ok(await purchases.providerFiles(quote)); await prisma.$disconnect();`
       );
     } finally {
+      await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS reject_review_audit ON audit_logs');
+      await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS reject_review_audit()');
+      await db.order.deleteMany({ where: { id: orderId } });
+      await db.auditLog.deleteMany({ where: { target: orderId } });
       await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS reject_purchase_audit ON audit_logs');
       await db.$executeRawUnsafe('DROP FUNCTION IF EXISTS reject_purchase_audit()');
       await db.quote.deleteMany({

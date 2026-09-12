@@ -40,6 +40,7 @@ export type AdminSetup = {
 };
 export type AdminSection =
   | 'overview'
+  | 'orders'
   | 'artwork'
   | 'connections'
   | 'installation'
