@@ -92,8 +92,8 @@ export function PublishedCollectionsPage({ id }: { id?: string }) {
                         }}
                       />
                       <figcaption>
-                        {artwork.label} · {artwork.widthInches} × {artwork.heightInches} in planned
-                        artwork
+                        {artwork.label} · {artwork.widthInches} × {artwork.heightInches} in{' '}
+                        {product.artworkMode === 'fixed' ? 'artwork' : 'example artwork'}
                       </figcaption>
                     </figure>
                   ))}
@@ -112,7 +112,9 @@ export function PublishedCollectionsPage({ id }: { id?: string }) {
                 )}
                 <p className="published-collection-note">
                   {collection.orderingAvailable
-                    ? 'Artwork preview for the listed product and variant. Review shipping and tax before payment.'
+                    ? product.artworkMode === 'fixed'
+                      ? 'Artwork preview for the listed product and variant. Review shipping and tax before payment.'
+                      : 'Example artwork. Add your own design below; the product, price and print area stay as shown.'
                     : 'Artwork preview. Product appearance, shipping, tax, and final price will be confirmed when ordering opens.'}
                 </p>
               </article>

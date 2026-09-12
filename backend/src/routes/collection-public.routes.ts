@@ -1,3 +1,6 @@
+import { generateCollectionArtwork } from '../collections/personalization-generation.js';
+import { collectionPurchasePreview } from '../collections/purchase-preview.js';
+import { requestStoreSettings } from '../admin/request-settings.js';
 import { collectionPurchases } from '../collections/purchase.service.js';
 import { collectionCommerceMode } from '../collections/sales.service.js';
 import { Router } from 'express';
@@ -37,6 +40,27 @@ router.get(
     res.setHeader('Content-Type', file.contentType);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(file.buffer);
+  })
+);
+router.post(
+  '/:id/artwork',
+  requestStoreSettings,
+  asyncHandler(async (req, res) => {
+    if (
+      !req.body ||
+      typeof req.body !== 'object' ||
+      Array.isArray(req.body) ||
+      'collectionId' in req.body
+    )
+      throw new HttpError('Invalid collection artwork request.', 400);
+    const draft = await generateCollectionArtwork({ ...req.body, collectionId: req.params.id });
+    res.status(201).json({ success: true, data: draft });
+  })
+);
+router.post(
+  '/quotes/:quoteId/preview',
+  asyncHandler(async (req, res) => {
+    res.type('png').send(await collectionPurchasePreview(req.params.quoteId, req.body));
   })
 );
 router.post(

@@ -37,3 +37,26 @@ selection while navigating and make saved, reviewed, deployed, and simulated sta
 Scenario-specific Twitch ingestion, competitions, voting, subscriptions and arbitrary workflow APIs
 remain later client-style forks. Test the reusable foundation with rights-cleared supplied artwork,
 AI fixtures, and explicit reviewed orders rather than claiming those integrations already exist.
+
+## Completed during owner-acceptance preparation
+
+- `585c4f6`: complete-history owner order search, attention filtering and pagination, including
+  older unresolved refunds and paging recovery. Seven isolated database checks and responsive
+  browser suite passed at that checkpoint.
+- `82cc414`: private logo/share preparation, reviewed profile publication, canonical URL editing,
+  source-independent brand copies and legacy draft compatibility. 127 backend tests, 18 root tests,
+  eight isolated database checks, and the full desktop/mobile browser suite passed.
+- `e0e9989`: persona-guided setup tasks, persisted progress, read-only migration/private-bucket
+  checks, configuration-change invalidation and explicit failed-save recovery. 129 backend tests,
+  18 root tests, nine isolated database checks, and responsive/admin browser contracts passed.
+  Screenshots inspected at desktop and phone widths. Setup still requires owned cloud accounts,
+  first-time hosting identity and migration execution; the guide does not claim provisioning.
+
+- Controlled personalization: owner-selected upload, generation and reference modes now keep
+  products, prices and print layouts attached. Session ownership, private original checksums,
+  generation replay receipts, saved print preview approval and interrupted-request recovery are
+  verified. 130 backend tests and 18 root tests passed; ten isolated database checks passed without
+  skips. Desktop and phone admin/purchase contracts passed, including all three customer modes.
+
+Current work: isolated backup/restore and a repeatable owner-testing installation with the exact
+walkthrough and remaining live-only checks.

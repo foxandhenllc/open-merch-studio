@@ -1,0 +1,59 @@
+.collection-artwork-input {
+  padding: 1.25rem 0 1.75rem;
+  border-top: 1px solid #ced8d0;
+}
+.collection-artwork-input h3 {
+  margin: 0;
+}
+.collection-artwork-input > p {
+  line-height: 1.6;
+  max-width: 65ch;
+}
+.collection-artwork-input > img {
+  width: 12rem;
+  max-width: 100%;
+  max-height: 12rem;
+  object-fit: contain;
+}
+.collection-artwork-input label {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.collection-artwork-input input[type='file'] {
+  max-width: 100%;
+  min-width: 0;
+}
+.collection-artwork-input textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.75rem;
+}
+.collection-artwork-input .collection-purchase-consent {
+  display: flex;
+  align-items: flex-start;
+}
+.collection-artwork-input button + button {
+  margin-top: 0.75rem;
+}
+.collection-print-previews {
+  margin-block: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.collection-print-previews figure {
+  margin: 0;
+}
+.collection-print-previews img {
+  display: block;
+  width: 100%;
+  max-height: 22rem;
+  object-fit: contain;
+  background: #eaece7;
+}
+.collection-print-previews figcaption {
+  padding-top: 0.5rem;
+  font-size: 0.85rem;
+}

@@ -163,7 +163,7 @@ export type DesignDraft = {
   sessionId?: string;
   provider: 'mock' | 'openai-ready' | 'openai' | 'upload';
   sourceType?: 'generated' | 'uploaded' | 'reference_generated' | 'edited';
-  purpose?: 'print' | 'reference';
+  purpose?: 'print' | 'reference' | 'collection';
   generationStatus: 'complete' | 'failed';
   prompt: string;
   imageUrl: string;

@@ -24,22 +24,22 @@ export const artworkModes = [
   {
     id: "fixed",
     label: "Owner artwork only",
-    hint: "Plan a fixed design with no customer changes.",
+    hint: "Use the owner’s approved artwork with no customer changes.",
   },
   {
     id: "upload",
     label: "Customer uploads artwork",
-    hint: "Plan direct use of an uploaded image, without generative changes.",
+    hint: "Use a customer original without generative changes, fitted inside your approved print area.",
   },
   {
     id: "generate",
     label: "Customer generates a design",
-    hint: "Plan a new design from a text prompt.",
+    hint: "Allow a new design from a text prompt inside your approved print area.",
   },
   {
     id: "reference",
     label: "Customer provides a reference",
-    hint: "Plan a new design guided by a supplied image.",
+    hint: "Allow a new design guided by a supplied reference inside your approved print area.",
   },
 ];
 const fail = (message) => {

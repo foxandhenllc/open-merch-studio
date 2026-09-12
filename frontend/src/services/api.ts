@@ -220,7 +220,7 @@ export const api = {
   uploadArtwork: async (body: {
     file: File;
     sessionId?: string;
-    purpose: 'print' | 'reference';
+    purpose: 'print' | 'reference' | 'collection';
     rightsConfirmed: boolean;
     placementCodes?: string[];
     removeBackground?: boolean;

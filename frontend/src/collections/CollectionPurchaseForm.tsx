@@ -1,3 +1,5 @@
+import { CollectionArtworkInput } from './CollectionArtworkInput';
+import { CollectionPrintPreviews } from './CollectionPrintPreviews';
 import { useEffect, useState } from 'react';
 import type { PublicCollection } from '@open-merch-studio/collection-drafts';
 import type { QuoteBreakdown, CheckoutSession } from '../types/catalog';
@@ -47,6 +49,16 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
       if (parsed && /^[a-f0-9-]{36}$/.test(parsed.requestId))
         return {
           requestId: parsed.requestId,
+          artwork: Object.fromEntries(
+            collection.products
+              .filter(
+                (item) =>
+                  item.artworkMode !== 'fixed' &&
+                  typeof parsed.artwork?.[item.id] === 'string' &&
+                  /^[A-Za-z0-9_-]{1,100}$/.test(parsed.artwork[item.id])
+              )
+              .map((item) => [item.id, parsed.artwork![item.id]])
+          ),
           quantities: Object.fromEntries(
             collection.products.map((item) => [
               item.id,
@@ -66,6 +78,8 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
   const [quote, setQuote] = useState<QuoteBreakdown | null>(null);
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState('');
+  const [artworkBusy, setArtworkBusy] = useState(false);
+  const [printsReady, setPrintsReady] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -83,7 +97,13 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
     try {
       const items = collection.products
         .filter((item) => cart.quantities[item.id] > 0)
-        .map((item) => ({ itemId: item.id, quantity: cart.quantities[item.id] }));
+        .map((item) => ({
+          itemId: item.id,
+          quantity: cart.quantities[item.id],
+          ...(item.artworkMode !== 'fixed' && cart.artwork?.[item.id]
+            ? { designAssetId: cart.artwork[item.id] }
+            : {}),
+        }));
       if (!items.length) throw new Error('Choose a quantity for at least one product.');
       const result = await post<QuoteBreakdown>(`/api/collections/${collection.id}/quotes`, {
         sessionId,
@@ -106,7 +126,7 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
     }
   }
   async function checkout() {
-    if (!quote || !accepted) return;
+    if (!quote || !accepted || !printsReady || artworkBusy) return;
     setBusy(true);
     setError('');
     try {
@@ -144,36 +164,58 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
           Fixture store: checkout is simulated. No payment or shipment is created.
         </p>
       )}
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy || artworkBusy}>
         <legend>Products and quantities</legend>
         {collection.products.map((item) => (
-          <label className="collection-purchase-line" key={item.id}>
-            <span>
-              {item.title}
-              <small>
-                {item.variantName} · {money(item.plannedPriceCents ?? 0)} each
-              </small>
-            </span>
-            <input
-              aria-label={`Quantity · ${item.title}`}
-              type="number"
-              min="0"
-              max="25"
-              step="1"
-              value={cart.quantities[item.id] ?? 0}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                if (!Number.isInteger(value) || value < 0 || value > 25) return;
-                setCart({
-                  quantities: { ...cart.quantities, [item.id]: value },
-                  requestId: crypto.randomUUID(),
-                });
-                setQuote(null);
-                setAccepted(false);
-                setError('');
-              }}
-            />
-          </label>
+          <div key={item.id}>
+            <label className="collection-purchase-line">
+              <span>
+                {item.title}
+                <small>
+                  {item.variantName} · {money(item.plannedPriceCents ?? 0)} each
+                </small>
+              </span>
+              <input
+                aria-label={`Quantity · ${item.title}`}
+                type="number"
+                min="0"
+                max="25"
+                step="1"
+                value={cart.quantities[item.id] ?? 0}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (!Number.isInteger(value) || value < 0 || value > 25) return;
+                  setCart({
+                    ...cart,
+                    quantities: { ...cart.quantities, [item.id]: value },
+                    requestId: crypto.randomUUID(),
+                  });
+                  setQuote(null);
+                  setAccepted(false);
+                  setError('');
+                }}
+              />
+            </label>
+            {item.artworkMode !== 'fixed' && (cart.quantities[item.id] ?? 0) > 0 && (
+              <CollectionArtworkInput
+                collection={collection}
+                item={item}
+                sessionId={sessionId}
+                assetId={cart.artwork?.[item.id]}
+                working={setArtworkBusy}
+                changed={(assetId) => {
+                  setCart((current) => ({
+                    ...current,
+                    artwork: { ...current.artwork, [item.id]: assetId ?? '' },
+                    requestId: crypto.randomUUID(),
+                  }));
+                  setQuote(null);
+                  setAccepted(false);
+                  setPrintsReady(false);
+                }}
+              />
+            )}
+          </div>
         ))}
         <button type="button" onClick={() => void review()}>
           {busy && !quote ? 'Preparing order estimate…' : 'Review order'}
@@ -182,6 +224,7 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
       {quote && (
         <div className="collection-order-summary" aria-live="polite">
           <h3>Your order estimate</h3>
+          <CollectionPrintPreviews quote={quote} sessionId={sessionId} ready={setPrintsReady} />
           {quote.costLines.map((line) => (
             <p key={line.code}>
               <span>{line.label}</span>
@@ -214,7 +257,7 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
               onChange={(event) => setAccepted(event.target.checked)}
             />
             <span>
-              I agree to the{' '}
+              I reviewed my saved print previews and agree to the{' '}
               <a href="/privacy" target="_blank" rel="noreferrer">
                 Privacy policy
               </a>
@@ -237,7 +280,11 @@ export function CollectionPurchaseForm({ collection }: { collection: PublicColle
               .
             </span>
           </label>
-          <button type="button" disabled={busy || !accepted} onClick={() => void checkout()}>
+          <button
+            type="button"
+            disabled={busy || artworkBusy || !accepted || !printsReady}
+            onClick={() => void checkout()}
+          >
             {busy
               ? 'Opening checkout…'
               : collection.commerceMode === 'fixture'

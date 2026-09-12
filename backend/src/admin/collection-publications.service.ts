@@ -172,6 +172,7 @@ const publicRecord = (entry: Publication): PublicCollection => ({
     productTitle: entry.review.products.find((product) => product.itemId === item.id)!.productTitle,
     variantName: entry.review.products.find((product) => product.itemId === item.id)!.variantName,
     plannedPriceCents: item.targetPriceCents,
+    artworkMode: item.artworkMode,
     artwork: entry.review.areas
       .filter((area) => area.itemId === item.id)
       .map((area) => ({

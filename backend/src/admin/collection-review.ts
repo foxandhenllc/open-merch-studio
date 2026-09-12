@@ -97,10 +97,6 @@ export async function reviewCollectionSnapshot(
       },
       variant,
     });
-    if (item.artworkMode !== 'fixed')
-      issues.push(
-        `${item.title}: public previews currently support owner artwork only. Keep customer personalization in draft.`
-      );
     for (const code of item.placementCodes) {
       const placement = product.placements.find((entry) => entry.code === code);
       const binding = item.artwork?.find((entry) => entry.placementCode === code);

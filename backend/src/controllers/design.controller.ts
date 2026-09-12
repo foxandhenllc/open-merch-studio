@@ -33,7 +33,12 @@ export const getDesignAllowance = asyncHandler(async (req: Request, res: Respons
 });
 
 export const postUploadAuthorization = asyncHandler(async (req: Request, res: Response) => {
-  const purpose = req.body?.purpose === 'reference' ? 'reference' : 'print';
+  const purpose =
+    req.body?.purpose === 'reference'
+      ? 'reference'
+      : req.body?.purpose === 'collection'
+        ? 'collection'
+        : 'print';
   const authorization = await authorizeArtworkUpload({
     sessionId: String(req.body?.sessionId ?? '') || undefined,
     filename: String(req.body?.filename ?? 'uploaded-artwork'),
@@ -54,7 +59,12 @@ export const postUploadCompletion = asyncHandler(async (req: Request, res: Respo
     inlineDataUrl: String(req.body?.inlineDataUrl ?? '') || undefined,
     filename: String(req.body?.filename ?? '') || undefined,
     contentType: String(req.body?.contentType ?? '') || undefined,
-    purpose: req.body?.purpose === 'reference' ? 'reference' : 'print',
+    purpose:
+      req.body?.purpose === 'reference'
+        ? 'reference'
+        : req.body?.purpose === 'collection'
+          ? 'collection'
+          : 'print',
   });
   res.status(201).json({ success: true, data: draft });
 });

@@ -1,3 +1,4 @@
+import { verifyCollectionPersonalization } from './collection-personalization-contract.mjs';
 import { verifyInstallationGuide } from './admin-installation-contract.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -235,6 +236,7 @@ try {
     await verifyCollectionEditor({ page, context, origin, viewport, output, signIn });
     await verifyOrderOperations({ page, viewport, output });
     await verifyInstallationGuide({ page, viewport, output, signIn });
+    await verifyCollectionPersonalization({ context, origin, viewport, output });
     const stored = await page.evaluate(() =>
       JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } })
     );

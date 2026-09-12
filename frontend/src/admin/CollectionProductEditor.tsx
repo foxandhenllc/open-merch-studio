@@ -202,7 +202,7 @@ export function CollectionProductEditor({
           />
         ))}
       <label className="collection-artwork-plan">
-        Planned customer options
+        Customer artwork option
         <select
           value={item.artworkMode}
           onChange={(event) =>
@@ -216,8 +216,8 @@ export function CollectionProductEditor({
           ))}
         </select>
         <small>
-          {artworkModes.find(({ id }) => id === item.artworkMode)?.hint} Applied to customers only
-          after the future publication step.
+          {artworkModes.find(({ id }) => id === item.artworkMode)?.hint} Applied after you publish
+          this collection. Owner artwork supplies the public example and print-area bounds.
         </small>
       </label>
     </section>

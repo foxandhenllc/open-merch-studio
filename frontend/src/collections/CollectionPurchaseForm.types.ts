@@ -1,1 +1,5 @@
-export type Cart = { quantities: Record<string, number>; requestId: string };
+export type Cart = {
+  quantities: Record<string, number>;
+  artwork?: Record<string, string>;
+  requestId: string;
+};

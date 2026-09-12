@@ -1,3 +1,8 @@
+import {
+  rememberFixtureOriginal,
+  forgetFixtureOriginal,
+  forgetFixtureSessionOriginals,
+} from './fixture-upload-originals.js';
 import { createHash, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { prisma } from '../config/database.js';
@@ -65,7 +70,7 @@ export async function authorizeArtworkUpload(params: {
   filename: string;
   contentType: string;
   byteSize: number;
-  purpose: 'print' | 'reference';
+  purpose: 'print' | 'reference' | 'collection';
 }): Promise<AssetUploadAuthorization> {
   assertUploadMetadata(params);
   const session = await getOrCreateDurableSession(params.sessionId);
@@ -174,7 +179,10 @@ export async function deleteArtworkUpload(params: {
   assetId: string;
   sessionId: string;
 }): Promise<boolean> {
-  if (!assetStorageConfigured()) return true;
+  if (!assetStorageConfigured()) {
+    forgetFixtureOriginal(params.assetId, params.sessionId);
+    return true;
+  }
   const asset = await prisma.designAsset.findFirst({
     where: {
       id: params.assetId,
@@ -197,7 +205,10 @@ export async function deleteArtworkUpload(params: {
 }
 
 export async function deleteAbandonedSessionUploads(sessionId: string): Promise<number> {
-  if (!assetStorageConfigured()) return 0;
+  if (!assetStorageConfigured()) {
+    forgetFixtureSessionOriginals(sessionId);
+    return 0;
+  }
   const candidates = await prisma.designAsset.findMany({
     where: {
       studioSessionId: sessionId,
@@ -244,7 +255,7 @@ function readinessForUpload(params: {
   width: number;
   height: number;
   placementCodes: string[];
-  purpose: 'print' | 'reference';
+  purpose: 'print' | 'reference' | 'collection';
   preparationMessage: string;
   preparationReady: boolean;
 }): DesignDraft['readiness'] {
@@ -312,7 +323,7 @@ export async function completeArtworkUpload(params: {
   inlineDataUrl?: string;
   filename?: string;
   contentType?: string;
-  purpose?: 'print' | 'reference';
+  purpose?: 'print' | 'reference' | 'collection';
 }): Promise<DesignDraft> {
   if (params.removeBackground)
     throw new HttpError(
@@ -360,7 +371,10 @@ export async function completeArtworkUpload(params: {
   const height = normalized.info.height;
   if (!width || !height) throw new HttpError('The image dimensions could not be read.', 400);
   const hasAlpha = Boolean(normalized.info.hasAlpha);
-  const purpose = (stored?.purpose ?? params.purpose ?? 'print') as 'print' | 'reference';
+  const purpose = (stored?.purpose ?? params.purpose ?? 'print') as
+    | 'print'
+    | 'reference'
+    | 'collection';
   const checksumSha256 = createHash('sha256').update(original).digest('hex');
   const preview = await sharp(normalized.data)
     .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
@@ -464,5 +478,7 @@ export async function completeArtworkUpload(params: {
     }
   }
 
+  if (!stored && !env.databaseUrl && env.nodeEnv !== 'production')
+    rememberFixtureOriginal(draft.id!, session.id, original);
   return saveDraft(draft);
 }

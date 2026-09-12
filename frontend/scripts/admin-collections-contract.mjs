@@ -25,10 +25,10 @@ export async function verifyCollectionEditor({ page, context, origin, viewport, 
   const first = page.getByRole('region', { name: 'Product 1', exact: true });
   await first.getByLabel('Product name', { exact: true }).fill('Artist edition tee');
   await first.getByLabel('Target price').fill('29.95');
-  assert.equal(await first.getByLabel('Planned customer options').inputValue(), 'fixed');
+  assert.equal(await first.getByLabel('Customer artwork option').inputValue(), 'fixed');
   await page.getByLabel('Collection purpose').selectOption('drop');
   assert.equal(
-    await first.getByLabel('Planned customer options').inputValue(),
+    await first.getByLabel('Customer artwork option').inputValue(),
     'fixed',
     'Purpose guidance must not silently enable AI'
   );
@@ -37,7 +37,7 @@ export async function verifyCollectionEditor({ page, context, origin, viewport, 
   await page.getByRole('button', { name: '+ Add product', exact: true }).click();
   const second = page.getByRole('region', { name: 'Product 2', exact: true });
   await second.getByLabel('Product name', { exact: true }).fill('Community print');
-  await second.getByLabel('Planned customer options').selectOption('upload');
+  await second.getByLabel('Customer artwork option').selectOption('upload');
   await second.getByRole('button', { name: 'Move product 2 up' }).click();
   assert.equal(
     await first.getByLabel('Product name', { exact: true }).inputValue(),

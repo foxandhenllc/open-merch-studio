@@ -913,12 +913,14 @@ export async function getDesignAssetImage(
   assetId: string
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   const draft = getDraft(assetId);
+  if (draft?.sourceType === 'uploaded') return null;
   const runtimeImage = draft ? dataUrlToBuffer(draft.imageUrl) : null;
   if (runtimeImage) return runtimeImage;
 
   if (!env.databaseUrl) return null;
 
   const asset = await prisma.designAsset.findUnique({ where: { id: assetId } });
+  if (asset?.sourceType === 'uploaded') return null;
   const imageUrl = asset?.transparentUrl ?? asset?.imageUrl;
   return imageUrl ? dataUrlToBuffer(imageUrl) : null;
 }

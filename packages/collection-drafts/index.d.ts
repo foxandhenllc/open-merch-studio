@@ -53,6 +53,7 @@ export type PublicCollection = CollectionPublicationSummary & {
     productTitle: string;
     variantName: string;
     plannedPriceCents: number | null;
+    artworkMode: ArtworkMode;
     artwork: Array<{
       label: string;
       previewUrl: string;

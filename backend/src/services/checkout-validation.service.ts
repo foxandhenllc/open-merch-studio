@@ -14,6 +14,8 @@ export type CheckoutDesignState = {
 
 export function checkoutDesignIssue(design: CheckoutDesignState | undefined): string | null {
   if (!design) return 'Selected artwork could not be verified for checkout.';
+  if (design.purpose === 'collection')
+    return 'Prepare this artwork through its collection so the owner’s product, price and print layout remain attached.';
   if (design.purpose === 'reference') {
     return 'Reference images must be turned into print artwork first.';
   }

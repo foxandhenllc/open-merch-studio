@@ -98,7 +98,7 @@ export function createCollectionPurchaseService(storageFor = purchaseStorage) {
             return structuredClone(existing.quote);
           }
           await reserveCollectionPreparation(input.sessionId);
-          const prepared = await prepareCollectionPurchase(selection);
+          const prepared = await prepareCollectionPurchase(selection, input.sessionId);
           if (!prepared.salesRevision)
             throw new HttpError(
               'Ordering is paused for this collection.',

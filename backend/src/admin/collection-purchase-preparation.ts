@@ -1,3 +1,7 @@
+import {
+  personalizedArtwork,
+  renderPersonalizedPrint,
+} from '../collections/personalized-artwork.js';
 import { createHash } from 'node:crypto';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
@@ -9,7 +13,7 @@ import { assertPublicationCurrent, renderVerifiedPrint } from './collection-prin
 import { collectionLayoutIssues } from './collection-print-layout-checks.js';
 import { layoutPixels, PRINT_DENSITY } from './collection-print-render.js';
 
-type Selection = { itemId: string; quantity: number };
+type Selection = { itemId: string; quantity: number; designAssetId?: string };
 type PurchaseSelection = {
   collectionId: string;
   version: number;
@@ -40,7 +44,11 @@ function selection(value: unknown): PurchaseSelection {
     value.items.length > MAX_QUOTE_LINE_ITEMS ||
     value.items.some(
       (item) =>
-        !exactObject(item, ['itemId', 'quantity']) ||
+        (!exactObject(item, ['itemId', 'quantity']) &&
+          !exactObject(item, ['itemId', 'quantity', 'designAssetId'])) ||
+        ('designAssetId' in item &&
+          (typeof item.designAssetId !== 'string' ||
+            !/^[A-Za-z0-9_-]{1,100}$/.test(item.designAssetId))) ||
         typeof item.itemId !== 'string' ||
         !item.itemId ||
         item.itemId.length > 100 ||
@@ -64,7 +72,7 @@ function selection(value: unknown): PurchaseSelection {
  * This returns an in-memory candidate, NOT a durable quote, paid-order snapshot, or payment authority.
  * A future caller must persist files and metadata atomically, then revalidate before checkout.
  */
-export function prepareCollectionPurchase(value: unknown) {
+export function prepareCollectionPurchase(value: unknown, sessionId?: string) {
   return publicationOperation(async () => {
     const input = selection(value);
     if (env.defaultCurrency.toUpperCase() !== 'USD')
@@ -99,8 +107,17 @@ export function prepareCollectionPurchase(value: unknown) {
       if (issues.length)
         throw new HttpError(issues.join(' '), 409, 'collection_purchase_not_ready');
       // Validate every line before reading or rendering any original.
-      const lines = input.items.map(({ itemId, quantity }) => {
+      const lines = input.items.map(({ itemId, quantity, designAssetId }) => {
         const item = entry.collection.items.find((item) => item.id === itemId)!;
+        if (
+          (item.artworkMode === 'fixed' && designAssetId) ||
+          (item.artworkMode !== 'fixed' && (!designAssetId || !sessionId))
+        )
+          throw new HttpError(
+            'Use only the artwork option offered by this product.',
+            400,
+            'collection_artwork_mode'
+          );
         if (
           !Number.isSafeInteger(item.targetPriceCents) ||
           Number(item.targetPriceCents) < 1 ||
@@ -134,6 +151,8 @@ export function prepareCollectionPurchase(value: unknown) {
         });
         return {
           itemId,
+          designAssetId,
+          artworkMode: item.artworkMode,
           title: item.title,
           productId: item.productId,
           variantId: item.variantId,
@@ -165,7 +184,15 @@ export function prepareCollectionPurchase(value: unknown) {
       const files = [];
       let totalBytes = 0;
       for (const { line, placement, layout, area, pixels } of tasks) {
-        const { bytes, sourceChecksum } = await renderVerifiedPrint(layout, area, false, tx);
+        const personalized = line.designAssetId
+          ? await personalizedArtwork.read(line.designAssetId, sessionId!, line.artworkMode)
+          : null;
+        const { bytes, sourceChecksum } = personalized
+          ? {
+              bytes: await renderPersonalizedPrint(personalized.bytes, layout, area),
+              sourceChecksum: personalized.checksum,
+            }
+          : await renderVerifiedPrint(layout, area, false, tx);
         totalBytes += bytes.length;
         if (totalBytes > 40 * 1024 * 1024)
           throw new HttpError(
@@ -179,7 +206,7 @@ export function prepareCollectionPurchase(value: unknown) {
           bytes,
           sha256: createHash('sha256').update(bytes).digest('hex'),
           sourceChecksum,
-          sourceAssetId: area.assetId,
+          sourceAssetId: line.designAssetId ?? area.assetId,
           width: pixels.width,
           height: pixels.height,
           density: PRINT_DENSITY,

@@ -13,10 +13,6 @@ export function collectionLayoutIssues(
       issues.push('Select a product from this published collection.');
       continue;
     }
-    if (item.artworkMode !== 'fixed')
-      issues.push(
-        `${item.title}: customer personalization is not available for collection orders yet.`
-      );
     if (!item.placementCodes.length) issues.push(`${item.title}: select at least one print area.`);
     for (const code of item.placementCodes) {
       const layouts =
