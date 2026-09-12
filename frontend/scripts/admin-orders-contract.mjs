@@ -71,6 +71,7 @@ export async function verifyOrderOperations({ page, viewport, output }) {
     .waitFor();
   await verifyPreparationRetention(page, panel);
   await verifyRefundReviewFilter(page, panel, detail.summary);
+  await verifyOrderPaging(page, panel, detail.summary);
   const sizes = await page.evaluate(() => [
     document.documentElement.clientWidth,
     document.documentElement.scrollWidth,
@@ -193,10 +194,10 @@ async function verifyRefundReviewFilter(page, panel, summary) {
       reviewStatus: 'unreviewed',
     },
   ];
-  await page.route('**/api/admin/order-operations', (route) =>
+  await page.route('**/api/admin/order-operations/search', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: orders }),
+      body: JSON.stringify({ success: true, data: { orders } }),
     })
   );
   try {
@@ -204,16 +205,102 @@ async function verifyRefundReviewFilter(page, panel, summary) {
     await panel
       .getByRole('button', { name: 'Review order OMS-REFUND-REVIEW', exact: true })
       .waitFor();
+    const filtered = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/order-operations/search') &&
+        response.request().postDataJSON().filter === 'attention'
+    );
     await panel.getByRole('combobox', { name: /Show orders/ }).selectOption('attention');
+    await filtered;
+    await panel
+      .getByRole('button', { name: 'Review order OMS-REFUND-REVIEW', exact: true })
+      .waitFor();
     assert.equal(await panel.getByRole('button', { name: /^Review order / }).count(), 1);
     await panel
       .getByRole('button', { name: 'Review order OMS-REFUND-REVIEW', exact: true })
       .waitFor();
   } finally {
-    await page.unroute('**/api/admin/order-operations');
+    await page.unroute('**/api/admin/order-operations/search');
   }
   await panel.getByRole('combobox', { name: /Show orders/ }).selectOption('all');
   await panel.getByRole('button', { name: 'Refresh orders', exact: true }).click();
+  await panel
+    .getByRole('button', { name: `Review order ${summary.orderNumber}`, exact: true })
+    .waitFor();
+}
+
+async function verifyOrderPaging(page, panel, summary) {
+  let failed = false;
+  const calls = [];
+  const older = { ...summary, id: 'older-search-fixture', orderNumber: 'OMS-OLDER-SEARCH' };
+  await page.route('**/api/admin/order-operations/search', async (route) => {
+    const query = route.request().postDataJSON();
+    calls.push(query);
+    if (query.cursor && !failed) {
+      failed = true;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          error: 'Older orders could not be loaded. Try again.',
+        }),
+      });
+      return;
+    }
+    const orders = query.search
+      ? [older]
+      : query.cursor
+        ? [older]
+        : Array.from({ length: 25 }, (_, index) => ({
+            ...summary,
+            id: `page-fixture-${index}`,
+            orderNumber: `OMS-PAGE-${index}`,
+          }));
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          orders,
+          ...(!query.search && !query.cursor ? { nextCursor: 'fixture-page-cursor' } : {}),
+        },
+      }),
+    });
+  });
+  try {
+    await panel.getByRole('button', { name: 'Refresh orders', exact: true }).click();
+    await panel.getByRole('button', { name: 'Load older orders', exact: true }).waitFor();
+    assert.equal(await panel.getByRole('button', { name: /^Review order / }).count(), 25);
+    await panel.getByRole('button', { name: 'Load older orders', exact: true }).click();
+    await panel
+      .getByRole('alert')
+      .filter({ hasText: 'Older orders could not be loaded' })
+      .waitFor();
+    assert.equal(await panel.getByRole('button', { name: /^Review order / }).count(), 25);
+    await panel.getByRole('button', { name: 'Load older orders', exact: true }).click();
+    await panel
+      .getByRole('button', { name: 'Review order OMS-OLDER-SEARCH', exact: true })
+      .waitFor();
+    assert.equal(await panel.getByRole('button', { name: /^Review order / }).count(), 26);
+    await panel.getByLabel('Find an order number', { exact: true }).fill('OLDER-SEARCH');
+    const searched = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/order-operations/search') &&
+        response.request().postDataJSON().search === 'OLDER-SEARCH'
+    );
+    await panel.getByRole('button', { name: 'Find orders', exact: true }).click();
+    await searched;
+    await panel
+      .getByRole('button', { name: 'Review order OMS-OLDER-SEARCH', exact: true })
+      .waitFor();
+    assert.equal(await panel.getByRole('button', { name: /^Review order / }).count(), 1);
+    assert.equal(calls.at(-1).cursor, undefined, 'New searches reset pagination');
+    assert.equal(calls.filter((call) => call.cursor).length, 2, 'Retry reuses the same page');
+  } finally {
+    await page.unroute('**/api/admin/order-operations/search');
+  }
+  await panel.getByRole('button', { name: 'Clear search', exact: true }).click();
   await panel
     .getByRole('button', { name: `Review order ${summary.orderNumber}`, exact: true })
     .waitFor();

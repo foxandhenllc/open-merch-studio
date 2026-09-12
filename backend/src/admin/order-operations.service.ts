@@ -1,3 +1,4 @@
+import { queryOperationOrders } from './order-operations-query.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
 import {
@@ -24,6 +25,13 @@ const summary = (order: AdminOrderListItem): OperationOrder => ({
       ? (fixtureReviews.get(order.id)!.at(-1)!.status as OperationOrder['reviewStatus'])
       : order.operatorReviewStatus,
 });
+export async function searchOperationOrders(input: unknown) {
+  return queryOperationOrders(
+    input,
+    (id) =>
+      (fixtureReviews.get(id)?.at(-1)?.status as OperationOrder['reviewStatus']) ?? 'unreviewed'
+  );
+}
 export async function operationOrders() {
   return (await listAdminOrderRecords({ limit: 100 })).map(summary);
 }

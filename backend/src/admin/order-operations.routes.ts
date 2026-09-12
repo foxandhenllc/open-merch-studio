@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler, HttpError } from '../middleware.js';
 import {
   operationOrders,
+  searchOperationOrders,
   operationDetail,
   recordOperationReview,
   retryOperation,
@@ -18,6 +19,12 @@ router.get(
   '/',
   asyncHandler(async (_req, res) => {
     res.json({ success: true, data: await operationOrders() });
+  })
+);
+router.post(
+  '/search',
+  asyncHandler(async (req, res) => {
+    res.json({ success: true, data: await searchOperationOrders(req.body) });
   })
 );
 router.get(

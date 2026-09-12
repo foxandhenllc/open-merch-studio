@@ -138,3 +138,20 @@
   padding-top: 32px;
   border-top: 1px solid var(--admin-line);
 }
+
+.operation-search {
+  margin: 24px 0;
+}
+.operation-search input {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-line);
+  border-radius: 4px;
+  background: var(--admin-paper);
+  color: inherit;
+  width: min(100%, 340px);
+}
+.operation-search .operation-actions {
+  align-items: center;
+  margin-top: 8px;
+}

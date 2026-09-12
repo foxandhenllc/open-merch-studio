@@ -17,3 +17,5 @@ export type OperationDetail = {
   reviews: Array<{ status: string; note?: string; createdAt: string }>;
   retryAvailable: boolean;
 };
+
+export type OperationPage = { orders: OperationOrder[]; nextCursor?: string };

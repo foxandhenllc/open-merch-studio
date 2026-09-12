@@ -14,9 +14,9 @@ checksums. A later collection edit or withdrawal cannot replace an order's saved
 
 ## Behavior and evidence
 
-- **Orders & review** lists the latest 100 orders and filters unresolved exceptions. Select an order
-  to see its products, payment/fulfillment state, print downloads, and review history. Older-order
-  navigation beyond this recent list remains follow-up work.
+- **Orders & review** searches the full order history and filters unresolved exceptions before pagination.
+  Load older orders without losing selection. Select an order to see its products, payment/fulfillment
+  state, print downloads, and review history. See [owner order search](./owner-order-search.md).
 - Refunded/cancelled orders with unresolved fulfillment issues remain in **Needs attention**, even
   though their payment state is terminal. Resolved reviews and ordinary deliveries are excluded.
 - An acknowledgment or resolution uses the existing durable review transaction. A resolution needs

@@ -1,7 +1,7 @@
 import { PreparationRetention } from './PreparationRetention';
 import { useEffect, useState } from 'react';
 import type { AdminBinaryRequest, AdminRequest } from './admin.types';
-import type { OperationDetail, OperationOrder } from './OrderOperations.types';
+import type { OperationDetail, OperationOrder, OperationPage } from './OrderOperations.types';
 import './order-operations.css';
 
 const label = (value: string) => value.replaceAll('_', ' ');
@@ -17,6 +17,10 @@ export function OrderOperations({
   const [orders, setOrders] = useState<OperationOrder[] | null>(null);
   const [detail, setDetail] = useState<OperationDetail | null>(null);
   const [filter, setFilter] = useState('all');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [search, setSearch] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -26,18 +30,53 @@ export function OrderOperations({
   useEffect(() => {
     let active = true;
     setError('');
-    void request<OperationOrder[]>('/order-operations')
+    setLoadingOrders(true);
+    setOrders(null);
+    setNextCursor(undefined);
+    void request<OperationPage>('/order-operations/search', 'POST', { search, filter })
       .then((result) => {
-        if (active) setOrders(result);
+        if (active) {
+          setOrders(result.orders);
+          setNextCursor(result.nextCursor);
+        }
       })
       .catch((failure) => {
         if (active)
           setError(failure instanceof Error ? failure.message : 'Orders could not be loaded.');
+      })
+      .finally(() => {
+        if (active) setLoadingOrders(false);
       });
     return () => {
       active = false;
     };
-  }, [request, attempt]);
+  }, [request, attempt, search, filter]);
+  async function loadMore() {
+    if (!nextCursor || loadingOrders) return;
+    setLoadingOrders(true);
+    setError('');
+    try {
+      const result = await request<OperationPage>('/order-operations/search', 'POST', {
+        search,
+        filter,
+        cursor: nextCursor,
+      });
+      setOrders((current) => [
+        ...new Map(
+          [...(current ?? []), ...result.orders].map((order) => [order.id, order])
+        ).values(),
+      ]);
+      setNextCursor(result.nextCursor);
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : 'More orders could not be loaded. Retry loading older orders.'
+      );
+    } finally {
+      setLoadingOrders(false);
+    }
+  }
   async function select(id: string) {
     setBusy(true);
     setError('');
@@ -145,19 +184,59 @@ export function OrderOperations({
         <h1>Orders & review</h1>
         <p>Review the order, inspect its saved print files, and record what needs attention.</p>
       </header>
+      <form
+        className="operation-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSearch(searchDraft.trim());
+          setAttempt((value) => value + 1);
+        }}
+      >
+        <label htmlFor="order-number-search">Find an order number</label>
+        <div className="operation-actions">
+          <input
+            id="order-number-search"
+            type="search"
+            maxLength={64}
+            value={searchDraft}
+            disabled={busy || loadingOrders}
+            onChange={(event) => setSearchDraft(event.target.value)}
+            placeholder="Full or partial order number"
+          />
+          <button type="submit" disabled={busy || loadingOrders}>
+            Find orders
+          </button>
+          {search && (
+            <button
+              type="button"
+              disabled={busy || loadingOrders}
+              onClick={() => {
+                setSearchDraft('');
+                setSearch('');
+              }}
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+      </form>
       <div className="operation-toolbar">
         <label>
           Show orders
           <select
             value={filter}
-            disabled={busy}
+            disabled={busy || loadingOrders}
             onChange={(event) => setFilter(event.target.value)}
           >
-            <option value="all">Recent orders</option>
+            <option value="all">All orders</option>
             <option value="attention">Needs attention</option>
           </select>
         </label>
-        <button type="button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>
+        <button
+          type="button"
+          disabled={busy || loadingOrders}
+          onClick={() => setAttempt((value) => value + 1)}
+        >
           Refresh orders
         </button>
       </div>
@@ -200,6 +279,13 @@ export function OrderOperations({
           </button>
         ))}
       </div>
+      {nextCursor && (
+        <div className="operation-actions">
+          <button type="button" disabled={busy || loadingOrders} onClick={() => void loadMore()}>
+            {loadingOrders ? 'Loading older orders…' : 'Load older orders'}
+          </button>
+        </div>
+      )}
       {detail && (
         <section
           className="operation-detail"

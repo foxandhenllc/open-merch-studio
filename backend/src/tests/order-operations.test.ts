@@ -59,6 +59,26 @@ test('owner operations protect sensitive fields and persist simulated reviews wi
         )
       );
     }
+    assert.equal(
+      (
+        await fetch(`${base}/search`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ search: '', filter: 'all' }),
+        })
+      ).status,
+      401
+    );
+    const search = await fetch(`${base}/search`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ search: 'OMS-REVIEW-TEST', filter: 'all' }),
+    });
+    assert.equal(search.status, 200);
+    assert.equal(
+      ((await search.json()) as { data: { orders: Array<{ id: string }> } }).data.orders[0].id,
+      id
+    );
     assert.equal((await fetch(`${base}/unknown-order`, { headers })).status, 404);
     assert.equal((await fetch(`${base}/${id}/prints/foreign-asset`, { headers })).status, 404);
     for (const body of [
