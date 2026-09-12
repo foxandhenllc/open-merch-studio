@@ -58,5 +58,12 @@ AI fixtures, and explicit reviewed orders rather than claiming those integration
   verified. 130 backend tests and 18 root tests passed; ten isolated database checks passed without
   skips. Desktop and phone admin/purchase contracts passed, including all three customer modes.
 
-Current work: isolated backup/restore and a repeatable owner-testing installation with the exact
-walkthrough and remaining live-only checks.
+- `68861e0`: committed controlled collection personalization and request recovery.
+- `83aeb3a`: persistent owner rehearsal, private uploaded print delivery, reviewed profile activation,
+  paired backup/isolated restore, restart verification, four synthetic persona collections and the
+  acceptance walkthrough. JSONB review ordering and branded static-build verification defects fixed.
+
+Preparation is complete for Chris's local owner acceptance. Start with
+[the walkthrough](owner-acceptance-walkthrough.md). Detailed checks and release-only boundaries are
+recorded in the [owner acceptance receipt](audits/2026-09-12-owner-acceptance.md). This completion does
+not approve a V1 tag or substitute fixtures for a hosted installation, human pilot or physical sample.
