@@ -13,6 +13,7 @@ import { env } from '../config/env.js';
 import { merchantConfig } from '../generated/merchant-config.js';
 import { installedPolicy } from '../generated/store-profile.js';
 import { HttpError } from '../middleware.js';
+import { brandAssets } from './brand-assets.service.js';
 import { deploymentSettings } from './deployment-settings.js';
 
 const key = 'merchant-profile-draft-v1';
@@ -151,6 +152,7 @@ export async function saveMerchantProfile(input: unknown, revision: unknown, bas
       409,
       'profile_base_changed'
     );
+  await brandAssets.assertProfile(draft.fields);
   return change(async (before) => {
     checkRevision(before, revision);
     const next = { draft, revision: before.revision + 1, baseDigest: activeDigest() };
@@ -193,6 +195,7 @@ export async function publishMerchantProfile(
         'profile_review_required'
       );
     }
+    await brandAssets.assertProfile(before.draft.fields);
     const receipt = await bridge.saveProfile(JSON.stringify(publication));
     return {
       next: before,

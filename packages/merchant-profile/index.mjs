@@ -16,6 +16,9 @@ export const profileFields = [
   ["brand.displayName", "Store name", "Brand", 80],
   ["brand.shortName", "Store initials", "Brand", 12],
   ["brand.shortDescription", "Short description", "Brand", 160],
+  ["brand.logoPath", "Store logo", "Brand images", 120, "asset"],
+  ["brand.socialImagePath", "Sharing image", "Brand images", 120, "asset"],
+  ["web.canonicalUrl", "Store website URL", "Search & sharing", 255, "url"],
   ["brand.colors.background", "Background color", "Colors", 7, "color"],
   ["brand.colors.foreground", "Text color", "Colors", 7, "color"],
   ["brand.colors.accent", "Accent color", "Colors", 7, "color"],
@@ -105,6 +108,17 @@ function compose(draft, baseConfig, purpose) {
 }
 
 export function validateProfileDraft(input, baseConfig) {
+  // Only these newly editable fields may be absent in a draft saved by an older version.
+  if (object(input) && object(input.fields)) {
+    input = structuredClone(input);
+    for (const path of [
+      "brand.logoPath",
+      "brand.socialImagePath",
+      "web.canonicalUrl",
+    ])
+      if (!Object.hasOwn(input.fields, path))
+        input.fields[path] = at(baseConfig, path);
+  }
   if (
     !sameKeys(input, ["fields", "pages", "policyVersion", "policyDate"]) ||
     !sameKeys(
@@ -126,6 +140,34 @@ export function validateProfileDraft(input, baseConfig) {
       (type === "color" && !/^#[0-9a-fA-F]{6}$/.test(value))
     )
       throw new Error(`Check ${label.toLowerCase()}.`);
+    if (
+      type === "asset" &&
+      value !== at(baseConfig, path) &&
+      !/^\/api\/brand-assets\/[a-f0-9]{64}\.png$/.test(value)
+    )
+      throw new Error(
+        `Prepare ${label.toLowerCase()} in the brand image editor.`,
+      );
+    if (type === "url") {
+      let url;
+      try {
+        url = new URL(value);
+      } catch {
+        throw new Error("Enter the HTTPS address of your store.");
+      }
+      if (
+        url.protocol !== "https:" ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        url.pathname !== "/" ||
+        !url.hostname.includes(".")
+      )
+        throw new Error(
+          "Use an HTTPS store address without a page path, password, or query.",
+        );
+    }
   }
   if (
     typeof input.policyVersion !== "string" ||
@@ -190,7 +232,7 @@ export function prepareProfilePublication(
   return compose(draft, activeConfig, "operator-approved");
 }
 
-/** Reconstruct from the allowlist, rejecting changes to domains, assets, attribution, catalog, or launch controls. */
+/** Reconstruct from the allowlist, rejecting changes outside reviewed identity, prepared assets, and policy fields. */
 export function parsePublishedProfile(encoded, baseConfig) {
   if (typeof encoded !== "string" || Buffer.byteLength(encoded) > 32768)
     throw new Error("Published merchant profile is invalid or too large.");

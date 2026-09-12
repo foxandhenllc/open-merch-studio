@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import sharp from 'sharp';
 
 export async function verifyProfileEditor({
   page,
@@ -11,9 +12,55 @@ export async function verifyProfileEditor({
 }) {
   const name = `Community Merch ${viewport.width}`;
   const editor = page.locator('.profile-editor');
-  await page.getByRole('navigation', { name: 'Store administration' }).getByRole('button', { name: /Overview$/ }).click();
+  await page
+    .getByRole('navigation', { name: 'Store administration' })
+    .getByRole('button', { name: /Overview$/ })
+    .click();
   await page.getByRole('button', { name: /Make it your store/ }).click();
   await page.getByLabel('Store name', { exact: true }).fill(name);
+  const image = await sharp({
+    create: { width: 1200, height: 900, channels: 4, background: '#315542' },
+  })
+    .png()
+    .toBuffer();
+  const prepared = {};
+  for (const [kind, label] of [
+    ['logo', 'Store logo'],
+    ['share', 'Sharing image'],
+  ]) {
+    const slot = page.getByRole('region', { name: label, exact: true });
+    await slot.locator('summary').first().click();
+    await slot.getByText('Upload an original image', { exact: true }).click();
+    await slot
+      .getByLabel('Artwork file', { exact: true })
+      .setInputFiles({
+        name: `${kind}-${viewport.width}.png`,
+        mimeType: 'image/png',
+        buffer: image,
+      });
+    await slot.getByRole('checkbox', { name: /I have permission/ }).check();
+    await slot.getByRole('button', { name: 'Upload and attach', exact: true }).click();
+    await slot.getByRole('button', { name: 'Detach artwork', exact: true }).waitFor();
+    const response = page.waitForResponse(
+      (res) => res.url().endsWith('/api/admin/brand-assets') && res.request().method() === 'POST'
+    );
+    await slot.getByRole('button', { name: `Use as ${label.toLowerCase()}`, exact: true }).click();
+    const result = await response;
+    assert.equal(result.status(), 200);
+    prepared[kind] = (await result.json()).data.publicPath;
+    assert.deepEqual(JSON.parse(result.request().postData()).kind, kind);
+    await slot.getByRole('img', { name: `${label} draft`, exact: true }).waitFor();
+    assert.ok(
+      await slot
+        .getByRole('img', { name: `${label} draft`, exact: true })
+        .evaluate((img) => img.complete && img.naturalWidth > 0)
+    );
+    assert.equal((await page.request.get(`${origin}${prepared[kind]}`)).status(), 404);
+    await slot.locator('summary').first().click();
+  }
+  await page
+    .getByLabel('Store website URL', { exact: true })
+    .fill(`https://community-${viewport.width}.example`);
   await page.getByLabel('Store initials').fill('CM');
   await page.getByLabel('Accent color').fill('#315542');
   await page.getByLabel('Support email', { exact: true }).fill('help@example.org');
@@ -42,12 +89,18 @@ export async function verifyProfileEditor({
   // Navigate away and back with an unsaved edit: the editor keeps it without changing live state.
   await page.getByLabel('Store name', { exact: true }).fill(name + ' draft');
   await page.getByRole('button', { name: /01Overview|01 Overview/ }).click();
-  await page.getByRole('navigation', { name: 'Store administration' }).getByRole('button', { name: /Store profile$/ }).click();
+  await page
+    .getByRole('navigation', { name: 'Store administration' })
+    .getByRole('button', { name: /Store profile$/ })
+    .click();
   assert.equal(await page.getByLabel('Store name', { exact: true }).inputValue(), name + ' draft');
   await page.getByLabel('Store name', { exact: true }).fill(name);
   await page.reload({ waitUntil: 'networkidle' });
   await signIn(page);
-  await page.getByRole('navigation', { name: 'Store administration' }).getByRole('button', { name: /Store profile$/ }).click();
+  await page
+    .getByRole('navigation', { name: 'Store administration' })
+    .getByRole('button', { name: /Store profile$/ })
+    .click();
   assert.equal(await page.getByLabel('Store name', { exact: true }).inputValue(), name);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await page.mouse.move(0, 0);
@@ -82,6 +135,9 @@ export async function verifyProfileEditor({
   assert.equal(profile.type, 'encrypted');
   const published = JSON.parse(profile.value);
   assert.equal(published.config.brand.displayName, name);
+  assert.equal(published.config.brand.logoPath, prepared.logo);
+  assert.equal(published.config.brand.socialImagePath, prepared.share);
+  assert.equal(published.config.web.canonicalUrl, `https://community-${viewport.width}.example`);
   assert.equal(published.config.operator.supportEmail, 'help@example.org');
   assert.equal(published.policy.approvedVersion, `fixture-browser-${viewport.width}`);
   assert.equal(

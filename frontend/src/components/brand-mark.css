@@ -1,0 +1,13 @@
+.store-brand-mark {
+  display: inline-block;
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.published-collections-brand a:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}

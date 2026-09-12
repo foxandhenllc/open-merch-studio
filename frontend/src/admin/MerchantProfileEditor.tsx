@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { AdminRequest } from './admin.types';
+import { BrandAssetsEditor } from './BrandAssetsEditor';
+import { BrandAssetPreview } from './BrandAssetPreview';
+import type { AdminRequest, AdminBinaryRequest } from './admin.types';
 import type { ProfileDraft, ProfileSnapshot } from './profile.types';
 import { ProfilePreview } from './ProfilePreview';
 import { PolicyEditor } from './PolicyEditor';
@@ -8,10 +10,12 @@ import './profile-editor.css';
 
 export function MerchantProfileEditor({
   request,
+  readFile,
   hostingAvailable,
   onPublished,
 }: {
   request: AdminRequest;
+  readFile: AdminBinaryRequest;
   hostingAvailable: boolean;
   onPublished: () => Promise<void>;
 }) {
@@ -187,7 +191,7 @@ export function MerchantProfileEditor({
                 <fieldset disabled={busy} className="profile-group" key={group}>
                   <legend>{group}</legend>
                   {saved.fields
-                    .filter((field) => field.group === group)
+                    .filter((field) => field.group === group && field.type !== 'asset')
                     .map((field) => (
                       <label className="profile-field" key={field.path}>
                         {field.label}
@@ -205,6 +209,24 @@ export function MerchantProfileEditor({
                         />
                       </label>
                     ))}
+                  {group === 'Brand images' && (
+                    <BrandAssetsEditor
+                      request={request}
+                      readFile={readFile}
+                      fields={draft.fields}
+                      working={setBusy}
+                      change={(field, path) =>
+                        update({ ...draft, fields: { ...draft.fields, [field]: path } })
+                      }
+                    />
+                  )}
+                  {group === 'Search & sharing' && (
+                    <p className="admin-fine">
+                      Use the website address customers will visit. Connect the domain in your
+                      hosting account and configure its DNS before publishing. Changing the address
+                      requires a new reviewed policy version.
+                    </p>
+                  )}
                   {group === 'Colors' && (
                     <p className="admin-fine">
                       Choose a readable background/text pair and a dark accent for white button
@@ -220,11 +242,10 @@ export function MerchantProfileEditor({
                 </fieldset>
               ))}
               <p className="admin-fine">
-                Domain: {saved.fixed.canonicalUrl}. Domain routing, currency, product pricing, logo
-                files, and payment identity remain installation settings.
+                Currency, product pricing, and payment identity remain installation settings.
               </p>
             </div>
-            <ProfilePreview draft={draft} />
+            <ProfilePreview draft={draft} readFile={readFile} />
           </div>
         )}
         {tab === 'policies' && <PolicyEditor draft={draft} disabled={busy} update={update} />}
@@ -241,12 +262,25 @@ export function MerchantProfileEditor({
               </p>
             )}
             <dl className="admin-detail-list">
-              {changes.map(({ path, label }) => (
+              {changes.map(({ path, label, type }) => (
                 <div key={path}>
                   <dt>{label}</dt>
                   <dd>
-                    <span className="profile-old-value">{saved.active.fields[path]}</span>
-                    <strong>{draft.fields[path]}</strong>
+                    {type === 'asset' ? (
+                      <>
+                        <span>Prepared image for publication</span>
+                        <BrandAssetPreview
+                          path={draft.fields[path]}
+                          label={label}
+                          readFile={readFile}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <span className="profile-old-value">{saved.active.fields[path]}</span>
+                        <strong>{draft.fields[path]}</strong>
+                      </>
+                    )}
                   </dd>
                 </div>
               ))}

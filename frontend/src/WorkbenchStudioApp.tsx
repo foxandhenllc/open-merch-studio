@@ -1,3 +1,4 @@
+import { BrandMark } from './components/BrandMark';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogPanel } from '@components/CatalogPanel';
 import { CheckoutPanel } from '@components/CheckoutPanel';
@@ -105,9 +106,7 @@ export function WorkbenchStudioApp() {
     return (
       <main className="loading-shell" aria-busy="true">
         <div className="loading-card">
-          <span className="brand-symbol" aria-hidden="true">
-            {merchantConfig.brand.shortName}
-          </span>
+          <BrandMark />
           <h1>{merchantConfig.brand.displayName}</h1>
           <p>Getting the studio ready…</p>
         </div>
@@ -158,9 +157,7 @@ export function WorkbenchStudioApp() {
       </div>
       <header className="app-header compact-header">
         <a className="brand" href="/" aria-label={`${merchantConfig.brand.displayName} home`}>
-          <span className="brand-symbol" aria-hidden="true">
-            {merchantConfig.brand.shortName}
-          </span>
+          <BrandMark />
           <span>
             <b>{merchantConfig.brand.displayName}</b>
             {publicConfig.enablePublicCheckout && <small>Now accepting orders</small>}

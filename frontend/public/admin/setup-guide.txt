@@ -25,7 +25,7 @@ ONE-TIME HOSTING SETUP
 5. Deploy. Open /admin and sign in with your admin access code.
 
 DAY-TO-DAY ADMINISTRATION
-- Artwork & limits: choose Image 2, Image 2.5 Flare, or Image 2.5 Sunburst.
+- Artwork & limits: choose Image 2.5 Flare or Image 2.5 Sunburst.
   Model and budget changes persist in PostgreSQL and apply to new requests.
   Existing artwork files are preserved. No paid verification call is made.
 - Connections: open your provider's account, copy the requested credentials,
@@ -56,8 +56,11 @@ explicit approval. Policy promises are never rewritten automatically.
 The hosting value OMS_MERCHANT_PROFILE is applied by the root npm run build.
 See docs/architecture/admin-merchant-profile.md for the publication contract.
 The committed config/merchant.config.json and config/policies/ remain the
-initial installation defaults. Domain routing, logo files, country/currency,
-catalog pricing, and first-time policy setup still need installation work.
+initial installation defaults. Prepare a logo and sharing image privately in
+Store profile. Those images become public only in the deployed profile.
+Set the store website URL there, then attach the domain and configure DNS
+in your hosting account. Country/currency, catalog pricing, and first-time
+policy setup still need installation work.
 Guided provisioning and OAuth account connections remain future milestones.
 The admin supports entering provider credentials, not OAuth.
 

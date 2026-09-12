@@ -100,3 +100,69 @@ test("deployment profile validation rejects arbitrary overrides, approval drift,
     /too large/,
   );
 });
+
+test("prepared brand assets round trip through the build and legacy drafts gain only the new fields", () => {
+  const draft = profileDraft(base, policy);
+  const legacy = structuredClone(draft);
+  for (const key of [
+    "brand.logoPath",
+    "brand.socialImagePath",
+    "web.canonicalUrl",
+  ])
+    delete legacy.fields[key];
+  assert.deepEqual(validateProfileDraft(legacy, base), draft);
+  delete legacy.fields["brand.displayName"];
+  assert.throws(
+    () => validateProfileDraft(legacy, base),
+    /missing or unsupported/,
+  );
+  draft.fields["brand.logoPath"] = `/api/brand-assets/${"a".repeat(64)}.png`;
+  draft.fields["brand.socialImagePath"] =
+    `/api/brand-assets/${"b".repeat(64)}.png`;
+  const publication = prepareProfilePublication(draft, base, policy, false);
+  assert.deepEqual(publication.policy, policy);
+  assert.deepEqual(
+    loadInstallationProfile({
+      OMS_MERCHANT_PROFILE: JSON.stringify(publication),
+    }),
+    publication,
+  );
+  for (const invalid of [
+    "/another-logo.svg",
+    "https://example.com/logo.png",
+    "/api/brand-assets/../secret",
+    "data:image/svg+xml,test",
+  ]) {
+    const bad = structuredClone(draft);
+    bad.fields["brand.logoPath"] = invalid;
+    assert.throws(() => validateProfileDraft(bad, base));
+  }
+  draft.fields["web.canonicalUrl"] = "https://creator.example";
+  assert.throws(
+    () => prepareProfilePublication(draft, base, policy, false),
+    /approve/,
+  );
+  assert.throws(
+    () => prepareProfilePublication(draft, base, policy, true),
+    /new policy version/,
+  );
+  draft.policyVersion = "domain-change-2";
+  assert.equal(
+    prepareProfilePublication(draft, base, policy, true).policy.merchant
+      .canonicalUrl,
+    "https://creator.example",
+  );
+  for (const invalid of [
+    "http://creator.example",
+    "https://creator.example/path",
+    "https://user:password@creator.example",
+    "https://creator.example?key=secret",
+    "https://creator.example#fragment",
+  ]) {
+    draft.fields["web.canonicalUrl"] = invalid;
+    assert.throws(
+      () => validateProfileDraft(draft, base),
+      /HTTPS store address/,
+    );
+  }
+});

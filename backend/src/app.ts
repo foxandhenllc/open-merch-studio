@@ -1,9 +1,10 @@
 import express from 'express';
+import { brandAssets } from './admin/brand-assets.service.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env.js';
-import { errorHandler, notFoundHandler, requestContext } from './middleware.js';
+import { asyncHandler, errorHandler, notFoundHandler, requestContext } from './middleware.js';
 import catalogRoutes from './routes/catalog.routes.js';
 import designRoutes from './routes/design.routes.js';
 import adminRoutes from './routes/admin.routes.js';
@@ -61,6 +62,18 @@ export function createApp() {
   app.get('/', getCatalogHealth);
   app.get('/api/health', getCatalogHealth);
   app.use(/^\/api\/design\/(?:sessions|drafts)(?:\/|$)/, requestStoreSettings);
+  app.get(
+    '/api/brand-assets/:hash.png',
+    asyncHandler(async (req, res) => {
+      res.set('Cache-Control', 'no-store');
+      const bytes = await brandAssets.publicImage(req.params.hash);
+      if (!bytes) {
+        res.status(404).end();
+        return;
+      }
+      res.type('png').send(bytes);
+    })
+  );
   app.use('/api/catalog', catalogRoutes);
   app.use('/api/design', designRoutes);
   app.use('/api/storefronts', storefrontRoutes);

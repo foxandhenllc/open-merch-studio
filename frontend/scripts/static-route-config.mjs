@@ -84,9 +84,9 @@ export function buildStaticRouteConfig(merchantConfig) {
       icons: [
         {
           src: merchantConfig.brand.logoPath,
-          sizes: 'any',
-          type: 'image/svg+xml',
-          purpose: 'any maskable',
+          sizes: merchantConfig.brand.logoPath.endsWith('.png') ? '512x512' : 'any',
+          type: merchantConfig.brand.logoPath.endsWith('.png') ? 'image/png' : 'image/svg+xml',
+          purpose: 'any',
         },
       ],
     },

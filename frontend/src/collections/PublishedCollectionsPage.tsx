@@ -1,3 +1,4 @@
+import { BrandMark } from '../components/BrandMark';
 import { CollectionPurchaseForm } from './CollectionPurchaseForm';
 import { useEffect, useState } from 'react';
 import type { PublicCollection } from '@open-merch-studio/collection-drafts';
@@ -36,7 +37,10 @@ export function PublishedCollectionsPage({ id }: { id?: string }) {
   return (
     <main className="published-collections">
       <header className="published-collections-brand">
-        <a href="/">{merchantConfig.brand.displayName}</a>
+        <a href="/">
+          <BrandMark />
+          {merchantConfig.brand.displayName}
+        </a>
         <a href="/collections">Collections</a>
       </header>
       <div className="published-collections-intro">

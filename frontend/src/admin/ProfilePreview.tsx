@@ -1,8 +1,16 @@
+import { BrandAssetPreview } from './BrandAssetPreview';
+import type { AdminBinaryRequest } from './admin.types';
 import type { CSSProperties } from 'react';
 import { useId, useState } from 'react';
 import type { ProfileDraft } from './profile.types';
 
-export function ProfilePreview({ draft }: { draft: ProfileDraft }) {
+export function ProfilePreview({
+  draft,
+  readFile,
+}: {
+  draft: ProfileDraft;
+  readFile: AdminBinaryRequest;
+}) {
   const value = draft.fields;
   const [expanded, setExpanded] = useState(false);
   const previewId = useId();
@@ -33,7 +41,11 @@ export function ProfilePreview({ draft }: { draft: ProfileDraft }) {
           }
         >
           <div className="profile-preview-brand">
-            <span>{value['brand.shortName']}</span>
+            <BrandAssetPreview
+              path={value['brand.logoPath']}
+              label="Draft store logo"
+              readFile={readFile}
+            />
             <strong>{value['brand.displayName']}</strong>
           </div>
           <div className="profile-preview-content">
@@ -48,7 +60,12 @@ export function ProfilePreview({ draft }: { draft: ProfileDraft }) {
           An identity preview. Your product catalog and saved artwork stay in place.
         </p>
         <div className="profile-search-preview">
-          <span className="admin-eyebrow">Search preview</span>
+          <span className="admin-eyebrow">Search & sharing preview</span>
+          <BrandAssetPreview
+            path={value['brand.socialImagePath']}
+            label="Draft sharing image"
+            readFile={readFile}
+          />
           <strong>{value['web.title']}</strong>
           <p>{value['web.description']}</p>
         </div>

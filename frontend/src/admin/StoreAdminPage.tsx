@@ -595,6 +595,7 @@ export function StoreAdminPage() {
           <div hidden={section !== 'profile'}>
             {profileOpened && (
               <MerchantProfileEditor
+                readFile={artworkRequest}
                 request={profileRequest}
                 hostingAvailable={setup.hosting.available}
                 onPublished={refresh}

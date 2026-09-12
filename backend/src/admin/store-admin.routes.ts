@@ -1,3 +1,4 @@
+import { brandAssets } from './brand-assets.service.js';
 import { preparationRetention } from '../collections/retention.service.js';
 import orderOperationsRoutes from './order-operations.routes.js';
 import { Router } from 'express';
@@ -18,6 +19,18 @@ import {
 } from './merchant-profile.service.js';
 
 const router = Router();
+router.post(
+  '/brand-assets',
+  asyncHandler(async (req, res) => {
+    res.json({ success: true, data: await brandAssets.prepare(req.body) });
+  })
+);
+router.get(
+  '/brand-assets/:hash/preview',
+  asyncHandler(async (req, res) => {
+    res.type('png').send(await brandAssets.preview(req.params.hash));
+  })
+);
 router.use('/order-operations', orderOperationsRoutes);
 router.post(
   '/preparation-retention',

@@ -5,7 +5,7 @@ September 10, 2026. One merchant per installation.
 ## Owner workflow
 
 Open `/admin`, choose **Store profile**, and edit branding, store initials, app description,
-colors, search copy, operator disclosure, support email, order prefix, email sender name, and
+colors, prepared logo/sharing images, website URL, search copy, operator disclosure, support email, order prefix, email sender name, and
 the displayed margin label. The catalog's actual pricing is not changed by its label. A live
 identity preview updates as the owner types. All five policy/support pages have plain-text
 fields and editable sections. The editor never rewrites prose by substituting business names.
@@ -73,8 +73,8 @@ failures remain visible. See [Vercel environment limits](https://vercel.com/docs
 
 ## Deliberate installation boundaries
 
-Domain routing and canonical origin, country/currency, actual margins/prices, logo and social
-image files, product catalog, policy routes, source attribution, provider identity, and live
+Domain routing and DNS, country/currency, actual margins/prices, product catalog,
+policy routes, source attribution, provider identity, and live
 commerce authorization remain outside this editor. They need coordinated setup or separate
 controls. A new fork still needs its own initial approved merchant/policy profile, accounts,
 database, storage configuration, domain setup, and deployment bridge.
@@ -97,3 +97,6 @@ database, storage configuration, domain setup, and deployment bridge.
 The UI follows the existing restrained admin surface: labeled fields, one live identity preview,
 and a distinct review step. Preview updates, section retention, and visible save/deploy states
 provide interaction feedback without decorative motion.
+
+Prepared image privacy, retention, validation, and legacy-draft compatibility are documented in
+[owner-brand-assets.md](owner-brand-assets.md).

@@ -45,7 +45,11 @@ export function validateMerchantConfig(config, options = {}) {
     const value = config.brand[key];
     if (!text(value) || !pathPattern.test(value))
       errors.push(`brand.${key} must be a root path.`);
-    if (options.checkAssets && pathPattern.test(value ?? "")) {
+    if (
+      options.checkAssets &&
+      pathPattern.test(value ?? "") &&
+      !/^\/api\/brand-assets\/[a-f0-9]{64}\.png$/.test(value)
+    ) {
       const asset = resolve(
         options.publicDirectory ?? "frontend/public",
         `.${value}`,
