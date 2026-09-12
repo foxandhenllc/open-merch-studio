@@ -1,3 +1,5 @@
+import { installationChecks } from './installation-checks.js';
+import { readInstallationProgress, saveInstallationProgress } from './installation-progress.js';
 import { brandAssets } from './brand-assets.service.js';
 import { preparationRetention } from '../collections/retention.service.js';
 import orderOperationsRoutes from './order-operations.routes.js';
@@ -19,6 +21,24 @@ import {
 } from './merchant-profile.service.js';
 
 const router = Router();
+router.get(
+  '/installation-checks',
+  asyncHandler(async (_req, res) => {
+    res.json({ success: true, data: await installationChecks() });
+  })
+);
+router.get(
+  '/installation-progress',
+  asyncHandler(async (_req, res) => {
+    res.json({ success: true, data: await readInstallationProgress() });
+  })
+);
+router.put(
+  '/installation-progress',
+  asyncHandler(async (req, res) => {
+    res.json({ success: true, data: await saveInstallationProgress(req.body) });
+  })
+);
 router.post(
   '/brand-assets',
   asyncHandler(async (req, res) => {

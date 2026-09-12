@@ -1,0 +1,62 @@
+.installation-guide {
+  max-width: 60rem;
+}
+.installation-task-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 1.5rem;
+}
+.installation-task-list li {
+  padding-block: 1.15rem;
+  border-top: 1px solid #dedbd4;
+}
+.installation-task-list label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+.installation-task-list input {
+  accent-color: #315542;
+}
+.installation-task-list p {
+  margin: 0.55rem 0 0.65rem 1.7rem;
+  max-width: 55rem;
+}
+.installation-task-list button {
+  margin-left: 1.7rem;
+}
+.installation-check-list > div {
+  padding-block: 1rem;
+  border-top: 1px solid #dedbd4;
+}
+.installation-check-list dt {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 650;
+}
+.installation-check-list dt span {
+  font-weight: 400;
+  font-size: 0.82rem;
+}
+.installation-check-list dd {
+  margin: 0.5rem 0 0;
+  line-height: 1.55;
+}
+.store-admin .installation-task-list label {
+  flex-direction: row;
+  align-items: flex-start;
+}
+.store-admin .installation-task-list input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  flex: 0 0 20px;
+  margin: 0;
+}
+.installation-task-list li > p {
+  margin: 0.55rem 0 0.65rem 1.7rem;
+}

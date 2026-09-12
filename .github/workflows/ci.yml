@@ -75,7 +75,7 @@ jobs:
         run: |
           psql "$OMS_STORE_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f backend/prisma/ci-storage-bootstrap.sql
           DATABASE_URL="$OMS_STORE_TEST_DATABASE_URL" node node_modules/prisma/build/index.js migrate deploy --schema backend/prisma/schema.prisma
-          node --import tsx --test --test-concurrency=1 backend/src/tests/store-settings-database.integration.test.ts backend/src/tests/collection-artwork.database.integration.test.ts backend/src/tests/collection-purchase.database.integration.test.ts backend/src/tests/image-model-upgrade.database.integration.test.ts backend/src/tests/order-search.database.integration.test.ts backend/src/tests/brand-assets.database.integration.test.ts
+          node --import tsx --test --test-concurrency=1 backend/src/tests/store-settings-database.integration.test.ts backend/src/tests/collection-artwork.database.integration.test.ts backend/src/tests/collection-purchase.database.integration.test.ts backend/src/tests/image-model-upgrade.database.integration.test.ts backend/src/tests/order-search.database.integration.test.ts backend/src/tests/brand-assets.database.integration.test.ts backend/src/tests/installation-guide.database.integration.test.ts
       - run: npm run build
       - name: Install the browser used by responsive smoke coverage
         run: npx playwright install --with-deps chromium

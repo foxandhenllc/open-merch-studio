@@ -1,3 +1,4 @@
+import { InstallationGuide } from './InstallationGuide';
 import { OrderOperations } from './OrderOperations';
 import { useCallback, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -494,6 +495,7 @@ export function StoreAdminPage() {
                 <h1>Installation</h1>
                 <p>Each store has its own deployment, accounts, credentials, and data.</p>
               </header>
+              <InstallationGuide request={profileRequest} navigate={navigate} />
               <section className="admin-section">
                 <h2>Current store identity</h2>
                 <dl className="admin-detail-list">

@@ -61,8 +61,12 @@ Store profile. Those images become public only in the deployed profile.
 Set the store website URL there, then attach the domain and configure DNS
 in your hosting account. Country/currency, catalog pricing, and first-time
 policy setup still need installation work.
-Guided provisioning and OAuth account connections remain future milestones.
-The admin supports entering provider credentials, not OAuth.
+Installation now includes a resumable owner checklist and read-only checks
+for database migration history, private bucket access and configured values.
+Select your store type to focus the next steps. Confirm tasks only after
+you have performed them. A changed deployed identity or account configuration
+clears earlier confirmations for review. Automatic provisioning and OAuth
+remain outside this version; account signup and verification stay with you.
 
 Credentials do not activate commerce. Configure and verify the server gates,
 your signed webhooks, catalog, merchant identity, and approved policies using
@@ -72,3 +76,36 @@ PRINTFUL_AUTO_CONFIRM_ORDERS=false for review-before-production fulfillment.
 Never put real credentials in a support ticket, screenshot, URL, or commit.
 The admin access code is held only in memory for the open page. Reloading
 requires signing in again. Rotate ADMIN_ACCESS_CODE to revoke access.
+
+DATABASE AND PRIVATE STORAGE RECOVERY
+- Before changing a working database or storage project, create a database
+  backup and a separate private-artwork backup. They are one recovery set.
+- Verify the selected project is your intended installation. With the matching
+  DATABASE_URL configured privately, run from the repository's backend folder:
+    npx prisma migrate status
+    npx prisma migrate deploy
+  These are one-time operator commands; never run a reset on an operating store.
+- If migration history reports a failure, preserve the database and read the
+  failing migration with your operator. Repair the cause and use the documented
+  Prisma migration recovery workflow; do not mark it complete just to clear
+  the check. Installation checks are read-only and cannot apply migrations.
+- Keep the configured upload bucket private. Verify its project URL, bucket
+  name and service-role access in Connections, redeploy, then run the checks.
+- If a value is present but account behavior fails, confirm it belongs to this
+  account and environment. Rotate it through Connections and redeploy. Do not
+  share the value or a screenshot that contains it in a support request.
+
+WEBHOOK AND DOMAIN REVIEW
+- Set the Store website URL to the HTTPS address you own. Add that domain in
+  your hosting account and follow the DNS instructions shown for your domain.
+  Saving the profile does not purchase a domain or change DNS.
+- Stripe events go to /api/stripe/webhook on your backend. Configure the
+  signing secret for that endpoint and the events checkout.session.completed,
+  checkout.session.expired, and charge.refunded. Verify test-mode delivery
+  against the matching test-mode account before a separate live-money test.
+- Printful events go to /api/printful/webhook. Configure the matching webhook
+  public and secret keys. Confirm a paid order remains a draft for manual review.
+- Test customer order access, duplicate payment-event handling and your refund
+  workflow. A browser success redirect alone is never fulfillment proof.
+- Optional customer email requires a verified sender and delivery evidence.
+  Otherwise, keep email disabled and use the published support workflow.
