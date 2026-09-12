@@ -15,7 +15,10 @@ checksums. A later collection edit or withdrawal cannot replace an order's saved
 ## Behavior and evidence
 
 - **Orders & review** lists the latest 100 orders and filters unresolved exceptions. Select an order
-  to see its products, payment/fulfillment state, print downloads, and review history.
+  to see its products, payment/fulfillment state, print downloads, and review history. Older-order
+  navigation beyond this recent list remains follow-up work.
+- Refunded/cancelled orders with unresolved fulfillment issues remain in **Needs attention**, even
+  though their payment state is terminal. Resolved reviews and ordinary deliveries are excluded.
 - An acknowledgment or resolution uses the existing durable review transaction. A resolution needs
   an operating note. The transaction records its audit entry without changing order/payment status.
 - Retry is offered only with durable storage, enabled draft fulfillment, no attached draft, and
