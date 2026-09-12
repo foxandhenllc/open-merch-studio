@@ -11,6 +11,15 @@
   },
   "headers": [
     {
+      "source": "/examples/streamer(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        }
+      ]
+    },
+    {
       "source": "/order/(.*)",
       "headers": [
         {
@@ -72,6 +81,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/examples/streamer/:path*",
+      "destination": "/index.html"
+    },
     {
       "source": "/order/:id",
       "destination": "/index.html"

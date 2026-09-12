@@ -274,3 +274,8 @@ export function parsePublishedProfile(encoded, baseConfig) {
     );
   }
 }
+
+export {
+  emptyProfileDraft,
+  validateSavedProfileDraft,
+} from "./draft-storage.mjs";

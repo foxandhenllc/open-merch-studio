@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Owner test · Backup & help</title
+  ><style>
+    body {
+      font: 17px/1.6 system-ui;
+      color: #20372e;
+      background: #f7f3e8;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    a {
+      color: inherit;
+    }
+    button,
+    input {
+      font: inherit;
+      padding: 10px;
+      margin: 6px;
+    }
+    section {
+      border-top: 1px solid #cbd2c7;
+      margin-top: 32px;
+      padding-top: 20px;
+    }
+    #status {
+      white-space: pre-wrap;
+    }
+  </style>
+  <body>
+    <p>OPEN MERCH STUDIO / PRIVATE OWNER TEST</p>
+    <h1>A blank store, ready for your decisions.</h1>
+    <p>
+      Your installation starts without merchant content, collections, uploaded
+      artwork or orders. Colors and spending limits are software defaults. Your
+      changes persist; provider operations remain simulated.
+    </p>
+    <p><a href="/admin/">Continue in store admin →</a></p>
+    <section>
+      <h2>Separate example</h2>
+      <p>
+        The fictional Night Shift streamer store is a read-only illustration.
+        Exploring it does not add anything to your installation.
+      </p>
+      <a href="/examples/streamer">See the streamer store →</a> ·
+      <a href="/examples/streamer/admin">See how it was configured →</a>
+    </section>
+    <section>
+      <h2>Backup & recovery</h2>
+      <p>
+        Back up your database and private files together. Restore opens an
+        isolated copy of the latest backup; the previous copy is preserved.
+        These controls change your working copy, not the separate example.
+      </p>
+      <label
+        >Admin access code
+        <input id="code" type="password" autocomplete="current-password"
+      /></label>
+      <div>
+        <button data-action="status">Check status</button
+        ><button data-action="backup">Back up this store</button
+        ><button data-action="restore">
+          Restore latest backup into a new copy
+        </button>
+      </div>
+      <p id="status" role="status"></p>
+    </section>
+    <script src="/lab/page.js" defer></script>
+  </body>
+</html>

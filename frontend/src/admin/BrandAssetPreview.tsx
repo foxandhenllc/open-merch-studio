@@ -34,6 +34,7 @@ export function BrandAssetPreview({
       if (url) URL.revokeObjectURL(url);
     };
   }, [path, hash, readFile, attempt]);
+  if (!path) return <span className="admin-fine">No image added</span>;
   if (hash && preview?.path !== path)
     return failed === path ? (
       <div role="status">

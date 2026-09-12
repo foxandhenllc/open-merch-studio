@@ -6,6 +6,27 @@ import { FoxHenCollectionPage } from './components/FoxHenCollectionPage';
 import { WorkbenchStudioApp } from './WorkbenchStudioApp';
 import { MiniStorePage } from './components/MiniStorePage';
 
+const StreamerDemo = lazy(() =>
+  import('./examples/StreamerDemo').then((module) => ({ default: module.StreamerDemo }))
+);
+function EmptyStorefront() {
+  return (
+    <main className="policy-shell">
+      <header className="policy-hero">
+        <span className="kicker">Store not published</span>
+        <h1>Your storefront starts here.</h1>
+        <p>
+          No merchant identity, products, artwork or policy text have been supplied. Save and review
+          your store profile in admin, then publish and redeploy it.
+        </p>
+        <a className="back-link" href="/admin/">
+          Continue setting up your store →
+        </a>
+      </header>
+    </main>
+  );
+}
+
 const path = () => window.location.pathname.replace(/\/+$/, '') || '/';
 const StoreAdminPage = lazy(() =>
   import('./admin/StoreAdminPage').then((module) => ({ default: module.StoreAdminPage }))
@@ -59,6 +80,14 @@ function NotFoundPage() {
 
 export default function App() {
   const currentPath = path();
+  if (currentPath === '/examples/streamer' || currentPath === '/examples/streamer/admin')
+    return (
+      <Suspense fallback={<main aria-busy="true">Opening the streamer example…</main>}>
+        <StreamerDemo admin={currentPath.endsWith('/admin')} />
+      </Suspense>
+    );
+  if (import.meta.env.VITE_OWNER_START_EMPTY === 'true' && currentPath !== '/admin')
+    return <EmptyStorefront />;
   const orderMatch = currentPath.match(/^\/order\/([A-Za-z0-9_-]{1,100})$/);
   if (orderMatch)
     return (

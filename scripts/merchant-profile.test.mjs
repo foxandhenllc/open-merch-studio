@@ -194,3 +194,21 @@ test("profile review survives JSONB object ordering while preserving text and se
   page.sections.reverse();
   assert.notEqual(profileDigest(reordered), profileDigest(draft));
 });
+
+test("empty owner drafts save partial work without inheriting sample identity or bypassing publication", async () => {
+  const { emptyProfileDraft, validateSavedProfileDraft } =
+    await import("../packages/merchant-profile/index.mjs");
+  const empty = emptyProfileDraft(base, policy);
+  assert.equal(empty.fields["brand.displayName"], "");
+  assert.equal(empty.pages["/terms"].sections[0].body, "");
+  assert.equal(empty.policyVersion, "");
+  empty.fields["brand.displayName"] = "My own store";
+  assert.deepEqual(validateSavedProfileDraft(empty, base, policy), empty);
+  assert.throws(() => prepareProfilePublication(empty, base, policy, true));
+  const unsafe = structuredClone(empty);
+  unsafe.fields["web.canonicalUrl"] = "javascript:alert(1)";
+  assert.throws(() => validateSavedProfileDraft(unsafe, base, policy));
+  const unknown = structuredClone(empty);
+  unknown.fields.providerToken = "not-allowed";
+  assert.throws(() => validateSavedProfileDraft(unknown, base, policy));
+});

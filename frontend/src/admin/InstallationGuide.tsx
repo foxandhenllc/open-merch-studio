@@ -6,7 +6,9 @@ import './installation-guide.css';
 export function InstallationGuide({
   request,
   navigate,
+  compact = false,
 }: {
+  compact?: boolean;
   request: AdminRequest;
   navigate: (section: AdminSection) => void;
 }) {
@@ -73,13 +75,14 @@ export function InstallationGuide({
       setChecking(false);
     }
   }
+  const nextTask = progress?.tasks.find((task) => !progress.completed.includes(task.id));
   return (
     <div className="installation-guide">
       <section className="admin-section">
-        <h2>Your setup path</h2>
+        <h2>{compact ? 'Start here, then work forward' : 'Your setup path'}</h2>
         <p>
-          Keep track of the work you have reviewed. Your checklist records your confirmation; it
-          does not open checkout or certify a live account.
+          Follow this order for your first store. Saving a draft is safe to do early; publishing and
+          opening sales are separate decisions.
         </p>
         {error && (
           <p role="alert">
@@ -116,6 +119,34 @@ export function InstallationGuide({
                 restarts.
               </p>
             )}
+            {nextTask ? (
+              <section className="installation-next" aria-label="Next setup action">
+                <span className="admin-eyebrow">
+                  Next · step {progress.tasks.indexOf(nextTask) + 1} of {progress.tasks.length}
+                </span>
+                <h3>{nextTask.title}</h3>
+                <p>{nextTask.detail}</p>
+                <button
+                  className="admin-primary"
+                  onClick={() =>
+                    navigate(
+                      nextTask.section === 'installation' ? 'installation' : nextTask.section
+                    )
+                  }
+                >
+                  Continue with this step →
+                </button>
+                <p className="admin-fine">
+                  After you finish, confirm this step in the checklist below. Confirmations record
+                  your review; they do not publish content or open checkout.
+                </p>
+              </section>
+            ) : (
+              <p className="admin-feedback">
+                You have confirmed every setup task. Run the installation checks and verify the
+                storefront before inviting customers.
+              </p>
+            )}
             <label className="profile-field">
               What are you building?
               <select
@@ -134,91 +165,98 @@ export function InstallationGuide({
             <p className="admin-fine">
               {progress.completed.length} of {progress.tasks.length} tasks confirmed by you
             </p>
-            <ol className="installation-task-list">
-              {progress.tasks.map((task) => (
-                <li key={task.id}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={progress.completed.includes(task.id)}
-                      disabled={busy}
-                      onChange={(event) =>
-                        void save(
-                          progress.persona,
-                          event.target.checked
-                            ? [...progress.completed, task.id]
-                            : progress.completed.filter((id) => id !== task.id)
-                        )
-                      }
-                    />
-                    <strong>{task.title}</strong>
-                  </label>
-                  <p>{task.detail}</p>
-                  {task.section !== 'installation' && (
-                    <button
-                      type="button"
-                      className="admin-text-link"
-                      onClick={() => navigate(task.section)}
-                    >
-                      Open{' '}
-                      {task.section === 'profile'
-                        ? 'store profile'
-                        : task.section === 'orders'
-                          ? 'orders & review'
-                          : task.section}{' '}
-                      →
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ol>
+            <details open={!compact}>
+              <summary>
+                {compact ? 'View the full sequence & confirm finished steps' : 'Setup checklist'}
+              </summary>
+              <ol className="installation-task-list">
+                {progress.tasks.map((task) => (
+                  <li key={task.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={progress.completed.includes(task.id)}
+                        disabled={busy}
+                        onChange={(event) =>
+                          void save(
+                            progress.persona,
+                            event.target.checked
+                              ? [...progress.completed, task.id]
+                              : progress.completed.filter((id) => id !== task.id)
+                          )
+                        }
+                      />
+                      <strong>{task.title}</strong>
+                    </label>
+                    <p>{task.detail}</p>
+                    {task.section !== 'installation' && (
+                      <button
+                        type="button"
+                        className="admin-text-link"
+                        onClick={() => navigate(task.section)}
+                      >
+                        Open{' '}
+                        {task.section === 'profile'
+                          ? 'store profile'
+                          : task.section === 'orders'
+                            ? 'orders & review'
+                            : task.section}{' '}
+                        →
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </details>
           </>
         )}
       </section>
-      <section className="admin-section" aria-label="Installation checks">
-        <h2>Check this installation</h2>
-        <p>
-          Read database migration status, private bucket access and configured account values. These
-          checks do not generate artwork, charge a card, send email, or create an order.
-        </p>
-        <button
-          className="admin-secondary"
-          type="button"
-          disabled={checking}
-          onClick={() => void inspect()}
-        >
-          {checking ? 'Checking installation…' : 'Run installation checks'}
-        </button>
-        {checkError && <p role="alert">{checkError}</p>}
-        {checks && (
-          <>
-            <p className="admin-fine">
-              Checked {new Date(checks.checkedAt).toLocaleString()} · Checkout access:{' '}
-              {checks.checkoutAccessMode}
-            </p>
-            <dl className="installation-check-list">
-              {checks.checks.map((check) => (
-                <div key={check.id}>
-                  <dt>
-                    {check.title}
-                    <span>
-                      {
+      {!compact && (
+        <section className="admin-section" aria-label="Installation checks">
+          <h2>Check this installation</h2>
+          <p>
+            Read database migration status, private bucket access and configured account values.
+            These checks do not generate artwork, charge a card, send email, or create an order.
+          </p>
+          <button
+            className="admin-secondary"
+            type="button"
+            disabled={checking}
+            onClick={() => void inspect()}
+          >
+            {checking ? 'Checking installation…' : 'Run installation checks'}
+          </button>
+          {checkError && <p role="alert">{checkError}</p>}
+          {checks && (
+            <>
+              <p className="admin-fine">
+                Checked {new Date(checks.checkedAt).toLocaleString()} · Checkout access:{' '}
+                {checks.checkoutAccessMode}
+              </p>
+              <dl className="installation-check-list">
+                {checks.checks.map((check) => (
+                  <div key={check.id}>
+                    <dt>
+                      {check.title}
+                      <span>
                         {
-                          verified: 'Check passed',
-                          configured: 'Values present',
-                          action: 'Review needed',
-                          simulated: 'Local simulation',
-                        }[check.status]
-                      }
-                    </span>
-                  </dt>
-                  <dd>{check.detail}</dd>
-                </div>
-              ))}
-            </dl>
-          </>
-        )}
-      </section>
+                          {
+                            verified: 'Check passed',
+                            configured: 'Values present',
+                            action: 'Review needed',
+                            simulated: 'Local simulation',
+                          }[check.status]
+                        }
+                      </span>
+                    </dt>
+                    <dd>{check.detail}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }

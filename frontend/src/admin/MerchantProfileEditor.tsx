@@ -147,7 +147,10 @@ export function MerchantProfileEditor({
       <header className="admin-page-heading">
         <span className="admin-eyebrow">Your store</span>
         <h1>Store profile</h1>
-        <p>Edit your identity and policy pages, then publish one consistent profile.</p>
+        <p>
+          Start with your name and colors. Save unfinished work privately; complete the remaining
+          details before publication.
+        </p>
       </header>
       <nav className="profile-tabs" aria-label="Profile editor">
         {(
@@ -183,7 +186,7 @@ export function MerchantProfileEditor({
           before saving again.
         </p>
       )}
-      <form onSubmit={save}>
+      <form onSubmit={save} noValidate>
         {tab === 'identity' && (
           <div className="profile-workspace">
             <div>

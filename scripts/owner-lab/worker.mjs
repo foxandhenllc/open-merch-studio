@@ -118,7 +118,7 @@ app.get("*", async (req, res) => {
     .send(
       html.replace(
         "<body>",
-        '<body><aside style="padding:10px 16px;background:#213b32;color:#fff;font:14px system-ui;position:relative;z-index:10000">Local owner rehearsal · payments, AI and hosting are simulated. <a style="color:#fff;text-decoration:underline" href="/lab/">Scenarios & backup</a></aside>',
+        '<body><aside style="padding:10px 16px;background:#213b32;color:#fff;font:14px system-ui;position:relative;z-index:10000">Private owner test · payments, AI and hosting are simulated. <a style="color:#fff;text-decoration:underline" href="/lab/">Backup & help</a></aside>',
       ),
     );
 });

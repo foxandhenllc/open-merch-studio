@@ -60,6 +60,23 @@ const freePort = () =>
 let config = existsSync(configPath)
   ? JSON.parse(readFileSync(configPath, "utf8"))
   : { pgPort: await freePort(), port, active: "initial", snapshots: [] };
+const fresh = process.argv.includes("--fresh");
+if (fresh) {
+  writeFileSync(
+    join(home, `previous-installation-${Date.now()}.json`),
+    JSON.stringify(config, null, 2),
+    { mode: 0o600 },
+  );
+  const freshId = `blank_${Date.now()}`;
+  config = {
+    ...config,
+    active: freshId,
+    cluster: `postgres-${freshId}`,
+    pgPort: await freePort(),
+    snapshots: [],
+    startEmpty: true,
+  };
+}
 assert.equal(
   config.port,
   port,
@@ -72,7 +89,8 @@ const database = () => `oms_owner_lab_${config.active.replaceAll("-", "_")}`;
 const databaseUrl = () =>
   `postgresql://oms_lab:${encodeURIComponent(code)}@127.0.0.1:${config.pgPort}/${database()}`;
 const instance = () => join(home, "instances", config.active);
-const dbDirectory = join(home, "postgres");
+assert.match(config.cluster ?? "postgres", /^postgres(?:-blank_[0-9]+)?$/);
+const dbDirectory = join(home, config.cluster ?? "postgres");
 const source = join(home, "source");
 const pgEnvironment = {
   PATH: process.env.PATH,
@@ -123,7 +141,11 @@ const server = createServer(async (req, res) => {
       req.method === "GET" &&
       ["/lab/", "/lab/page.js"].includes(url.pathname)
     ) {
-      const file = url.pathname.endsWith(".js") ? "page.js" : "page.html";
+      const file = url.pathname.endsWith(".js")
+        ? "page.js"
+        : config.startEmpty
+          ? "blank-page.html"
+          : "page.html";
       res.setHeader(
         "Content-Type",
         file.endsWith(".js") ? "text/javascript" : "text/html",
@@ -133,6 +155,7 @@ const server = createServer(async (req, res) => {
     }
     if (
       req.method === "GET" &&
+      !config.startEmpty &&
       /^\/lab\/samples\/(community|artist|coffee|local)\.png$/.test(
         url.pathname,
       )
@@ -255,6 +278,7 @@ const environment = () =>
     code,
     instance: instance(),
     variables: variables(),
+    startEmpty: config.startEmpty === true,
   });
 async function startWorker() {
   worker = fork(join(source, "scripts/owner-lab/worker.mjs"), [], {
@@ -447,7 +471,7 @@ try {
     "start",
   ]);
   pgStarted = true;
-  if (!existsSync(configPath)) {
+  if (fresh || !existsSync(configPath)) {
     await pgRun("createdb", [database()]);
     await pgRun("psql", [
       "--dbname",

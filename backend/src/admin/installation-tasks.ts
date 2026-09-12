@@ -26,14 +26,7 @@ export const installationTasks = [
     id: 'identity',
     title: 'Make the store yours',
     detail:
-      'Set your brand, logo, sharing image and contact details. Review all five policy pages, then publish and redeploy. Check the resulting storefront.',
-    section: 'profile',
-  },
-  {
-    id: 'domain',
-    title: 'Connect your store address',
-    detail:
-      'Attach the domain in your hosting account and follow the DNS records it provides. Open your HTTPS address and confirm it reaches this store, including a direct visit to /collections.',
+      'Start in Store profile → Brand & details. Add your store name and colors, then Save draft. You can leave other fields unfinished. The preview changes as you edit; the storefront stays unchanged.',
     section: 'profile',
   },
   {
@@ -47,8 +40,22 @@ export const installationTasks = [
     id: 'collection',
     title: 'Prepare your first collection',
     detail:
-      'Upload rights-cleared artwork, choose products and prices, review print dimensions and layouts, then publish a collection. Enable sales only after reviewing its readiness checks.',
+      'In Collections, create one collection, upload artwork you can use, and choose products and prices. Save privately, review the print size, then publish its preview. Customers can see a published preview; ordering is still a separate approval.',
     section: 'collections',
+  },
+  {
+    id: 'domain',
+    title: 'Connect your store address',
+    detail:
+      'Attach the domain in your hosting account and follow the DNS records it provides. Open your HTTPS address and confirm it reaches this store, including a direct visit to /collections.',
+    section: 'profile',
+  },
+  {
+    id: 'publication',
+    title: 'Review what customers will see',
+    detail:
+      'Complete your identity, contact details and policy pages. Save the profile, open Review & publish, then redeploy the saved values. Open the storefront to verify the result. Collection previews publish separately; ordering stays closed until its own approval.',
+    section: 'profile',
   },
   {
     id: 'webhooks',

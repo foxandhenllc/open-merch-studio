@@ -101,3 +101,13 @@ export function validatePolicyContent(
   policy: unknown,
   config: ProfileConfig,
 ): string[];
+
+export function emptyProfileDraft(
+  config: ProfileConfig,
+  policy: PolicyDocument,
+): ProfileDraft;
+export function validateSavedProfileDraft(
+  input: unknown,
+  config: ProfileConfig,
+  policy: PolicyDocument,
+): ProfileDraft;

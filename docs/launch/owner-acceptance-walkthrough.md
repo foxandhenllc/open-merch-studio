@@ -1,3 +1,6 @@
+> For the current blank-start review, use [Blank owner test and streamer example](blank-owner-and-streamer-review.md).
+> The scenario-filled rehearsal below is separate; do not seed its sample content into the blank owner test.
+
 # Owner acceptance: Open Merch Studio V1 candidate
 
 This is the hands-on acceptance checkpoint before a V1 release decision. It exercises the supported

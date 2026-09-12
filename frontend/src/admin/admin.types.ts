@@ -26,6 +26,7 @@ export type Connection = {
   fields: ConnectionField[];
 };
 export type AdminSetup = {
+  content?: { empty: boolean };
   store: { name: string; url: string; supportEmail: string };
   settings: SettingsSnapshot | null;
   models: Array<{ id: string; name: string; description: string; transparent: boolean }>;

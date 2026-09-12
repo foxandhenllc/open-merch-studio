@@ -60,3 +60,50 @@
 .installation-task-list li > p {
   margin: 0.55rem 0 0.65rem 1.7rem;
 }
+.installation-next {
+  padding: 1.4rem 0 1.6rem;
+  border-block: 1px solid #cbd2c7;
+  margin: 1.4rem 0;
+}
+.installation-next h3 {
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+  margin: 0.5rem 0;
+}
+.installation-next p {
+  max-width: 48rem;
+}
+.installation-guide summary {
+  cursor: pointer;
+  padding: 1rem 0;
+  font-weight: 600;
+}
+.admin-workflow-guide {
+  border-left: 3px solid #315542;
+  padding: 0.4rem 1.1rem;
+  margin-bottom: 2rem;
+  max-width: 60rem;
+}
+.admin-workflow-guide p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+.admin-workflow-guide button {
+  margin-right: 1.5rem;
+  font-size: 0.85rem;
+}
+.installation-next button {
+  transition:
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+.installation-next button:hover {
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .installation-next button {
+    transition: none;
+    transform: none;
+  }
+}

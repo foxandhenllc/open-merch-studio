@@ -1,3 +1,4 @@
+import { AdminSectionGuide, ChangeVisibilityGuide } from './SetupGuidance';
 import { InstallationGuide } from './InstallationGuide';
 import { OrderOperations } from './OrderOperations';
 import { useCallback, useRef, useState } from 'react';
@@ -139,7 +140,9 @@ export function StoreAdminPage() {
     return (
       <div className="store-admin admin-login">
         <a className="admin-brand" href="/">
-          {merchantConfig.brand.displayName}
+          {import.meta.env.VITE_OWNER_START_EMPTY === 'true'
+            ? 'Open Merch Studio'
+            : merchantConfig.brand.displayName}
         </a>
         <main>
           <span className="admin-eyebrow">Store administration</span>
@@ -193,7 +196,7 @@ export function StoreAdminPage() {
                 setNotice('');
               }}
             >
-              <span>{item.number}</span>
+              <span aria-hidden="true">{item.id === 'overview' ? '→' : '·'}</span>
               {item.label}
             </button>
           ))}
@@ -253,93 +256,34 @@ export function StoreAdminPage() {
               <header className="admin-page-heading">
                 <span className="admin-eyebrow">Your store</span>
                 <h1>Store overview</h1>
-                <p>Make the store your own, connect your accounts, and prepare to launch.</p>
+                <p>
+                  Begin with a private draft. Work through the setup path and check each change
+                  before customers see it.
+                </p>
               </header>
-              <div className="admin-summary">
-                <div>
-                  <span>Artwork model</span>
-                  <strong>{selected?.name ?? settings?.values.imageModel ?? 'Unavailable'}</strong>
-                  <button onClick={() => navigate('artwork')}>Choose model →</button>
-                </div>
-                <div>
-                  <span>Daily AI budget</span>
-                  <strong>
-                    {settings
-                      ? `$${(settings.values.dailyAiBudgetCents / 100).toFixed(2)}`
-                      : 'Unavailable'}
-                  </strong>
-                  <button onClick={() => navigate('artwork')}>Manage limits →</button>
-                </div>
-                <div>
-                  <span>Checkout access</span>
-                  <strong>{setup.commerce.checkoutAccessMode}</strong>
-                  <span className="admin-fine">
-                    Authorization is controlled by this deployment.
-                  </span>
-                </div>
-              </div>
-              <section className="admin-section">
-                <h2>Set up your store</h2>
-                <div className="admin-step-list">
-                  <button onClick={() => navigate('profile')}>
-                    <span>01</span>
-                    <div>
-                      <strong>Make it your store</strong>
-                      <p>
-                        Preview your name and colors, add support details, and review your policies.
-                      </p>
-                    </div>
-                    <span>→</span>
-                  </button>
-                  <button onClick={() => navigate('connections')}>
-                    <span>02</span>
-                    <div>
-                      <strong>Connect your accounts</strong>
-                      <p>
-                        Set up payments, printing, artwork storage, and email with your own
-                        accounts.
-                      </p>
-                    </div>
-                    <span>→</span>
-                  </button>
-                  <button onClick={() => navigate('collections')}>
-                    <span>03</span>
-                    <div>
-                      <strong>Plan your first collection</strong>
-                      <p>
-                        Name a collection, choose products, and save a private draft for your next
-                        drop or event.
-                      </p>
-                    </div>
-                    <span>→</span>
-                  </button>
-                  <button onClick={() => navigate('artwork')}>
-                    <span>04</span>
-                    <div>
-                      <strong>Set your AI artwork limits</strong>
-                      <p>
-                        AI creation is optional. Choose its model and budget here; customers can
-                        also upload artwork.
-                      </p>
-                    </div>
-                    <span>→</span>
-                  </button>
-                  <button onClick={() => navigate('installation')}>
-                    <span>05</span>
-                    <div>
-                      <strong>Review installation & launch</strong>
-                      <p>Check hosting setup, store identity, and the remaining launch steps.</p>
-                    </div>
-                    <span>→</span>
-                  </button>
-                </div>
-              </section>
-              <p className="admin-fine">
-                A configured key shows that a value is present. Account access, webhooks, and live
-                commerce need their own verification.
-              </p>
+              {setup.content?.empty && (
+                <p className="admin-message">
+                  Empty installation · No collections, artwork, orders, merchant identity, or policy
+                  text have been added for you. Colors and AI limits are product defaults; provider
+                  choices are unconnected until you supply values.
+                </p>
+              )}
+              <InstallationGuide request={profileRequest} navigate={navigate} compact />
+              <ChangeVisibilityGuide />
+              <details className="admin-section">
+                <summary>Current operating defaults</summary>
+                <p>
+                  Artwork: {selected?.name}. Daily AI budget:{' '}
+                  {settings
+                    ? `$${(settings.values.dailyAiBudgetCents / 100).toFixed(2)}`
+                    : 'Unavailable'}
+                  . Checkout access: {setup.commerce.checkoutAccessMode}.
+                </p>
+                <p>These are software settings, not sample store content. AI remains optional.</p>
+              </details>
             </>
           )}
+          {section !== 'overview' && <AdminSectionGuide section={section} navigate={navigate} />}
           {section === 'orders' && (
             <OrderOperations request={profileRequest} readFile={artworkRequest} />
           )}

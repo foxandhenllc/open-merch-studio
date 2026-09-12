@@ -1,9 +1,11 @@
+import { emptyOwnerInstallation } from '../config/owner-rehearsal.js';
 import { Prisma } from '@prisma/client';
 import {
   profileDraft,
   profileDigest,
   profileFields,
-  validateProfileDraft,
+  validateSavedProfileDraft,
+  emptyProfileDraft,
   needsPolicyReview,
   prepareProfilePublication,
   type ProfileDraft,
@@ -17,7 +19,10 @@ import { brandAssets } from './brand-assets.service.js';
 import { deploymentSettings } from './deployment-settings.js';
 
 const key = 'merchant-profile-draft-v1';
-const activeDraft = () => profileDraft(merchantConfig, installedPolicy);
+const activeDraft = () =>
+  emptyOwnerInstallation()
+    ? emptyProfileDraft(merchantConfig, installedPolicy)
+    : profileDraft(merchantConfig, installedPolicy);
 const activeDigest = () => profileDigest(activeDraft());
 type DraftRecord = { draft: ProfileDraft; revision: number; baseDigest: string };
 let fixture: DraftRecord | undefined;
@@ -44,7 +49,10 @@ function parse(value: unknown): DraftRecord {
   )
     throw unavailable();
   try {
-    return { ...record, draft: validateProfileDraft(record.draft, merchantConfig) };
+    return {
+      ...record,
+      draft: validateSavedProfileDraft(record.draft, merchantConfig, installedPolicy),
+    };
   } catch {
     throw unavailable();
   }
@@ -138,7 +146,7 @@ function checkRevision(record: DraftRecord, revision: unknown) {
 export async function saveMerchantProfile(input: unknown, revision: unknown, baseDigest: unknown) {
   let draft: ProfileDraft;
   try {
-    draft = validateProfileDraft(input, merchantConfig);
+    draft = validateSavedProfileDraft(input, merchantConfig, installedPolicy);
   } catch (error) {
     throw new HttpError(
       error instanceof Error ? error.message : 'Invalid profile.',

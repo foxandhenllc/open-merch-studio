@@ -16,7 +16,10 @@ export async function verifyProfileEditor({
     .getByRole('navigation', { name: 'Store administration' })
     .getByRole('button', { name: /Overview$/ })
     .click();
-  await page.getByRole('button', { name: /Make it your store/ }).click();
+  await page
+    .getByRole('region', { name: 'Next setup action' })
+    .getByRole('button', { name: 'Continue with this step →', exact: true })
+    .click();
   await page.getByLabel('Store name', { exact: true }).fill(name);
   const image = await sharp({
     create: { width: 1200, height: 900, channels: 4, background: '#315542' },
@@ -31,13 +34,11 @@ export async function verifyProfileEditor({
     const slot = page.getByRole('region', { name: label, exact: true });
     await slot.locator('summary').first().click();
     await slot.getByText('Upload an original image', { exact: true }).click();
-    await slot
-      .getByLabel('Artwork file', { exact: true })
-      .setInputFiles({
-        name: `${kind}-${viewport.width}.png`,
-        mimeType: 'image/png',
-        buffer: image,
-      });
+    await slot.getByLabel('Artwork file', { exact: true }).setInputFiles({
+      name: `${kind}-${viewport.width}.png`,
+      mimeType: 'image/png',
+      buffer: image,
+    });
     await slot.getByRole('checkbox', { name: /I have permission/ }).check();
     await slot.getByRole('button', { name: 'Upload and attach', exact: true }).click();
     await slot.getByRole('button', { name: 'Detach artwork', exact: true }).waitFor();
@@ -88,7 +89,10 @@ export async function verifyProfileEditor({
   await editor.getByRole('status').filter({ hasText: 'Draft saved' }).waitFor();
   // Navigate away and back with an unsaved edit: the editor keeps it without changing live state.
   await page.getByLabel('Store name', { exact: true }).fill(name + ' draft');
-  await page.getByRole('button', { name: /01Overview|01 Overview/ }).click();
+  await page
+    .getByRole('navigation', { name: 'Store administration' })
+    .getByRole('button', { name: /Overview$/ })
+    .click();
   await page
     .getByRole('navigation', { name: 'Store administration' })
     .getByRole('button', { name: /Store profile$/ })

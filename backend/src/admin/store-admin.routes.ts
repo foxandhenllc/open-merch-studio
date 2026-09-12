@@ -1,3 +1,4 @@
+import { emptyOwnerInstallation } from '../config/owner-rehearsal.js';
 import { installationChecks } from './installation-checks.js';
 import { readInstallationProgress, saveInstallationProgress } from './installation-progress.js';
 import { brandAssets } from './brand-assets.service.js';
@@ -138,10 +139,11 @@ router.get(
       success: true,
       data: {
         store: {
-          name: merchantConfig.brand.displayName,
-          url: merchantConfig.web.canonicalUrl,
-          supportEmail: merchantConfig.operator.supportEmail,
+          name: emptyOwnerInstallation() ? 'Your store' : merchantConfig.brand.displayName,
+          url: emptyOwnerInstallation() ? '' : merchantConfig.web.canonicalUrl,
+          supportEmail: emptyOwnerInstallation() ? '' : merchantConfig.operator.supportEmail,
         },
+        content: { empty: emptyOwnerInstallation() },
         settings,
         models: imageModels,
         connections: connectionSummaries(),

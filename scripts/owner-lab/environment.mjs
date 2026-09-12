@@ -4,6 +4,7 @@ export function labEnvironment({
   code,
   instance,
   variables = [],
+  startEmpty = false,
 }) {
   return {
     PATH: process.env.PATH,
@@ -11,6 +12,12 @@ export function labEnvironment({
     TMPDIR: process.env.TMPDIR,
     NODE_ENV: "development",
     OMS_OWNER_REHEARSAL: "local-only",
+    OMS_LAB_START_EMPTY: startEmpty ? "1" : "",
+    VITE_OWNER_START_EMPTY:
+      startEmpty &&
+      !variables.some((item) => item.key === "OMS_MERCHANT_PROFILE")
+        ? "true"
+        : "false",
     DATABASE_URL: databaseUrl,
     BACKEND_URL: origin,
     FRONTEND_URL: origin,

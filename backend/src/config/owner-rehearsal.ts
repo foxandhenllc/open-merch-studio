@@ -35,3 +35,12 @@ export function ownerRehearsalEnabled(source: NodeJS.ProcessEnv = process.env): 
     return false;
   }
 }
+
+/** This switch only hides preinstalled merchant content in the isolated first-owner rehearsal. */
+export function emptyOwnerInstallation(): boolean {
+  return (
+    ownerRehearsalEnabled() &&
+    process.env.OMS_LAB_START_EMPTY === '1' &&
+    !process.env.OMS_MERCHANT_PROFILE
+  );
+}
