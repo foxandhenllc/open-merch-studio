@@ -1,13 +1,6 @@
 /** Reviewed Image API choices. Add capabilities deliberately when adding a model. */
 export const imageModels = [
   {
-    id: 'gpt-image-2',
-    name: 'GPT Image 2',
-    description: 'Established generation and editing. Uses separate background removal.',
-    transparent: false,
-    inputFidelity: false,
-  },
-  {
     id: 'gpt-image-2.5-flare',
     name: 'GPT Image 2.5 Flare',
     description: 'Fast everyday artwork and concepts, with transparent output.',
@@ -32,6 +25,11 @@ export function imageModelCapabilities(model: string) {
 
 /** Budget reservations, not advertised provider prices. Calibrate 2.5 after controlled evaluation. */
 export function imageRequestEstimate(model: string, quality: 'rough' | 'final', editing = false) {
-  if (/^gpt-image-2\.5-/.test(model)) return quality === 'final' ? 100 : 50;
-  return quality === 'final' ? (editing ? 40 : 36) : editing ? 14 : 6;
+  void model;
+  void editing;
+  return quality === 'final' ? 100 : 50;
 }
+
+/** Existing Image 2 installations move to the reviewed everyday model on upgrade. */
+export const upgradeLegacyImageModel = (model: string) =>
+  /^gpt-image-2(?:-\d{4}-\d{2}-\d{2})?$/.test(model) ? 'gpt-image-2.5-flare' : model;

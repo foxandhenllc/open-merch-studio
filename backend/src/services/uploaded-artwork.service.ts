@@ -5,7 +5,6 @@ import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
 import type { AssetUploadAuthorization, DesignDraft } from '../types/catalog.js';
 import { dataUrlToBuffer } from './openai-design-provider.js';
-import { prepareArtworkForPrint } from './background-removal.service.js';
 import {
   assetStorageConfigured,
   createPrivatePreviewUrl,
@@ -315,6 +314,12 @@ export async function completeArtworkUpload(params: {
   contentType?: string;
   purpose?: 'print' | 'reference';
 }): Promise<DesignDraft> {
+  if (params.removeBackground)
+    throw new HttpError(
+      'Automatic background removal is no longer supported. Upload a prepared transparent PNG or preserve the original background.',
+      400,
+      'background_removal_retired'
+    );
   if (!params.rightsConfirmed) {
     throw new HttpError(
       'Confirm that you have permission to reproduce this artwork on merchandise.',
@@ -362,24 +367,12 @@ export async function completeArtworkUpload(params: {
     .webp({ quality: 84 })
     .toBuffer();
 
-  let printBuffer = normalized.data;
-  let preparationStatus: NonNullable<DesignDraft['printPreparation']>['status'] = 'prepared';
-  let preparationProvider: NonNullable<DesignDraft['printPreparation']>['provider'] = 'sharp';
-  let preparationMessage = hasAlpha
+  const printBuffer = normalized.data;
+  const preparationStatus: NonNullable<DesignDraft['printPreparation']>['status'] = 'prepared';
+  const preparationProvider: NonNullable<DesignDraft['printPreparation']>['provider'] = 'sharp';
+  const preparationMessage = hasAlpha
     ? 'A transparent, color-managed PNG was prepared without generative changes.'
     : 'A color-managed PNG was prepared and the original background was preserved.';
-
-  if (purpose === 'print' && params.removeBackground) {
-    const prepared = await prepareArtworkForPrint({
-      imageUrl: `data:image/png;base64,${normalized.data.toString('base64')}`,
-      model: 'gpt-image-2',
-    });
-    const decoded = prepared.transparentUrl ? dataUrlToBuffer(prepared.transparentUrl) : null;
-    if (decoded) printBuffer = Buffer.from(decoded.buffer);
-    preparationStatus = prepared.status === 'removed' ? 'removed' : 'failed';
-    preparationProvider = prepared.provider;
-    preparationMessage = prepared.message;
-  }
 
   const previewStoragePath = `${session.id}/${params.assetId}/preview.webp`;
   const printStoragePath = purpose === 'print' ? `uploads/${params.assetId}/print.png` : null;
@@ -402,7 +395,7 @@ export async function completeArtworkUpload(params: {
     placementCodes: params.placementCodes ?? [],
     purpose,
     preparationMessage,
-    preparationReady: preparationStatus !== 'failed',
+    preparationReady: true,
   });
   const policy: DesignDraft['policy'] = {
     status: 'pass',
@@ -446,14 +439,13 @@ export async function completeArtworkUpload(params: {
         where: { id: stored.id },
         data: {
           imageUrl: printStoragePath ? imageUrl : null,
-          transparentUrl:
-            printStoragePath && (hasAlpha || preparationStatus === 'removed') ? imageUrl : null,
+          transparentUrl: printStoragePath && hasAlpha ? imageUrl : null,
           previewStoragePath,
           printStoragePath,
           byteSize: original.byteLength,
           width,
           height,
-          hasAlpha: preparationStatus === 'removed' ? true : hasAlpha,
+          hasAlpha,
           checksumSha256,
           rightsConfirmedAt: new Date(),
           generationStatus: 'complete',

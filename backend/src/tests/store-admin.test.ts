@@ -76,11 +76,15 @@ test('admin model selection persists across app instances, rejects stale/unknown
     const old = await fetch(`${base}/api/admin/store-settings`, {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({ revision: first.revision, values: { imageModel: 'gpt-image-2' } }),
+      body: JSON.stringify({
+        revision: first.revision,
+        values: { imageModel: 'gpt-image-2.5-sunburst' },
+      }),
     });
     assert.equal(old.status, 409);
     for (const values of [
       { imageModel: 'invented-model' },
+      { imageModel: 'gpt-image-2' },
       { dailyAiBudgetCents: -1 },
       { perSessionBudgetCents: 9000 },
       { checkoutEnabled: true },
@@ -96,7 +100,7 @@ test('admin model selection persists across app instances, rejects stale/unknown
     }
     assert.equal((await readStoreSettings()).revision, saved.revision);
     await Promise.all(
-      ['gpt-image-2', 'gpt-image-2.5-flare'].map((imageModel) =>
+      ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'].map((imageModel) =>
         withStoreSettings({ ...saved.values, imageModel }, async () => {
           await new Promise((resolve) => setTimeout(resolve, 5));
           assert.equal(activeImageModel(), imageModel);
@@ -124,7 +128,7 @@ test('admin model selection persists across app instances, rejects stale/unknown
     env.nodeEnv = 'production';
     await assert.rejects(readStoreSettings, /database connection/);
     await assert.rejects(
-      () => saveStoreSettings({ imageModel: 'gpt-image-2' }, saved.revision),
+      () => saveStoreSettings({ imageModel: 'gpt-image-2.5-sunburst' }, saved.revision),
       /database connection/
     );
   } finally {

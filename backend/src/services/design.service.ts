@@ -1,3 +1,4 @@
+import { reconcileImageUsage } from './image-usage-reconciliation.js';
 import { activeImageModel } from '../admin/store-settings.js';
 import { imageRequestEstimate } from '../admin/image-models.js';
 import { prisma } from '../config/database.js';
@@ -11,11 +12,11 @@ import type {
 } from '../types/catalog.js';
 import {
   createMockDesignImage,
+  ImageRequestNotSentError,
   dataUrlToBuffer,
   generateDesignImage,
   editDesignImage,
   canUseLiveOpenAi,
-  supportsTransparentBackground,
 } from './openai-design-provider.js';
 import { getProductsByIds } from './catalog.service.js';
 import { describePrintfulError, generatePrintfulMockupPreview } from './printful.service.js';
@@ -61,24 +62,10 @@ type DesignArtwork = {
 
 const blockedTerms = ['nike', 'disney', 'marvel', 'pokemon', 'supreme'];
 
-const estimatedBackgroundRemovalCostCents = () =>
-  canUseLiveOpenAi() &&
-  Boolean(env.removeBgApiKey) &&
-  !supportsTransparentBackground(activeImageModel())
-    ? Math.max(0, env.removeBgEstimatedCostCents)
-    : 0;
-
 const estimatedGenerationCostCents = (qualityTier: 'rough' | 'final') =>
-  canUseLiveOpenAi()
-    ? imageRequestEstimate(activeImageModel(), qualityTier) + estimatedBackgroundRemovalCostCents()
-    : 1;
-
+  canUseLiveOpenAi() ? imageRequestEstimate(activeImageModel(), qualityTier) : 1;
 const estimatedRevisionCostCents = () =>
-  canUseLiveOpenAi()
-    ? (/^gpt-image-2\.5-/.test(activeImageModel())
-        ? imageRequestEstimate(activeImageModel(), 'rough', true)
-        : 12) + estimatedBackgroundRemovalCostCents()
-    : 1;
+  canUseLiveOpenAi() ? imageRequestEstimate(activeImageModel(), 'rough', true) : 1;
 
 export function evaluatePolicy(prompt: string): DesignDraft['policy'] {
   const lowered = prompt.toLowerCase();
@@ -411,6 +398,7 @@ export async function createDesignDraft(
           qualityTier,
         });
   } catch (error) {
+    const requestNotSent = error instanceof ImageRequestNotSentError;
     const failedReadiness: DesignDraft['readiness'] = {
       status: 'blocked',
       checks: [
@@ -453,12 +441,14 @@ export async function createDesignDraft(
         failedAssetId = failedAsset.id;
       } catch {
         if (liveOpenAi) {
-          if (authorization.allowed && authorization.event) {
+          if (requestNotSent && authorization.allowed && authorization.event) {
             await releaseLiveDesignSpend(authorization);
           }
           logOperationalEvent('error', 'openai_generation_failed', {
             ...failureContext,
-            outcome: 'allowance_released_persistence_failed',
+            outcome: requestNotSent
+              ? 'allowance_released_persistence_failed'
+              : 'reservation_retained_persistence_failed',
           });
           throw new HttpError(
             'Live artwork generation failed and its failure record could not be stored safely.',
@@ -470,13 +460,13 @@ export async function createDesignDraft(
       }
     }
     const allowance =
-      liveOpenAi && authorization.allowed && authorization.event
+      liveOpenAi && requestNotSent && authorization.allowed && authorization.event
         ? await releaseLiveDesignSpend(authorization, { designAssetId: failedAssetId })
         : authorization.allowance;
     if (liveOpenAi) {
       logOperationalEvent('error', 'openai_generation_failed', {
         ...failureContext,
-        outcome: 'allowance_released',
+        outcome: requestNotSent ? 'allowance_released' : 'reservation_retained',
       });
     }
     return saveDraft({
@@ -498,6 +488,7 @@ export async function createDesignDraft(
       createdAt: runtimeNow(),
     });
   }
+  if (liveOpenAi) await reconcileImageUsage(authorization, generated.usage);
   const printPreparation =
     generated.provider === 'mock'
       ? {

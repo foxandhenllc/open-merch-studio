@@ -642,6 +642,8 @@ export async function releaseLiveDesignSpend(
         )::text AS locked
       `;
 
+      if (await tx.auditLog.findUnique({ where: { id: `${event.id}:image-usage` } }))
+        throw new Error('Recorded image usage cannot be released as an unstarted request.');
       const existingRelease = await tx.aiSpendEvent.findUnique({
         where: { id: releaseEventId },
       });
@@ -802,4 +804,10 @@ export function buildAdminReport(): AdminReport {
     ),
     launchReadiness: buildLaunchReadiness(),
   };
+}
+
+/** Mirror an already committed provider usage correction in the local operator report. */
+export function applyReconciledRuntimeSpend(eventId: string, estimatedCostCents: number) {
+  const event = state.ledger.find((event) => event.id === eventId);
+  if (event) event.estimatedCostCents = estimatedCostCents;
 }

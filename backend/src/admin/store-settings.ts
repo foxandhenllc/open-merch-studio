@@ -3,7 +3,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware.js';
-import { imageModels, type ImageModelId } from './image-models.js';
+import {
+  imageModels,
+  imageModelCapabilities,
+  upgradeLegacyImageModel,
+  type ImageModelId,
+} from './image-models.js';
 
 export type StoreSettings = {
   imageModel: string;
@@ -21,14 +26,25 @@ const requestSettings = new AsyncLocalStorage<StoreSettings>();
 let fixtureSnapshot: SettingsSnapshot | undefined;
 
 const defaults = (): StoreSettings => ({
-  imageModel: env.openaiDesignModel,
+  imageModel: upgradeLegacyImageModel(env.openaiDesignModel),
   dailyAiBudgetCents: env.dailyAiBudgetCents,
   perSessionBudgetCents: env.perSessionBudgetCents,
   freeDraftLimit: env.studioPassEnabled ? env.freeDraftLimit : Math.max(env.freeDraftLimit, 3),
 });
 
 export const currentStoreSettings = () => requestSettings.getStore();
-export const activeImageModel = () => currentStoreSettings()?.imageModel ?? env.openaiDesignModel;
+export const activeImageModel = () => {
+  const model = upgradeLegacyImageModel(
+    currentStoreSettings()?.imageModel ?? env.openaiDesignModel
+  );
+  if (!imageModelCapabilities(model))
+    throw new HttpError(
+      'Choose Flare or Sunburst in Store admin before generating artwork.',
+      400,
+      'invalid_image_model'
+    );
+  return model;
+};
 export const withStoreSettings = <T>(values: StoreSettings, operation: () => T): T =>
   requestSettings.run(values, operation);
 
@@ -96,11 +112,45 @@ export async function readStoreSettings(): Promise<SettingsSnapshot> {
     );
   }
   try {
-    const row = await prisma.adminSetting.findUnique({ where: { key: storeSettingsKey } });
-    return {
-      ...(row ? parseSaved(row.value) : { values: defaults(), revision: 0 }),
-      storage: 'database',
-    };
+    return await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storeSettingsKey}))`;
+        const row = await tx.adminSetting.findUnique({ where: { key: storeSettingsKey } });
+        const raw = row?.value as
+          | { values?: { imageModel?: unknown }; revision?: unknown }
+          | undefined;
+        const oldModel = raw?.values?.imageModel;
+        if (typeof oldModel === 'string' && upgradeLegacyImageModel(oldModel) !== oldModel) {
+          const migrated = parseSaved({
+            ...raw,
+            values: { ...raw!.values, imageModel: upgradeLegacyImageModel(oldModel) },
+          });
+          migrated.revision += 1;
+          await tx.adminSetting.update({
+            where: { key: storeSettingsKey },
+            data: { value: migrated, updatedBy: 'image-model-upgrade' },
+          });
+          await tx.auditLog.create({
+            data: {
+              actor: 'image-model-upgrade',
+              action: 'legacy_image_model_migrated',
+              target: storeSettingsKey,
+              metadata: {
+                from: oldModel,
+                to: migrated.values.imageModel,
+                revision: migrated.revision,
+              },
+            },
+          });
+          return { ...migrated, storage: 'database' as const };
+        }
+        return {
+          ...(row ? parseSaved(row.value) : { values: defaults(), revision: 0 }),
+          storage: 'database' as const,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
   } catch {
     return unavailable();
   }
@@ -148,6 +198,7 @@ export async function saveStoreSettings(
   try {
     return await prisma.$transaction(
       async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${storeSettingsKey}))`;
         const row = await tx.adminSetting.findUnique({ where: { key: storeSettingsKey } });
         const before: SettingsSnapshot = {
           ...(row ? parseSaved(row.value) : { values: defaults(), revision: 0 }),

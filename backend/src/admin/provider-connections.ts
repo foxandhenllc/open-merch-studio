@@ -72,13 +72,6 @@ export const providerConnections: ConnectionDefinition[] = [
     ],
   },
   {
-    id: 'remove-bg',
-    name: 'remove.bg',
-    purpose: 'Remove backgrounds from uploads and older-model artwork.',
-    accountUrl: 'https://www.remove.bg/dashboard',
-    fields: [{ key: 'REMOVE_BG_API_KEY', label: 'API key', secret: true }],
-  },
-  {
     id: 'email',
     name: 'Resend',
     purpose: 'Customer receipts and shipment messages after sender verification.',
@@ -122,7 +115,6 @@ function configuredValue(key: string): unknown {
     SUPABASE_SERVICE_ROLE_KEY: env.supabaseServiceRoleKey,
     SUPABASE_STORAGE_BUCKET: env.supabaseStorageBucket,
     SUPABASE_UPLOAD_BUCKET: env.supabaseUploadBucket,
-    REMOVE_BG_API_KEY: env.removeBgApiKey,
     RESEND_API_KEY: env.resendApiKey,
     RESEND_WEBHOOK_SECRET: env.resendWebhookSecret,
     EMAIL_FROM: env.emailFrom,

@@ -386,7 +386,8 @@ export function StoreAdminPage() {
                 <p className="admin-fine">
                   No redeploy needed. Selection does not make a paid test request or verify access
                   to the model. Image 2.5 budget reservations are $0.50 per draft/revision and $1.00
-                  per final, pending calibration; these are estimates, not provider prices.
+                  per final. Verified response usage updates the counted estimate; missing usage
+                  keeps the reservation. These are estimates, not a provider billing cap.
                 </p>
               </section>
               {settings && (

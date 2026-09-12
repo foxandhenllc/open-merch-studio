@@ -59,6 +59,7 @@ function createReservationDb(options: { pass?: StoredPass } = {}) {
     async $transaction<T>(callback: (tx: unknown) => Promise<T>): Promise<T> {
       let release: (() => void) | undefined;
       const tx = {
+        auditLog: { findUnique: async () => null },
         async $queryRaw(query: TemplateStringsArray) {
           assert.match(
             query.join(''),
@@ -310,7 +311,7 @@ test('a durable reservation consumes one revision allowance and one spend event'
   }
 });
 
-test('a failed provider request restores allowance and offsets spend exactly once', async () => {
+test('an unstarted provider request restores allowance and offsets spend exactly once', async () => {
   const before = getRuntimeSettings();
   try {
     updateRuntimeSettings({ dailyAiBudgetCents: 1000, perSessionBudgetCents: 1000 });

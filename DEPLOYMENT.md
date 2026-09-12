@@ -13,7 +13,6 @@ Open Merch Studio can be deployed as a split frontend/backend app or as separate
 - Printful bearer value and store ID for live catalog sync, draft-order creation, and fulfillment review
 - Printful v2 webhook public and secret keys for signed shipment and delivery updates
 - OpenAI key for guarded provider-backed design generation
-- remove.bg key for converting `gpt-image-2` output into transparent print-ready PNGs
 - Stripe key and webhook signing value for Checkout Sessions and webhook reconciliation
 - Resend API key plus a verified sender and Reply-To for optional OMS transactional email
 
@@ -64,11 +63,13 @@ enabled after sender verification, exactly-once fixture coverage, and an externa
 test. Scheduled shipment reconciliation is not yet part of the launch contract. See
 [the current post-payment experience](./docs/architecture/current-post-payment-experience.md).
 
-New installations default to `gpt-image-2.5-flare`; both Image 2.5 options support transparent
-output without a remove.bg connection. An existing `OPENAI_DESIGN_MODEL` value or saved admin
-selection still takes precedence. The legacy Image 2 adapter remains for existing installations
-during migration; it uses separate background removal. The V1 target supports only the two Image
-2.5 models. See the [V1 release contract](./docs/launch/v1-release-contract.md) for the migration gate.
+New installations default to `gpt-image-2.5-flare`. Flare and Sunburst are the supported
+image models. Existing Image 2 environment values resolve to Flare, and saved Image 2 settings
+are upgraded durably with an audit and a new settings revision. Existing artwork is retained.
+The remove.bg connection and calls are retired; old removal requests receive an explicit error.
+Remove obsolete `REMOVE_BG_*` values from your deployment when convenient. Review your merchant's
+processor disclosures before republishing policies; this upgrade does not silently rewrite signed-off
+merchant policy content. See the [image model upgrade contract](./docs/architecture/image-model-upgrade.md).
 
 Owners can choose GPT Image 2.5 Sunburst or Flare in `/admin` without a source edit or
 redeploy. The initial default remains `OPENAI_DESIGN_MODEL` until an owner saves a model.

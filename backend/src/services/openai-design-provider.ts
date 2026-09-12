@@ -1,12 +1,20 @@
+import { imageUsageReceipt, type ImageUsageReceipt } from './image-usage.js';
 import OpenAI, { toFile } from 'openai';
 import { env } from '../config/env.js';
 import { activeImageModel } from '../admin/store-settings.js';
 import { imageModelCapabilities, imageRequestEstimate } from '../admin/image-models.js';
 
+export class ImageRequestNotSentError extends Error {
+  constructor() {
+    super('Image generation was not started.');
+  }
+}
+
 export type GeneratedDesignImage = {
   provider: 'mock' | 'openai';
   imageUrl: string;
   revisedPrompt?: string;
+  usage?: ImageUsageReceipt;
   estimatedCostCents: number;
 };
 
@@ -42,12 +50,12 @@ export function canUseLiveOpenAi(): boolean {
 }
 
 export function supportsTransparentBackground(model: string): boolean {
-  return imageModelCapabilities(model)?.transparent ?? /^gpt-image-1(?:[.-]|$)/.test(model);
+  return imageModelCapabilities(model)?.transparent ?? false;
 }
 
 export function supportsInputFidelity(model: string): boolean {
   // Omit optional fidelity for 2.x; never infer API support from an unknown model name.
-  return imageModelCapabilities(model)?.inputFidelity ?? /^gpt-image-1(?:\.5)?(?:-|$)/.test(model);
+  return imageModelCapabilities(model)?.inputFidelity ?? false;
 }
 
 function detectTextIntent(prompt: string): boolean {
@@ -96,6 +104,8 @@ async function assertPromptAllowed(client: OpenAI, prompt: string): Promise<void
     input: prompt,
   });
   const result = moderation.results?.[0];
+  if (!result || typeof result.flagged !== 'boolean')
+    throw new Error('Moderation did not return a decision.');
   if (result?.flagged) {
     const categories = Object.entries(result.categories ?? {})
       .filter(([, value]) => value)
@@ -122,7 +132,11 @@ export async function generateDesignImage(params: {
   });
   const quality = params.qualityTier === 'final' ? 'high' : 'low';
   const finalPrompt = buildPrintReadyPrompt(params.prompt, activeImageModel());
-  await assertPromptAllowed(client, finalPrompt);
+  try {
+    await assertPromptAllowed(client, finalPrompt);
+  } catch {
+    throw new ImageRequestNotSentError();
+  }
   const response = await client.images.generate({
     model: activeImageModel(),
     prompt: finalPrompt,
@@ -144,6 +158,7 @@ export async function generateDesignImage(params: {
 
   return {
     provider: 'openai',
+    usage: imageUsageReceipt(activeImageModel(), response.usage) ?? undefined,
     imageUrl,
     revisedPrompt: image?.revised_prompt ?? finalPrompt,
     estimatedCostCents: imageRequestEstimate(activeImageModel(), params.qualityTier),
@@ -187,7 +202,11 @@ export async function editDesignImage(params: {
       : 'Use a centered, isolated subject, strong silhouette, readable shapes, and a plain background that can be removed cleanly.',
     'Do not add unrequested words, signatures, watermarks, brands, celebrities, or protected characters.',
   ].join(' ');
-  await assertPromptAllowed(client, finalPrompt);
+  try {
+    await assertPromptAllowed(client, finalPrompt);
+  } catch {
+    throw new ImageRequestNotSentError();
+  }
   const uploads = await Promise.all(
     params.images.map((image) => toFile(image.buffer, image.filename, { type: image.contentType }))
   );
@@ -210,6 +229,7 @@ export async function editDesignImage(params: {
   if (!imageUrl) throw new Error('OpenAI image editing did not return an image.');
   return {
     provider: 'openai',
+    usage: imageUsageReceipt(activeImageModel(), response.usage) ?? undefined,
     imageUrl,
     estimatedCostCents: imageRequestEstimate(activeImageModel(), params.qualityTier, true),
   };
