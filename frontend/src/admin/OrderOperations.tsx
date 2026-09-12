@@ -135,7 +135,8 @@ export function OrderOperations({
     (order) =>
       filter === 'all' ||
       (order.reviewStatus !== 'resolved' &&
-        ['failed', 'needs_review', 'paid'].includes(order.status))
+        (['failed', 'needs_review', 'paid'].includes(order.status) ||
+          ['failed', 'needs_review'].includes(order.fulfillmentStatus)))
   );
   return (
     <section className="order-operations" aria-label="Order operations">

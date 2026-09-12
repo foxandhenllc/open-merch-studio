@@ -70,6 +70,7 @@ export async function verifyOrderOperations({ page, viewport, output }) {
     })
     .waitFor();
   await verifyPreparationRetention(page, panel);
+  await verifyRefundReviewFilter(page, panel, detail.summary);
   const sizes = await page.evaluate(() => [
     document.documentElement.clientWidth,
     document.documentElement.scrollWidth,
@@ -162,5 +163,58 @@ async function verifyPreparationRetention(page, panel) {
     .click();
   await maintenance
     .getByText('Fixture mode has no durable storage to clean.', { exact: false })
+    .waitFor();
+}
+
+async function verifyRefundReviewFilter(page, panel, summary) {
+  const orders = [
+    {
+      ...summary,
+      id: 'refund-review-fixture',
+      orderNumber: 'OMS-REFUND-REVIEW',
+      status: 'refunded',
+      fulfillmentStatus: 'needs_review',
+      reviewStatus: 'unreviewed',
+    },
+    {
+      ...summary,
+      id: 'refund-resolved-fixture',
+      orderNumber: 'OMS-REFUND-RESOLVED',
+      status: 'refunded',
+      fulfillmentStatus: 'needs_review',
+      reviewStatus: 'resolved',
+    },
+    {
+      ...summary,
+      id: 'delivery-fixture',
+      orderNumber: 'OMS-DELIVERED',
+      status: 'delivered',
+      fulfillmentStatus: 'submitted',
+      reviewStatus: 'unreviewed',
+    },
+  ];
+  await page.route('**/api/admin/order-operations', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: orders }),
+    })
+  );
+  try {
+    await panel.getByRole('button', { name: 'Refresh orders', exact: true }).click();
+    await panel
+      .getByRole('button', { name: 'Review order OMS-REFUND-REVIEW', exact: true })
+      .waitFor();
+    await panel.getByRole('combobox', { name: /Show orders/ }).selectOption('attention');
+    assert.equal(await panel.getByRole('button', { name: /^Review order / }).count(), 1);
+    await panel
+      .getByRole('button', { name: 'Review order OMS-REFUND-REVIEW', exact: true })
+      .waitFor();
+  } finally {
+    await page.unroute('**/api/admin/order-operations');
+  }
+  await panel.getByRole('combobox', { name: /Show orders/ }).selectOption('all');
+  await panel.getByRole('button', { name: 'Refresh orders', exact: true }).click();
+  await panel
+    .getByRole('button', { name: `Review order ${summary.orderNumber}`, exact: true })
     .waitFor();
 }
